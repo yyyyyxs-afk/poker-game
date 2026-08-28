@@ -261,6 +261,31 @@ let lastTurnKey = '';
 let lastResultKey = '';
 let prevPot = null;
 let prevCurrentBet = null;
+let turnCountdownTimer = null;
+
+/** 思考倒计时（显示用途）：按房间行动时长从本轮开始递减，剩 10 秒转红 */
+function startTurnTimer() {
+  stopTurnTimer();
+  const el = document.getElementById('turn-timer');
+  const total = cfg().actionTime || 45;
+  let left = total;
+  const render = () => {
+    const pct = Math.max(0, Math.min(100, (left / total) * 100));
+    el.innerHTML = `思考时间 <span class="bar"><i style="width:${pct}%"></i></span> <b>${Math.max(0, left)}s</b>`;
+    el.classList.toggle('urgent', left <= 10);
+  };
+  render();
+  turnCountdownTimer = setInterval(() => {
+    left--;
+    if (left <= 0) { stopTurnTimer(); return; }
+    render();
+  }, 1000);
+}
+function stopTurnTimer() {
+  if (turnCountdownTimer) { clearInterval(turnCountdownTimer); turnCountdownTimer = null; }
+  const el = document.getElementById('turn-timer');
+  if (el) { el.classList.add('hidden'); el.classList.remove('urgent'); }
+}
 
 function renderTableInfo() {
   const stageText = {
@@ -349,19 +374,27 @@ function renderSeats() {
 
     div.innerHTML = `
       <div class="avatar">${p.avatar}${badges.length ? `<span class="badges">${badges.join('')}</span>` : ''}</div>
-      <div class="pname">${p.name}${p.connected ? '' : '<br><span class="offline-mark">离线</span>'}${p.sittingOut ? '<br><span class="sitting-mark">暂离</span>' : ''}</div>
-      <div class="pchips">${p.chips}</div>
-      ${p.totalBet > 0 && state.stage !== 'waiting' ? `<div class="ptotal">本局已投 ${p.totalBet}</div>` : ''}
+      <div class="plate">
+        <div class="pname">${p.name}${p.connected ? '' : '<br><span class="offline-mark">离线</span>'}${p.sittingOut ? '<br><span class="sitting-mark">暂离</span>' : ''}</div>
+        <div class="pchips">${p.chips}</div>
+        ${p.totalBet > 0 && state.stage !== 'waiting' ? `<div class="ptotal">本局已投 ${p.totalBet}</div>` : ''}
+      </div>
       <div class="hole-cards"></div>
-      ${p.roundBet > 0 ? `<div class="bet-chip">下注 ${p.roundBet}</div>` : ''}
+      ${p.roundBet > 0 ? `<div class="bet-chip">${p.roundBet}</div>` : ''}
       ${p.sittingOut ? `<button class="sit-back-btn" data-seat="${p.seat}">坐回</button>` : ''}
     `;
 
-    // 手牌：自己的只在底部"我的区域"展示；对手不渲染背面牌（避免遮挡公共牌，
-    // 也更简约），摊牌后服务端会公开真实手牌，届时自然亮出
+    // 手牌：自己的只在底部"我的区域"展示；对手未摊牌时显示牌背（营造对局感），
+    // 摊牌后服务端会公开真实手牌，届时自然亮出
     const holeDiv = div.querySelector('.hole-cards');
     if (p.seat !== mySeat && p.hole && p.hole.length) {
       p.hole.forEach((c) => holeDiv.appendChild(cardEl(c, false)));
+    } else if (p.seat !== mySeat && !p.hole && p.holeCount === 2 && !p.folded && state.stage !== 'waiting') {
+      for (let k = 0; k < 2; k++) {
+        const back = document.createElement('div');
+        back.className = 'card back';
+        holeDiv.appendChild(back);
+      }
     }
     div.style.left = pos.x + '%';
     div.style.top = pos.y + '%';
@@ -437,6 +470,7 @@ function renderMyArea() {
   const myCards = document.getElementById('my-cards');
   const bar = document.getElementById('action-bar');
   const tip = document.getElementById('waiting-tip');
+  const timerEl = document.getElementById('turn-timer');
 
   if (me && me.hole && me.hole.length && state.stage !== 'waiting') {
     myCards.classList.remove('hidden');
@@ -473,16 +507,19 @@ function renderMyArea() {
     tip.textContent = '';
     resetFoldBtn(); // 新一轮行动开始时复位弃牌确认态
     updateActionBar(me);
-    // 轮到自己：提示音 + 振动（每次行动只触发一次）
+    // 轮到自己：提示音 + 振动 + 思考倒计时（每次行动只触发一次）
     const turnKey = `${state.handNumber}_${state.stage}_${state.turnSeat}`;
     if (lastTurnKey !== turnKey) {
       lastTurnKey = turnKey;
       sfx.turn();
       if (navigator.vibrate) navigator.vibrate(120);
+      startTurnTimer();
     }
+    timerEl.classList.remove('hidden');
   } else {
     bar.classList.add('hidden');
     hideRaisePanel();
+    stopTurnTimer();
     if (inHandActive) tip.textContent = '等待其他玩家行动…';
     else if (me && (me.folded || me.allIn) && state.stage !== 'handover') {
       tip.textContent = me.folded ? '你已弃牌，观战中' : '你已全押，等待摊牌';

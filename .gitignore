@@ -9,3 +9,5 @@ tools/
 data/
 *.log
 .DS_Store
+tmp-*.js
+share-url.txt
