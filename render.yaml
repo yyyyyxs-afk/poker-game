@@ -1,0 +1,10 @@
+# Render.com 部署清单（Blueprint）
+# 在 Render 控制台选择 "New +" → "Blueprint" 并连接本仓库即可自动按此配置创建服务
+services:
+  - type: web
+    name: poker-game          # 服务名，决定固定链接：<服务名>.onrender.com
+    runtime: node
+    plan: free                # 免费档：闲置 15 分钟后休眠，再次访问约 30-60 秒唤醒
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /        # 根路径即首页，用于健康检查
