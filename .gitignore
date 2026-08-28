@@ -1,0 +1,11 @@
+# 依赖
+node_modules/
+
+# 大体积二进制（cloudflared 隧道工具 54MB，请另行下载：
+# https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/）
+tools/
+
+# 本地运行产物
+data/
+*.log
+.DS_Store

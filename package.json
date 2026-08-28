@@ -1,0 +1,18 @@
+{
+  "name": "poker-game",
+  "version": "1.0.0",
+  "description": "多人在线德州扑克（Node.js + Socket.IO）",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/rules.test.js && node test/smoke.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3"
+  }
+}

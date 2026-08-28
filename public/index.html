@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>德州扑克 · 好友局</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- 大厅 -->
+  <div id="lobby" class="screen">
+    <div class="lobby-card">
+      <h1>德州扑克</h1>
+      <p class="subtitle">无限注 · 盲注 10/20 · 起始筹码 2000 · 2-6 人</p>
+      <label>你的昵称
+        <input id="nickname" type="text" maxlength="8" placeholder="昵称（每人不同）" />
+      </label>
+      <button id="btn-create" class="btn btn-primary">创建房间</button>
+      <div class="divider">或加入好友房间</div>
+      <div class="join-row">
+        <input id="room-code" type="text" maxlength="6" placeholder="6 位邀请码"
+               autocapitalize="characters" autocomplete="off" spellcheck="false" />
+        <button id="btn-join" class="btn btn-secondary">加入</button>
+      </div>
+      <div id="lobby-error" class="error"></div>
+    </div>
+  </div>
+
+  <!-- 牌桌 -->
+  <div id="game" class="screen hidden">
+    <header id="topbar">
+      <span class="room-badge">房号 <b id="room-code-display"></b><button id="btn-copy-code" title="复制房号">复制</button><button id="btn-copy-link" title="复制邀请链接">复制链接</button></span>
+      <span class="blinds" id="blinds-info">盲注 10/20</span>
+      <span id="hand-info"></span>
+      <button id="btn-settings" class="chip-btn hidden">房管设置</button>
+      <button id="btn-sound" class="chip-btn"></button>
+      <button id="btn-leave" class="btn btn-secondary btn-small">退出房间</button>
+    </header>
+
+    <main id="table-wrap">
+      <div id="table">
+        <div id="table-inner">
+          <div id="pot-display">底池 <b id="pot-value">0</b></div>
+          <div id="community"></div>
+          <div id="stage-label"></div>
+        </div>
+        <!-- 玩家座位由 JS 渲染 -->
+        <div id="seats"></div>
+      </div>
+
+      <aside id="log-panel">
+        <h3>牌局动态</h3>
+        <ul id="log-list"></ul>
+      </aside>
+    </main>
+
+    <!-- 我的区域 + 操作栏 -->
+    <footer id="my-area">
+      <div id="my-cards" class="hidden"></div>
+      <div id="action-bar" class="hidden">
+        <div id="raise-panel" class="hidden">
+          <button class="btn preset" data-preset="third">1/3池</button>
+          <button class="btn preset" data-preset="half">1/2池</button>
+          <button class="btn preset" data-preset="twothird">2/3池</button>
+          <button class="btn preset" data-preset="pot">满池</button>
+          <input id="raise-slider" type="range" min="0" max="0" step="10" value="0" />
+          <input id="raise-input" type="number" step="10" />
+        </div>
+        <div id="action-buttons">
+          <button id="btn-fold" class="btn btn-danger">弃牌</button>
+          <button id="btn-check-call" class="btn btn-secondary">过牌</button>
+          <button id="btn-toggle-raise" class="btn btn-primary">加注</button>
+          <button id="btn-allin" class="btn btn-warning">全押</button>
+        </div>
+      </div>
+      <div id="emoji-bar" class="hidden"></div>
+      <div class="footer-buttons">
+        <button id="btn-start" class="btn btn-primary hidden">开始游戏</button>
+        <button id="btn-rebuy" class="btn btn-warning hidden">重新买入（补充 2000 筹码）</button>
+        <button id="btn-sit-out" class="btn btn-secondary hidden">暂离（不参与下局）</button>
+        <button id="btn-sit-back" class="btn btn-primary hidden">坐回</button>
+      </div>
+      <div id="waiting-tip"></div>
+    </footer>
+
+    <!-- 房管设置弹窗 -->
+    <div id="settings-overlay" class="overlay hidden">
+      <div id="settings-card">
+        <h2>房管设置</h2>
+        <label>每人起始筹码
+          <input id="set-start-chips" type="number" min="100" max="1000000" step="100" />
+        </label>
+        <div class="settings-row">
+          <label>小盲注
+            <input id="set-sb" type="number" min="1" step="5" />
+          </label>
+          <label>大盲注
+            <input id="set-bb" type="number" min="1" step="5" />
+          </label>
+        </div>
+        <div class="settings-row">
+          <label>行动时长
+            <select id="set-action-time">
+              <option value="20">20 秒</option>
+              <option value="30">30 秒</option>
+              <option value="45" selected>45 秒</option>
+              <option value="60">60 秒</option>
+            </select>
+          </label>
+          <label>局间倒计时
+            <select id="set-next-hand">
+              <option value="5">5 秒</option>
+              <option value="10">10 秒</option>
+              <option value="20" selected>20 秒</option>
+            </select>
+          </label>
+        </div>
+        <label>允许重买
+          <select id="set-rebuy">
+            <option value="true" selected>允许（重买 = 起始筹码）</option>
+            <option value="false">禁止（输光即出局）</option>
+          </select>
+        </label>
+        <p class="settings-tip">仅开局前可修改；还没开过局时，已入座玩家会按新筹码重置。</p>
+        <div id="settings-error" class="error"></div>
+        <div class="settings-actions">
+          <button id="btn-settings-close" class="btn btn-secondary btn-small">取消</button>
+          <button id="btn-settings-save" class="btn btn-primary btn-small">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 结果弹窗 -->
+    <div id="result-overlay" class="overlay hidden">
+      <div id="result-card">
+        <h2 id="result-title"></h2>
+        <div id="result-pots"></div>
+        <div id="session-box" class="hidden">
+          <h3>本场战绩</h3>
+          <table id="session-table">
+            <thead>
+              <tr><th>玩家</th><th>买入</th><th>筹码</th><th>盈亏</th><th>手数</th><th>胜场</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="next-tip"></div>
+        <button id="btn-next-hand" class="btn btn-primary hidden">立即开始下一局</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 断线提示遮罩 -->
+  <div id="conn-overlay" class="overlay hidden">
+    <div class="conn-card">连接断开，正在重连…<br><span>恢复后会自动回到牌局</span></div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="client.js"></script>
+</body>
+</html>

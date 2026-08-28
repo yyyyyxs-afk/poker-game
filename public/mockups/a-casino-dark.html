@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>方案 A · 暗夜赌场风</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #14181f;
+  --bg-2: #1b212b;
+  --glass: rgba(24, 30, 40, .82);
+  --line: rgba(255, 255, 255, .08);
+  --gold: #d4af37;
+  --gold-soft: #e8cf7a;
+  --text: #e8e6e0;
+  --muted: #9aa3b2;
+  --felt-1: #1d5c46;
+  --felt-2: #123c2d;
+  --red: #e05a6e;
+  --blue: #4d8df5;
+  --num: Georgia, "Times New Roman", serif;
+}
+body {
+  font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+  background:
+    radial-gradient(1100px 500px at 50% -10%, #232c3a 0%, transparent 60%),
+    radial-gradient(900px 700px at 85% 110%, #10141b 0%, transparent 55%),
+    var(--bg);
+  color: var(--text);
+  height: 100vh; overflow: hidden;
+  display: flex; flex-direction: column;
+}
+
+/* ── 顶栏 ── */
+#topbar {
+  display: flex; align-items: center; gap: 16px;
+  padding: 12px 22px;
+  background: rgba(20, 24, 31, .9);
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.room { display: flex; align-items: baseline; gap: 10px; }
+.room .label { color: var(--muted); }
+.room b { font-family: var(--num); font-size: 19px; letter-spacing: 4px; color: var(--gold); }
+.pill {
+  border: 1px solid var(--line); background: rgba(255,255,255,.04);
+  color: var(--muted); border-radius: 999px; font-size: 12px; padding: 4px 12px;
+}
+#hand-info { margin-left: auto; color: var(--muted); }
+#hand-info b { color: var(--gold-soft); font-weight: 600; }
+
+/* ── 主区 ── */
+#stage { flex: 1; display: flex; gap: 16px; padding: 18px 22px; min-height: 0; }
+#table-zone { flex: 1; position: relative; min-width: 0; }
+
+/* ── 牌桌：金色包边 + 墨绿呢面 ── */
+#table {
+  position: absolute; inset: 6% 4%;
+  border-radius: 999px;
+  background:
+    radial-gradient(120% 130% at 50% 0%, var(--felt-1) 0%, var(--felt-2) 70%),
+    var(--felt-2);
+  border: 10px solid transparent;
+  background-clip: padding-box;
+  box-shadow:
+    0 0 0 2px #6d5a1e,
+    0 0 0 10px #2a2410,
+    0 0 0 11px #4a3d15,
+    0 24px 70px rgba(0, 0, 0, .6),
+    inset 0 0 60px rgba(0, 0, 0, .45);
+}
+#table::after { /* 呢面纹理光晕 */
+  content: ""; position: absolute; inset: 0; border-radius: 999px;
+  background: radial-gradient(90% 90% at 50% 30%, rgba(255,255,255,.05), transparent 60%);
+  pointer-events: none;
+}
+/* 桌面印字 */
+#brand {
+  position: absolute; left: 50%; bottom: 12%; transform: translateX(-50%);
+  color: rgba(212, 175, 55, .28); font-size: 13px; letter-spacing: 6px; font-weight: 600;
+}
+
+/* ── 桌心 ── */
+#center {
+  position: absolute; left: 50%; top: 44%; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; gap: 16px; z-index: 3;
+}
+#pot {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(10, 14, 12, .55); border: 1px solid rgba(212, 175, 55, .35);
+  padding: 8px 24px; border-radius: 999px;
+}
+#pot .coins { display: flex; }
+#pot .coin {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #f4dd8a, #c9a227 70%);
+  border: 2px solid #8a6d1f; margin-left: -7px;
+  box-shadow: 0 2px 4px rgba(0,0,0,.5);
+}
+#pot .coin:first-child { margin-left: 0; }
+#pot .label { font-size: 12px; color: var(--muted); }
+#pot .amt { font-family: var(--num); font-size: 24px; color: var(--gold-soft); font-weight: 700; letter-spacing: 1px; }
+#community { display: flex; gap: 10px; }
+
+/* ── 扑克牌（真实角标版式）── */
+.card {
+  position: relative; width: 62px; height: 88px;
+  background: linear-gradient(150deg, #fdfdfb, #f0eee6);
+  border-radius: 8px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .45), 0 1px 0 rgba(255,255,255,.6) inset;
+  color: #1f2430; flex: none;
+}
+.card.red { color: #c93a47; }
+.card .idx {
+  position: absolute; top: 5px; left: 6px; text-align: center; line-height: 1;
+  font-family: var(--num); font-weight: 700;
+}
+.card .idx b { display: block; font-size: 17px; }
+.card .idx span { display: block; font-size: 12px; margin-top: 1px; }
+.card .idx.flip { top: auto; left: auto; bottom: 5px; right: 6px; transform: rotate(180deg); }
+.card .pip { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 30px; }
+.card.back {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(212,175,55,.5) 0 14%, transparent 15%),
+    repeating-linear-gradient(45deg, #232c3a 0 5px, #1b222d 5px 10px);
+  border: 3px solid #e8e6e0; box-shadow: 0 6px 16px rgba(0,0,0,.5);
+}
+.card.back .idx, .card.back .pip { display: none; }
+
+/* ── 座位 ── */
+.seat { position: absolute; transform: translate(-50%, -50%); text-align: center; width: 150px; z-index: 4; }
+.seat.me { bottom: -4%; }
+.ring {
+  position: relative; width: 58px; height: 58px; margin: 0 auto; border-radius: 50%;
+  background: #262e3b; border: 2px solid rgba(255,255,255,.15);
+  display: flex; align-items: center; justify-content: center; font-size: 30px;
+  box-shadow: 0 6px 18px rgba(0,0,0,.5);
+}
+.seat.active .ring {
+  border-color: transparent;
+  background:
+    linear-gradient(#262e3b, #262e3b) padding-box,
+    conic-gradient(var(--gold) 320deg, rgba(255,255,255,.12) 0) border-box;
+  border: 3px solid transparent;
+  animation: breathe 1.2s ease-in-out infinite alternate;
+}
+@keyframes breathe {
+  from { box-shadow: 0 0 0 3px rgba(212,175,55,.15), 0 6px 18px rgba(0,0,0,.5); }
+  to { box-shadow: 0 0 0 8px rgba(212,175,55,.28), 0 6px 18px rgba(0,0,0,.5); }
+}
+.pname { margin-top: 6px; font-size: 13px; font-weight: 600; }
+.pchips { font-family: var(--num); font-size: 14px; color: var(--gold-soft); font-weight: 700; }
+.ptotal { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.dbadge {
+  position: absolute; right: 22px; top: -4px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #f4dd8a, #c9a227 75%);
+  color: #4a3d15; font-size: 12px; font-weight: 800; line-height: 22px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.5);
+}
+.betchip {
+  position: absolute; left: 50%; top: 100%; transform: translate(-50%, -140%);
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(10, 14, 12, .6); border: 1px solid rgba(212,175,55,.4);
+  padding: 3px 12px 3px 4px; border-radius: 999px; white-space: nowrap;
+}
+.betchip .c {
+  width: 16px; height: 16px; border-radius: 50%; flex: none;
+  background: radial-gradient(circle at 35% 30%, #e05a6e, #a92c40 75%);
+  border: 2px dashed rgba(255,255,255,.75);
+}
+.betchip b { font-family: var(--num); font-size: 13px; color: #f2c94c; }
+.seat.me .betchip { display: none; }
+.cards-hold { display: flex; gap: 5px; justify-content: center; margin-bottom: -20px; position: relative; z-index: 5; }
+.cards-hold .card { width: 40px; height: 57px; }
+.cards-hold .card .idx b { font-size: 12px; } .cards-hold .card .idx span { font-size: 9px; }
+.cards-hold .card .pip { font-size: 20px; }
+.seat.me .cards-hold .card { width: 52px; height: 74px; }
+.seat.me .cards-hold .card .pip { font-size: 26px; }
+.hole-opp { position: absolute; left: 50%; top: -14px; transform: translateX(-50%); display: flex; gap: 3px; }
+.hole-opp .card { width: 26px; height: 37px; border-radius: 5px; border-width: 2px; }
+
+/* ── 日志（暗色玻璃）── */
+#log {
+  width: 240px; border-radius: 16px; padding: 16px;
+  background: var(--glass); border: 1px solid var(--line);
+  font-size: 12.5px; overflow: hidden; display: flex; flex-direction: column;
+}
+#log h3 { font-size: 12px; color: var(--muted); letter-spacing: 2px; margin-bottom: 12px; display: flex; justify-content: space-between; }
+#log h3 span { color: var(--gold); }
+#log ul { list-style: none; }
+#log li { padding: 6px 0; border-bottom: 1px dashed rgba(255,255,255,.07); color: var(--muted); }
+#log li:last-child { color: var(--text); }
+#log li b { color: var(--gold-soft); font-weight: 600; }
+
+/* ── 操作栏 ── */
+#actionbar {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 22px 18px;
+  background: rgba(20, 24, 31, .92);
+  border-top: 1px solid var(--line);
+}
+#my-cards { display: flex; gap: 8px; margin-right: 6px; }
+#my-cards .card { width: 50px; height: 71px; }
+#timer {
+  margin-left: auto; display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px;
+}
+#timer .bar { width: 120px; height: 5px; border-radius: 99px; background: rgba(255,255,255,.08); overflow: hidden; }
+#timer .bar i { display: block; height: 100%; width: 72%; border-radius: 99px; background: linear-gradient(90deg, #d4af37, #f2c94c); }
+.acts { display: flex; gap: 12px; margin-left: auto; }
+.act {
+  border: none; cursor: pointer; color: #fff;
+  padding: 13px 26px; border-radius: 999px;
+  font-size: 15px; font-weight: 700; font-family: inherit;
+  display: flex; align-items: baseline; gap: 8px;
+  transition: transform .08s;
+}
+.act:active { transform: scale(.96); }
+.act small { font-family: var(--num); font-size: 13px; opacity: .85; }
+.a-fold { background: #3a2530; color: #f0a2b0; box-shadow: inset 0 0 0 1px rgba(224,90,110,.45); }
+.a-call { background: #1d3a5c; color: #a8c8f5; box-shadow: inset 0 0 0 1px rgba(77,141,245,.5); }
+.a-raise { background: linear-gradient(135deg, #8a6d1f, #6d5616); color: #f4dd8a; box-shadow: inset 0 0 0 1px rgba(212,175,55,.5); }
+.a-allin { background: linear-gradient(135deg, #a92c40, #7e1e2e); color: #ffd7de; box-shadow: 0 4px 18px rgba(169,44,64,.4); }
+
+/* 角标 */
+.tag {
+  position: fixed; right: 18px; top: 64px; z-index: 9;
+  font-size: 12px; color: var(--gold); letter-spacing: 2px;
+  border: 1px solid rgba(212,175,55,.4); border-radius: 999px; padding: 4px 14px;
+  background: rgba(20,24,31,.8);
+}
+</style>
+</head>
+<body>
+
+<header id="topbar">
+  <div class="room"><span class="label">房号</span><b>7927</b><span class="pill">复制链接</span></div>
+  <span class="pill">盲注 10/20</span>
+  <span id="hand-info">第 <b>3</b> 局 · <b>翻牌</b></span>
+  <span class="pill">♪ 音效</span>
+  <span class="pill">退出房间</span>
+</header>
+
+<main id="stage">
+  <div id="table-zone">
+    <div id="table"><div id="brand">FRIENDLY HOLD'EM</div></div>
+
+    <div id="center">
+      <div id="pot">
+        <span class="coins"><i class="coin"></i><i class="coin"></i><i class="coin"></i></span>
+        <span class="label">底池</span><span class="amt">2,040</span>
+      </div>
+      <div id="community">
+        <div class="card"><span class="idx"><b>A</b><span>♠</span></span><span class="idx flip"><b>A</b><span>♠</span></span><span class="pip">♠</span></div>
+        <div class="card red"><span class="idx"><b>K</b><span>♥</span></span><span class="idx flip"><b>K</b><span>♥</span></span><span class="pip">♥</span></div>
+        <div class="card red"><span class="idx"><b>Q</b><span>♦</span></span><span class="idx flip"><b>Q</b><span>♦</span></span><span class="pip">♦</span></div>
+      </div>
+    </div>
+
+    <div class="seat active" style="left:22%; top:10%;">
+      <div class="hole-opp"><div class="card back"></div><div class="card back"></div></div>
+      <div class="ring">🦊</div>
+      <div class="pname">小爱</div>
+      <div class="pchips">1,970</div>
+      <div class="betchip"><i class="c"></i><b>20</b></div>
+    </div>
+
+    <div class="seat" style="left:78%; top:10%;">
+      <div class="hole-opp"><div class="card back"></div><div class="card back"></div></div>
+      <div class="ring">🐼</div>
+      <div class="pname">小酷</div>
+      <div class="pchips">5,980</div>
+      <div class="dbadge">D</div>
+    </div>
+
+    <div class="seat" style="left:50%; top:1%;">
+      <div class="hole-opp"><div class="card back"></div><div class="card back"></div></div>
+      <div class="ring">🐯</div>
+      <div class="pname">小跳</div>
+      <div class="pchits"></div>
+      <div class="pchips">2,000</div>
+    </div>
+
+    <div class="seat me" style="left:50%; top:96%;">
+      <div class="cards-hold">
+        <div class="card red"><span class="idx"><b>A</b><span>♥</span></span><span class="idx flip"><b>A</b><span>♥</span></span><span class="pip">♥</span></div>
+        <div class="card"><span class="idx"><b>J</b><span>♠</span></span><span class="idx flip"><b>J</b><span>♠</span></span><span class="pip">♠</span></div>
+      </div>
+      <div class="ring">🐯</div>
+      <div class="pname">ZCode（你）</div>
+      <div class="pchips">1,990</div>
+    </div>
+  </div>
+
+  <aside id="log">
+    <h3>牌局动态 <span>收起</span></h3>
+    <ul>
+      <li><b>小酷</b> 加注到 60</li>
+      <li><b>小爱</b> 跟注 60</li>
+      <li>翻牌：♠A ♥K ♦Q</li>
+      <li><b>小跳</b> 过牌</li>
+      <li><b>小酷</b> 下注 120</li>
+      <li>轮到你行动</li>
+    </ul>
+  </aside>
+</main>
+
+<footer id="actionbar">
+  <div id="my-cards">
+    <div class="card red"><span class="idx"><b>A</b><span>♥</span></span><span class="idx flip"><b>A</b><span>♥</span></span><span class="pip">♥</span></div>
+    <div class="card"><span class="idx"><b>J</b><span>♠</span></span><span class="idx flip"><b>J</b><span>♠</span></span><span class="pip">♠</span></div>
+  </div>
+  <div class="acts">
+    <button class="act a-fold">弃牌</button>
+    <button class="act a-call">跟注 <small>120</small></button>
+    <button class="act a-raise">加注 ▾</button>
+    <button class="act a-allin">全押 <small>1,990</small></button>
+  </div>
+  <div id="timer">思考时间 <span class="bar"><i></i></span> 32s</div>
+</footer>
+
+<div class="tag">方案 A · 暗夜赌场风</div>
+</body>
+</html>
