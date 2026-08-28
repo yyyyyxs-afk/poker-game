@@ -537,13 +537,27 @@ body {
   .card .pip { font-size: 20px; }
   .card.mini { width: 26px; height: 38px; }
   #my-cards .card { width: 48px; height: 68px; }
+  /* 窄屏压缩座位堆叠高度，防止下注筹码/铭牌遮挡桌心底池 */
   .seat { width: 108px; }
-  .avatar { width: 46px; height: 46px; font-size: 22px; }
-  .plate { min-width: 84px; padding: 3px 10px 4px; }
-  .dealer-badge { right: 22px; }
+  .avatar { width: 40px; height: 40px; font-size: 20px; border-width: 2px; }
+  .plate { min-width: 72px; padding: 2px 8px 3px; }
+  .pname { font-size: 12px; }
+  .pchips { font-size: 12px; }
+  .ptotal { display: none; }
+  .bet-chip { font-size: 11px; padding: 1px 8px 1px 2px; gap: 4px; margin-top: 2px; }
+  .bet-chip::before { width: 12px; height: 12px; border-width: 1.5px; }
+  .hole-cards { bottom: calc(100% + 8px); }
+  .hole-cards .card { width: 22px; height: 31px; }
+  .dealer-badge { width: 18px; height: 18px; font-size: 10px; line-height: 18px; right: 18px; }
   .btn { padding: 11px 18px; }
   #toast { font-size: 12px; }
   #felt-deco::after { font-size: 10px; letter-spacing: 4px; }
+}
+
+/* 极窄屏：桌心整体下移，给顶部座位堆叠让位，避免压住底池 */
+@media (max-width: 420px) {
+  #table-inner { transform: translateY(10px); }
+  #community { min-height: 48px; gap: 10px; }
 }
 
 /* 手机横屏：压缩顶栏与牌桌高度，保证一屏放下 */

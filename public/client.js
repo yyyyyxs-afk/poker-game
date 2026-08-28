@@ -347,11 +347,14 @@ function seatPosition(index, total, isMe) {
   const rad = (angleDeg * Math.PI) / 180;
   let rx = 46, ry = 42; // 椭圆半轴（百分比）
   if (isMe) { rx = 0; ry = 44; }
-  // 窄屏收紧横向钳制：座位宽 110px 时 86% 会把最右座位推出视口（320px 实测裁切 8px）
+  // 窄屏收紧横向/纵向钳制：座位堆叠在窄屏会往下压到桌心底池，
+  // 顶部座位上移到 8% 给桌心让位；86% 横向也会把最右座位推出视口
+  const narrow = typeof window !== 'undefined' && window.innerWidth <= 900;
   const maxX = (window.innerWidth <= 420 && !isMe) ? 83 : 86;
+  const yMin = narrow ? 8 : 12;
   return {
     x: Math.max(14, Math.min(maxX, 50 + Math.cos(rad) * rx)),
-    y: Math.max(12, Math.min(88, 50 + Math.sin(rad) * ry)),
+    y: Math.max(yMin, Math.min(88, 50 + Math.sin(rad) * ry)),
   };
 }
 
