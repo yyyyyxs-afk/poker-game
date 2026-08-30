@@ -195,8 +195,9 @@ document.getElementById('btn-rebuy').onclick = () => {
   });
 };
 
-// 暂离 / 坐回
+// 暂离 / 坐回（暂离入口在 Header 汉堡菜单内，点击后收起菜单）
 document.getElementById('btn-sit-out').onclick = () => {
+  closeMenu();
   socket.emit('sit_out', null, (res) => {
     if (!res.ok) flashTip(res.err);
   });
@@ -391,17 +392,18 @@ function avatarPng(seat) {
 
 /** 座位围绕椭圆分布，自己固定在底部（Hero Dock），其余席位在桌沿顺时针排布：
  *  1=左下 2=左上 3=顶部 4=右上 5=右下（6 人时与 A1 效果图一致）。
+ *  手机（≤900）收窄钳制范围：席位完整落在 4:3 竖版桌沿内。
  *  注意：传入的 index 已是"相对自己的序号"，自己=0 恒在正下方。 */
 function seatPosition(index, total) {
   const angleDeg = 90 + (index / total) * 360;
   const rad = (angleDeg * Math.PI) / 180;
   const narrow = typeof window !== 'undefined' && window.innerWidth <= 900;
-  const rx = narrow ? 46 : 44;
-  const ry = narrow ? 42 : 42;
+  const rx = narrow ? 44 : 44;
+  const ry = narrow ? 40 : 42;
   const xMin = narrow ? 14 : 9;
   const xMax = narrow ? 86 : 91;
-  const yMin = narrow ? 8 : 9;
-  const yMax = narrow ? 88 : 71;
+  const yMin = narrow ? 11 : 9;
+  const yMax = narrow ? 84 : 71;
   return {
     x: Math.max(xMin, Math.min(xMax, 50 + Math.cos(rad) * rx)),
     y: Math.max(yMin, Math.min(yMax, 50 + Math.sin(rad) * ry)),
@@ -621,10 +623,18 @@ function renderMyArea() {
   const showSitBack = me && me.sittingOut;
   sitOutBtn.classList.toggle('hidden', !showSitOut);
   sitBackBtn.classList.toggle('hidden', !showSitBack);
-  // 表情栏：开局后显示，等待阶段隐藏
+  // 表情栏：开局后显示，等待阶段隐藏；手机端为弹层（#emoji-toggle 是入口）
   const ebar = document.getElementById('emoji-bar');
-  if (ebar) ebar.classList.toggle('hidden', state.stage === 'waiting' || mySeat < 0);
-  if (state.stage === 'waiting') tip.textContent = waitingTipText();
+  const etoggle = document.getElementById('emoji-toggle');
+  const emojiVisible = state.stage !== 'waiting' && mySeat >= 0;
+  if (ebar) ebar.classList.toggle('hidden', !emojiVisible);
+  if (etoggle) etoggle.classList.toggle('hidden', !emojiVisible);
+  if (state.stage === 'waiting') {
+    // 回到等待阶段时收起表情弹层，避免残留
+    if (ebar) ebar.classList.remove('open');
+    if (etoggle) etoggle.setAttribute('aria-expanded', 'false');
+    tip.textContent = waitingTipText();
+  }
 
   const inHandActive = me && !me.folded && !me.allIn &&
     ['preflop', 'flop', 'turn', 'river'].includes(state.stage);
@@ -763,15 +773,18 @@ function updateActionBar(me) {
   document.getElementById('btn-raise-cancel').onclick = hideRaisePanel;
 }
 
-/** 加注按钮：点击展开 Raise Controller 面板，面板内取消或确认 */
+/** 加注按钮：点击展开 Raise Controller 面板，面板内取消或确认。
+ *  .raising 同时挂到 action-bar 上：手机端据此收起四个主按钮（PC 无此样式规则） */
 function onRaiseToggleClick() {
   raiseOpen = true;
   document.getElementById('raise-panel').classList.remove('hidden');
+  document.getElementById('action-bar').classList.add('raising');
   document.getElementById('btn-toggle-raise').classList.add('is-active');
 }
 function hideRaisePanel() {
   raiseOpen = false;
   document.getElementById('raise-panel').classList.add('hidden');
+  document.getElementById('action-bar').classList.remove('raising');
   const toggle = document.getElementById('btn-toggle-raise');
   if (toggle) toggle.classList.remove('is-active');
 }
@@ -954,14 +967,24 @@ document.getElementById('btn-next-hand').onclick = () => {
 };
 
 // ---------------- 表情快捷互动 ----------------
+// 手机端：#emoji-bar 是底部弹层，#emoji-toggle 为入口；PC 端保持一排常驻
 const EMOJI_LIST = ['😀', '😂', '😭', '👍', '🎉', '🤔', '😈', '🔥'];
 const emojiBar = document.getElementById('emoji-bar');
+const emojiToggle = document.getElementById('emoji-toggle');
+function setEmojiOpen(open) {
+  emojiBar.classList.toggle('open', open);
+  emojiToggle.setAttribute('aria-expanded', String(open));
+}
+emojiToggle.addEventListener('click', () => {
+  setEmojiOpen(!emojiBar.classList.contains('open'));
+});
 EMOJI_LIST.forEach((e) => {
   const b = document.createElement('button');
   b.className = 'emoji-btn';
   b.textContent = e;
   b.onclick = () => {
     socket.emit('emoji', { emoji: e }, () => {});
+    setEmojiOpen(false); // 发送后收起弹层（PC 一排形态不受 open 类影响）
     // 本端即时反馈（服务端会广播回来，靠 seat 匹配去重太繁琐，本地直接展示）
     if (mySeat >= 0) showEmojiBubble(mySeat, e);
   };
