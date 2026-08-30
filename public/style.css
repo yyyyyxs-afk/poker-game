@@ -509,6 +509,8 @@ body {
 /* ---- 次级按钮 / 表情 / 提示 ---- */
 .footer-buttons { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
 .footer-buttons .btn { min-height: 38px; font-size: 13px; }
+/* 表情入口仅手机（≤900）显示；PC 保持一排常驻 */
+#emoji-toggle { display: none; }
 #emoji-bar { display: flex; gap: 8px; width: 100%; max-width: 440px; }
 .emoji-btn {
   flex: 1; min-width: 0;
@@ -684,22 +686,37 @@ body {
   .avatar-img { width: 38px; height: 38px; }
 }
 
-/* 手机最小适配：保证操作 / 重连可用，布局深度设计留待 Phase 4/5 */
+/* ============================================================
+   手机牌桌独立布局（Phase 4）—— 不是 PC 缩小版
+   基准 375×812（强制验收线），兼顾 320 / 390×844 / 430
+   一屏顺序：Header → 牌桌+席位 → Hero(手牌/倒计时) →
+   行动提示 → 主操作(弃牌/跟注/加注) → 次要(全押/表情) → 次级按钮
+   ============================================================ */
 @media (max-width: 900px) {
-  #topbar { flex-wrap: wrap; gap: 6px 10px; padding: 8px 12px; font-size: 12px; }
-  .topbar-group { gap: 8px; }
+  /* ---- Room Header：压缩单行 ---- */
+  #topbar { min-height: 44px; flex-wrap: nowrap; gap: 8px; padding: 5px 10px; font-size: 12px; }
+  .topbar-group { gap: 7px; min-width: 0; }
+  .topbar-right { gap: 2px; }
   .topbar-sep { display: none; }
-  .room-meta b { font-size: 14px; letter-spacing: 2px; }
-  #hand-info { flex-basis: 100%; text-align: right; min-height: 0; }
+  .room-meta { white-space: nowrap; overflow: hidden; }
+  .room-meta b { font-size: 13px; letter-spacing: 2px; }
+  .blinds { white-space: nowrap; }
+  #hand-info { display: none; } /* 阶段信息由桌心 stage-label 承担，省出高度 */
 
-  #play-layout { padding: 8px 8px 10px; gap: 8px; }
+  /* ---- Poker Table：宽度驱动高度的跑道桌，席位围绕桌沿 ---- */
+  #play-layout { padding: 8px 8px 10px; gap: 6px; }
   #table {
     width: 100%; flex: none;
-    aspect-ratio: 5 / 4; min-height: 0;
+    aspect-ratio: 4 / 3; min-height: 240px;
     border-width: 8px;
+    margin-top: 2px;
   }
   #table-ring { inset: 10px; }
+  #stage-label { font-size: 10px; letter-spacing: 2px; }
+  #pot-display { gap: 1px; }
+  #pot-display .pot-label { font-size: 11px; }
   #pot-display b { font-size: 26px; }
+  #community { gap: 7px; }
   .card-slot { width: 40px; height: 57px; }
   .card { width: 40px; height: 57px; }
   .card .idx b { font-size: 12px; }
@@ -707,36 +724,113 @@ body {
   .card .pip { font-size: 19px; }
   .card.mini { width: 26px; height: 37px; }
 
-  .seat { width: 108px; }
+  .seat { width: 102px; }
   .seat-card { min-width: 0; padding: 4px 8px 4px 4px; gap: 6px; }
-  .avatar-img { width: 34px; height: 34px; }
-  .seat-copy strong { font-size: 12px; }
-  .seat-copy .seat-chips { font-size: 12px; }
+  .avatar-img { width: 32px; height: 32px; }
+  .seat-copy strong { font-size: 11px; }
+  .seat-copy .seat-chips { font-size: 12px; margin-top: 2px; }
+  .state-badge { font-size: 9px; padding: 1px 6px; top: -8px; }
+  .dealer-badge { width: 17px; height: 17px; font-size: 9px; right: -6px; top: -6px; }
   .bet-chip { font-size: 11px; padding: 2px 7px 2px 4px; }
   .bet-chip .chip-dot { width: 9px; height: 9px; }
   .hole-cards { bottom: calc(100% + 6px); }
+  .kick-btn { font-size: 9px; padding: 1px 7px; bottom: -9px; }
 
-  #hero-dock { margin-top: 8px; gap: 6px; }
-  #hero-row { gap: 12px; min-height: 52px; }
-  .seat-card.me-seat { min-width: 0; }
-  #my-cards .card { width: 48px; height: 68px; }
-  #my-cards .card .idx b { font-size: 14px; }
-  #my-cards .card .pip { font-size: 24px; }
+  /* ---- Hero 区：自己的牌是一屏第一优先级 ---- */
+  #hero-dock { margin-top: 8px; gap: 5px; }
+  #hero-row { gap: 12px; min-height: 56px; }
+  .seat-card.me-seat { min-width: 0; padding: 5px 10px 5px 5px; }
+  #my-cards { gap: 6px; }
+  #my-cards .card { width: 52px; height: 74px; }
+  #my-cards .card .idx b { font-size: 15px; }
+  #my-cards .card .idx i { font-size: 11px; }
+  #my-cards .card .pip { font-size: 26px; }
   #turn-timer .timer-ring { width: 46px; height: 46px; }
   #turn-timer .timer-ring b { width: 36px; height: 36px; font-size: 13px; }
+  #action-hint { font-size: 13px; min-height: 18px; }
 
+  /* ---- 主操作：弃牌/跟注/加注一行三键，全押降级为窄条 ---- */
   #action-bar { width: 100%; }
-  #action-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  #action-buttons .btn { min-height: 44px; }
+  #action-buttons { display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 8px; }
+  #action-buttons .btn { min-height: 46px; padding: 0 6px; font-size: 14px; }
+  #action-buttons #btn-allin { grid-column: 1 / -1; min-height: 34px; font-size: 12px; }
+  /* Raise 抽屉打开：四主按钮收起，只留抽屉里的取消/确认 */
+  #action-bar.raising #action-buttons { display: none; }
+  #action-bar.raising #action-hint { display: none; }
+
+  /* ---- 次级按钮行：开始/重买/坐回 + 表情入口 ---- */
+  .footer-buttons { gap: 8px; }
+  .footer-buttons .btn { min-height: 36px; font-size: 12px; padding: 0 14px; }
+  #emoji-toggle { display: grid; } /* 仅手机显示表情入口 */
+  #waiting-tip { font-size: 12px; min-height: 16px; }
+  #toast { font-size: 12px; top: 10%; }
+
+  /* ---- Emoji：底部弹层（不再常驻一排） ---- */
+  #emoji-bar {
+    display: none;
+    position: fixed; left: 10px; right: 10px;
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    z-index: 70;
+    max-width: none; gap: 8px;
+    padding: 12px;
+    background: var(--a1-surface-raised);
+    border: 1px solid var(--a1-line);
+    border-radius: var(--a1-radius-md);
+    box-shadow: var(--a1-shadow-panel);
+  }
+  #emoji-bar.open { display: flex; }
+  .emoji-btn { height: 42px; font-size: 20px; background: var(--a1-surface-quiet); }
+
+  /* ---- 牌局记录：Header 入口 + Bottom Sheet ---- */
+  #log-panel {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    width: 100%; max-height: 52vh;
+    z-index: 65;
+    border-radius: var(--a1-radius-lg) var(--a1-radius-lg) 0 0;
+    border-bottom: none;
+    padding: 12px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.45);
+  }
+  #log-panel .log-head h3 { font-size: 13px; }
+  #btn-log-collapse img { transform: rotate(90deg); } /* 折叠箭头指向下方 */
+  /* 手机默认 collapsed（JS 初始处理），展开即抽屉 */
+
+  /* ---- Raise Bottom Sheet（§16） ---- */
+  #raise-panel {
+    position: fixed; left: 0; right: 0; bottom: 0; top: auto;
+    width: 100%;
+    z-index: 80;
+    gap: 10px;
+    padding: 14px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    border-radius: var(--a1-radius-lg) var(--a1-radius-lg) 0 0;
+    border-bottom: none;
+    box-shadow: 0 -16px 40px rgba(0, 0, 0, 0.5);
+  }
+  .raise-head { gap: 2px; }
+  .raise-label { font-size: 12px; }
+  #raise-input { font-size: 34px; width: 170px; } /* ≥16px，避免 iOS 聚焦自动放大 */
+  .raise-presets { gap: 6px; }
+  .raise-presets .preset { min-height: 36px; font-size: 12px; padding: 0 4px; }
+  .raise-slider-row { gap: 10px; }
+  .step-btn { width: 40px; height: 40px; flex-basis: 40px; }
+  .raise-range { font-size: 11px; }
+  .raise-actions { gap: 10px; }
+  .raise-actions .btn { min-height: 44px; font-size: 14px; }
 
   .btn { padding: 10px 14px; font-size: 13px; }
-  #toast { font-size: 12px; }
 }
 
+/* 极窄（320 等）：牌面与席位再收一档，按钮保持可点 */
 @media (max-width: 420px) {
-  #table { aspect-ratio: 4 / 5; }
-  #community { gap: 6px; }
+  #table { aspect-ratio: 19 / 15; }
+  .seat { width: 92px; }
+  .avatar-img { width: 28px; height: 28px; }
+  .seat-copy strong { font-size: 10px; }
+  .seat-copy .seat-chips { font-size: 11px; }
+  #community { gap: 5px; }
   .card-slot, .card { width: 34px; height: 48px; }
+  #pot-display b { font-size: 22px; }
+  .raise-presets .preset { font-size: 11px; }
 }
 
 /* 手机横屏：压缩顶栏与牌桌高度，保证一屏放下 */
@@ -744,12 +838,12 @@ body {
   #topbar { padding: 4px 14px; font-size: 12px; min-height: 40px; }
   #play-layout { flex-direction: row; padding: 4px 12px 6px; }
   #table { width: min(72vw, 860px); aspect-ratio: 16 / 8; min-height: 0; }
-  #log-panel { display: none; }
+  /* 日志走手机 Bottom Sheet（不硬隐藏，保持可用） */
   #hero-dock { margin-top: 4px; }
   #my-cards .card { width: 42px; height: 60px; }
-  #emoji-bar { order: 3; }
   .btn { padding: 8px 16px; font-size: 13px; min-height: 38px; }
   #action-buttons .btn { min-height: 40px; }
+  #raise-panel { max-height: 78vh; overflow-y: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {
