@@ -91,18 +91,23 @@ body {
 .icon-btn:hover img { opacity: 1; }
 .icon-btn:focus-visible { outline: none; box-shadow: var(--a1-focus); }
 
-/* ============ 大厅（结构保留，仅换 A1 皮肤；Phase 6 深度改版） ============ */
-#lobby { align-items: center; justify-content: center; }
+/* ============ 大厅（§19：私人好友局入口，A1 简约克制） ============ */
+#lobby {
+  align-items: center; justify-content: center;
+  background: radial-gradient(1000px 560px at 50% 26%, rgba(26, 34, 37, 0.9), transparent 72%);
+}
 .lobby-card {
   background: var(--a1-surface);
   border: 1px solid var(--a1-line-soft);
   border-radius: var(--a1-radius-lg);
-  padding: 40px 44px;
-  width: min(400px, 92vw);
+  padding: 44px 48px 36px;
+  width: min(420px, 92vw);
   text-align: center;
   box-shadow: var(--a1-shadow-panel);
 }
-.lobby-card h1 { font-size: 26px; letter-spacing: 4px; margin-bottom: 8px; color: var(--a1-text); }
+.lobby-card h1 { font-size: 24px; letter-spacing: 2px; margin-bottom: 6px; color: var(--a1-text); font-weight: 650; }
+.lobby-tag { color: var(--a1-action-strong); font-size: 13px; margin: 0 0 4px; }
+.subtitle { color: var(--a1-faint); font-size: 12px; margin-bottom: 28px; }
 .subtitle { color: var(--a1-muted); font-size: 13px; margin-bottom: 26px; }
 .lobby-card label {
   display: block; text-align: left;
@@ -378,21 +383,21 @@ body {
 }
 .kick-btn:hover { background: var(--a1-danger); color: #f4e3e2; }
 
-/* ============ 下注筹码：席位与桌心之间 ============ */
+/* ============ 下注筹码：贴自家席位短伸，席位色描边标归属 ============ */
 .bet-chip {
   position: absolute; z-index: 2;
-  transform: translate(-50%, -50%);
   display: inline-flex; align-items: center; gap: 5px;
   padding: 3px 9px 3px 5px;
+  border: 1.5px solid var(--chip-c, var(--a1-line));
   border-radius: var(--a1-radius-round);
-  background: rgba(25, 31, 32, 0.85);
+  background: rgba(25, 31, 32, 0.88);
   color: var(--a1-text);
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18);
   white-space: nowrap;
 }
 .bet-chip .chip-dot {
   width: 11px; height: 11px; border-radius: 50%; flex: none;
-  background: radial-gradient(circle at 35% 30%, #b9a878, #8f7d52 78%);
+  background: var(--chip-c, #8f7d52);
   box-shadow: inset 0 0 0 1.5px rgba(247, 245, 239, 0.75);
 }
 .bet-chip b { font: 650 12px/1 var(--a1-font-number); font-variant-numeric: tabular-nums; }

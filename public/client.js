@@ -144,10 +144,67 @@ function showLobbyError(msg) { document.getElementById('lobby-error').textConten
 function enterRoom(code) {
   const name = document.getElementById('nickname').value.trim();
   if (name) localStorage.setItem('poker-nickname', name);
+  saveLastRoom(code, name || localStorage.getItem('poker-nickname') || '');
   document.getElementById('lobby').classList.add('hidden');
   document.getElementById('game').classList.remove('hidden');
   document.getElementById('room-code-display').textContent = code;
 }
+
+// ---------------- 断线自动重连（token 恢复座位，客户端行为） ----------------
+// 服务端断线保护窗口与座位语义不变；这里只做：断线后 socket 重连成功时，
+// 用本地保存的房号/昵称/token 自动 join_room 恢复座位，重试数次后给手动入口。
+const LAST_ROOM_KEY = 'poker-last-room';
+function saveLastRoom(code, name) {
+  if (!code || !name) return;
+  localStorage.setItem(LAST_ROOM_KEY, JSON.stringify({ code, name }));
+}
+function getLastRoom() {
+  try { return JSON.parse(localStorage.getItem(LAST_ROOM_KEY) || 'null'); }
+  catch { return null; }
+}
+function clearLastRoom() { localStorage.removeItem(LAST_ROOM_KEY); }
+
+const connOverlay = document.getElementById('conn-overlay');
+const connMsg = document.getElementById('conn-msg');
+const connSub = document.getElementById('conn-sub');
+const connActions = document.getElementById('conn-actions');
+let reconnectAttempts = 0;
+function setConnState(msg, sub, showActions) {
+  connMsg.textContent = msg;
+  connSub.textContent = sub || '';
+  connActions.classList.toggle('hidden', !showActions);
+}
+function tryRejoin() {
+  const last = getLastRoom();
+  if (!last || !last.code) { connOverlay.classList.add('hidden'); return; }
+  setConnState('正在恢复牌局…', `${last.code} · ${last.name}`);
+  socket.emit('join_room', {
+    code: last.code,
+    name: last.name,
+    token: storedToken()[`${last.code}_${last.name}`],
+  }, (res) => {
+    if (res && res.ok) {
+      reconnectAttempts = 0;
+      enterRoom(last.code);
+      connOverlay.classList.add('hidden');
+      flashTip('已重新连接，回到牌局');
+    } else if (reconnectAttempts < 3) {
+      reconnectAttempts++;
+      setTimeout(tryRejoin, 1500);
+    } else {
+      setConnState('重新连接失败', (res && res.err) || '请稍后手动重试', true);
+    }
+  });
+}
+document.getElementById('btn-reconnect').addEventListener('click', () => {
+  reconnectAttempts = 0;
+  setConnState('正在恢复牌局…', '');
+  tryRejoin();
+});
+document.getElementById('btn-conn-lobby').addEventListener('click', () => {
+  clearLastRoom();
+  location.reload();
+});
 
 function copyText(text) {
   if (navigator.clipboard && window.isSecureContext) {
@@ -179,7 +236,10 @@ document.getElementById('btn-copy-link').onclick = () => {
   const url = location.origin + location.pathname + '?room=' + code;
   copyText(url).then((ok) => flashCopied(document.getElementById('btn-copy-link'), ok));
 };
-document.getElementById('btn-leave').onclick = () => location.reload();
+document.getElementById('btn-leave').onclick = () => {
+  clearLastRoom(); // 主动退出：不留自动重连的恢复信息
+  location.reload();
+};
 
 // 开始游戏（等待阶段且人数 >= 2 时显示）
 document.getElementById('btn-start').onclick = () => {
@@ -255,19 +315,24 @@ socket.on('state', (s) => {
   render();
 });
 
-// 断线感知：掉线立即全屏提示，恢复后自动消失
+// 断线感知：掉线全屏提示；socket 自动重连成功后用 token 恢复座位
 let everConnected = false;
 socket.on('connect', () => {
-  if (everConnected) document.getElementById('conn-overlay').classList.add('hidden');
-  everConnected = true;
+  if (!everConnected) { everConnected = true; return; } // 首次连接不算断线恢复
+  reconnectAttempts = 0;
+  connOverlay.classList.remove('hidden');
+  setConnState('连接恢复，正在回到牌局…', '');
+  tryRejoin();
 });
 socket.on('disconnect', () => {
-  document.getElementById('conn-overlay').classList.remove('hidden');
+  connOverlay.classList.remove('hidden');
+  setConnState('连接断开，正在重连…', '断线期间轮到你时，牌局会保留一段时间');
 });
 
 function render() {
   if (!state) return;
   try {
+    updateWinnerSeats();
     renderTableInfo();
     renderSeats();
     renderBets();
@@ -380,7 +445,9 @@ function escapeHtml(v) {
   }[ch]));
 }
 
-/** 像素头像：Phase 1 的 3 张真实 PNG，按座位号循环复用（同一玩家本局内稳定） */
+/** 像素头像：Phase 1 的 3 张真实 PNG 循环复用（同一玩家本局内稳定）。
+ *  Phase 6 扩充：待 6 款资产生成后（见 assets/a1/avatars/prompts-phase6.md），
+ *  按文件名顺序追加 3 项即可一席一款（数组按座位号取模）。 */
 const AVATAR_PNGS = [
   'assets/a1/avatars/avatar-blue-headphones.png',
   'assets/a1/avatars/avatar-magenta-asym.png',
@@ -448,6 +515,15 @@ function seatCardHtml(p, isMe) {
   `;
 }
 
+/** 摊牌赢家座位集合：牌桌直显的席位高亮（第一层结算） */
+let winnerSeats = new Set();
+function updateWinnerSeats() {
+  winnerSeats = new Set();
+  if (state.stage === 'handover' && state.results) {
+    state.results.pots.forEach((pot) => pot.winners.forEach((w) => winnerSeats.add(w.seat)));
+  }
+}
+
 function renderSeats() {
   const wrap = document.getElementById('seats');
   wrap.innerHTML = '';
@@ -460,6 +536,7 @@ function renderSeats() {
     const div = document.createElement('div');
     div.className = 'seat' + (p.folded ? ' folded-seat' : '') +
       (p.seat === state.turnSeat && !p.folded ? ' active-turn' : '') +
+      (winnerSeats.has(p.seat) ? ' winner-seat' : '') +
       (p.connected ? '' : ' offline');
     div.dataset.seat = p.seat;
 
@@ -515,7 +592,7 @@ function renderHeroSeat(me) {
     ['preflop', 'flop', 'turn', 'river'].includes(state.stage);
   const stateBadge = seatStateBadge(me);
   box.innerHTML = `
-    <div class="seat-card me-seat${isTurn ? ' is-current' : ''}${me.folded ? ' folded-seat' : ''}">
+    <div class="seat-card me-seat${isTurn ? ' is-current' : ''}${me.folded ? ' folded-seat' : ''}${winnerSeats.has(me.seat) ? ' winner-seat' : ''}">
       ${me.isDealer && state.stage !== 'waiting' ? '<span class="dealer-badge" title="庄家">D</span>' : ''}
       <img class="avatar-img" src="${avatarPng(me.seat)}" alt="我的像素头像" />
       <div class="seat-copy">
@@ -527,73 +604,131 @@ function renderHeroSeat(me) {
   `;
 }
 
-/** 下注筹码落点：席位→桌心 42% 插值；若落入中央区保守带则弹出带外。
- *  保守带 y 上界取 28%（320 真机校准：1:1 桌 stage-label 上沿之上，
- *  同时不碰 375/PC 顶部席位卡下缘），下界 82%（牌带之下）；
- *  判定用圆片矩形（含最坏半尺寸 8%/4%，手机 375 宽下的 56×20 圆片）。
- *  手机侧翼席位圆片贴席位卡上/下沿（该区域与桌心文字带之间无净空）；
- *  ≤420 顶部席位卡与 label 之间不足一个圆片高，横推到带外。
- *  注意：与 seatPosition 的手机侧翼参数耦合，改动必须连带复跑
- *  全断点 × 人数 × 席位的落点穷举（见提交 ff4ae98 说明）。 */
-const BET_BAND = { x1: 17, x2: 83, y1: 30, y2: 82 };
-const BET_CHIP_HALF_W = 8; // 圆片半宽（桌宽百分比，取手机最坏情况再留余量）
-const BET_CHIP_HALF_H = 4; // 圆片半高（桌高百分比）
-function betPosition(pos) {
-  const { x, y } = pos;
-  let bx = x + (50 - x) * 0.42;
-  let by = y + (50 - y) * 0.42;
-  const w = typeof window !== 'undefined' ? window.innerWidth : 1280;
-  const narrow = w <= 900;
-  const veryNarrow = narrow && w <= 420;
-  const inBand = bx + BET_CHIP_HALF_W > BET_BAND.x1 && bx - BET_CHIP_HALF_W < BET_BAND.x2 &&
-    by + BET_CHIP_HALF_H > BET_BAND.y1 && by - BET_CHIP_HALF_H < BET_BAND.y2;
-  if (inBand) {
-    if (narrow && (x <= 30 || x >= 70)) {
-      // 手机侧翼席位：圆片贴席位卡上/下沿（与卡片保持分离）
-      by = y < 50 ? y - 14 : y + 14;
-      if (by - BET_CHIP_HALF_H < 1 || by + BET_CHIP_HALF_H > 99) {
-        // 贴边无空间（如横屏下侧翼）：沿横轴推到带外、纵轴取带中线
-        bx = bx < 50 ? BET_BAND.x1 - BET_CHIP_HALF_W : BET_BAND.x2 + BET_CHIP_HALF_W;
-        by = 56;
-      }
-    } else if (y < 50) {
-      if (veryNarrow) {
-        // ≤420 顶部席位卡与 label 间隙不足一个圆片：横推到带外
-        bx = bx < 50 ? BET_BAND.x1 - BET_CHIP_HALF_W : BET_BAND.x2 + BET_CHIP_HALF_W;
-        by = 56;
-      } else {
-        by = BET_BAND.y1 - BET_CHIP_HALF_H - 1;
-      }
-    } else if (y <= 78) {
-      by = BET_BAND.y2 + BET_CHIP_HALF_H + 1;
-    } else {
-      // 贴桌沿席位（手机自己的席位，x 居中）：横推到带外、取带中线避开侧翼席位卡
-      bx = bx < 50 ? BET_BAND.x1 - BET_CHIP_HALF_W : BET_BAND.x2 + BET_CHIP_HALF_W;
-      by = 56;
-    }
-  }
-  return { x: bx, y: by };
-}
-
-/** 下注筹码层：显示在席位与桌心之间，不挤进玩家卡片 */
+/** 下注筹码定位（归属优先，运行时 DOM 实测，任何断点自适应）：
+ *  1. 锚点 = 自家席位卡边缘，沿"席位→桌心"方向短距离伸出（归属第一线索）；
+ *  2. 与桌心中央区（stage-label/pot/公共牌）、其他席位卡、自家卡、桌界冲突时，
+ *     只沿该轴回退到第一个可行点，绝不横向漂到其他席位的方位区；
+ *  3. 轴上无解（卡与中央区之间放不下）则贴卡上/下/左/右沿（仍在自家席位半侧）；
+ *  4. 圆片带席位色描边（--a1-seat-N，a1-foundation.css 追加 tokens）作为
+ *     与位置无关的第二归属线索。
+ *  几何参数的模型级回归见 test/geometry-check.js（校准基准见其头注释）。 */
 function renderBets() {
   const wrap = document.getElementById('bets');
   wrap.innerHTML = '';
   if (state.stage === 'waiting') return;
-  const players = state.players;
-  players.forEach((p) => {
+  const tableEl = document.getElementById('table');
+  const tableRect = tableEl.getBoundingClientRect();
+  if (!tableRect.width) return;
+
+  // 障碍：桌心中央区三件套 + 全部席位卡（含 hero；自家卡单独判定不压数字）
+  const obstacles = ['stage-label', 'pot-display', 'community']
+    .map((id) => document.getElementById(id))
+    .filter((el) => el && !el.classList.contains('hidden'))
+    .map((el) => el.getBoundingClientRect());
+  const seatRects = new Map();
+  document.querySelectorAll('#seats .seat').forEach((el) => {
+    const card = el.querySelector('.seat-card');
+    if (card && el.dataset.seat) seatRects.set(Number(el.dataset.seat), card.getBoundingClientRect());
+  });
+  const heroCard = document.querySelector('#hero-seat .seat-card');
+  if (heroCard && mySeat >= 0) seatRects.set(mySeat, heroCard.getBoundingClientRect());
+
+  const overlaps = (r, o, m) => r.right > o.left + m && r.left < o.right - m && r.bottom > o.top + m && r.top < o.bottom - m;
+
+  state.players.forEach((p) => {
     if (!(p.roundBet > 0)) return;
-    const relIdx = (p.seat - (mySeat >= 0 ? mySeat : 0) + players.length) % players.length;
-    const pos = seatPosition(relIdx, players.length);
-    const { x: bx, y: by } = betPosition(pos);
+    const selfRect = seatRects.get(p.seat);
+    if (!selfRect) return;
+
     const chip = document.createElement('div');
     chip.className = 'bet-chip';
-    chip.style.left = bx + '%';
-    chip.style.top = by + '%';
+    chip.style.visibility = 'hidden'; // 先挂载测实际尺寸，再定位显示
+    chip.style.setProperty('--chip-c', `var(--a1-seat-${((p.seat % 6) + 6) % 6 + 1})`);
     chip.innerHTML = `<i class="chip-dot" aria-hidden="true"></i><b>${p.roundBet}</b>`;
     wrap.appendChild(chip);
+    if (!selfRect.width) return;
+
+    const halfW = chip.offsetWidth / 2;
+    const halfH = chip.offsetHeight / 2;
+    const cx = selfRect.left + selfRect.width / 2;
+    const cy = selfRect.top + selfRect.height / 2;
+    let vx = tableRect.left + tableRect.width / 2 - cx;
+    let vy = tableRect.top + tableRect.height / 2 - cy;
+    const vlen = Math.hypot(vx, vy) || 1;
+    vx /= vlen; vy /= vlen;
+
+    // 碰撞 margin 语义：正数=更严格（提前判撞），负数=允许轻擦。
+    // 中央区不允许任何压盖（+2）；其他席位卡允许轻擦 3px（密集桌的圆片贴边）；
+    // 自家卡允许贴沿 4px（圆片底边擦到卡片边框，不遮昵称/筹码数字）。
+    const blocked = (px, py) => {
+      const r = { left: px - halfW, right: px + halfW, top: py - halfH, bottom: py + halfH };
+      if (r.left < tableRect.left + 3 || r.right > tableRect.right - 3 ||
+          r.top < tableRect.top + 3 || r.bottom > tableRect.bottom - 3) return true;
+      for (const o of obstacles) if (overlaps(r, o, 2)) return true;
+      for (const [seat, o] of seatRects) {
+        if (seat === p.seat) continue;
+        if (overlaps(r, o, -3)) return true; // 不压其他席位卡（避免归属混淆）
+      }
+      // 不压自家卡文字区（允许 4px 边框轻擦）
+      if (r.right > selfRect.left + 4 && r.left < selfRect.right - 4 &&
+          r.bottom > selfRect.top + 4 && r.top < selfRect.bottom - 4) return true;
+      return false;
+    };
+    const place = (px, py) => {
+      chip.style.left = (px - tableRect.left) + 'px';
+      chip.style.top = (py - tableRect.top) + 'px';
+      chip.style.visibility = '';
+    };
+
+    // 1) 沿"席位→桌心"轴：从贴卡缘向外找第一个可行点（最贴近自家席位）。
+    //    起始距离用卡矩形在轴上的投影半径（正上/正下席位远小于对角半径）。
+    const dMin = Math.abs(vx) * (selfRect.width / 2) + Math.abs(vy) * (selfRect.height / 2) + 2;
+    const dMax = Math.min(tableRect.width, tableRect.height) * 0.26;
+    for (let d = dMin; d <= dMax; d += 3) {
+      const px = cx + vx * d;
+      const py = cy + vy * d;
+      if (!blocked(px, py)) { place(px, py); return; }
+    }
+    // 2) 轴上无解：贴自家卡四沿（仍在本席位半侧），按桌心方向优先排序
+    const offY = selfRect.height / 2 + halfH + 4;
+    const offX = selfRect.width / 2 + halfW + 4;
+    const edges = [
+      [cx, cy + Math.sign(vy || 1) * offY],
+      [cx, cy - Math.sign(vy || 1) * offY],
+      [cx + offX, cy],
+      [cx - offX, cy],
+    ];
+    for (const [px, py] of edges) {
+      if (!blocked(px, py)) { place(px, py); return; }
+    }
+    // 3) 极度拥挤（矮桌/满员，如 320×568 六人顶部席位）：四沿按压盖代价取最小——
+    //    community 10 / 他卡 8 / pot 6 / label 3 / 自家卡 2 / 出界禁选；
+    //    此类位置的归属由席位色描边兜底。
+    let best = null;
+    let bestScore = Infinity;
+    for (const [px, py] of edges) {
+      const r = { left: px - halfW, right: px + halfW, top: py - halfH, bottom: py + halfH };
+      if (r.left < 0 || r.right > tableRect.width || r.top < 0 || r.bottom > tableRect.height) continue;
+      let s = 2; // 贴自家卡
+      obstacles.forEach((o, i) => {
+        if (overlaps(r, o, 0)) s += [3, 6, 10][i] || 5; // [label, pot, community]
+      });
+      for (const [seat, o] of seatRects) {
+        if (seat !== p.seat && overlaps(r, o, 0)) s += 8;
+      }
+      if (s < bestScore) { bestScore = s; best = [px, py]; }
+    }
+    if (best) place(best[0], best[1]);
+    else place(cx, cy);
   });
 }
+
+// 视口变化后按新布局重新定位（renderBets 为纯定位，无副作用）
+let betResizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(betResizeTimer);
+  betResizeTimer = setTimeout(() => { if (state) renderBets(); }, 150);
+});
 
 const RANK_LABEL = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
 const SUIT_CHAR = { s: '♠', h: '♥', d: '♦', c: '♣' };
@@ -793,6 +928,16 @@ function updateActionBar(me) {
     slider.value = clamped;
     confirmValue.textContent = clamped.toLocaleString('zh-CN');
   };
+  // P2-5：失焦时把显示值回写为钳制后的合法值（输入中不打断，确认金额始终一致）
+  input.onblur = () => {
+    const v = parseInt(input.value, 10);
+    const clamped = Number.isFinite(v)
+      ? Math.max(+slider.min, Math.min(+slider.max, v))
+      : Number(slider.value);
+    input.value = clamped;
+    slider.value = clamped;
+    confirmValue.textContent = clamped.toLocaleString('zh-CN');
+  };
   document.getElementById('raise-dec').onclick = () => {
     slider.value = Number(slider.value) - Number(slider.step);
     syncRaiseViews();
@@ -932,17 +1077,43 @@ function renderLogs() {
   ul.scrollTop = ul.scrollHeight;
 }
 
-// ---------------- 结果弹窗 ----------------
+// ---------------- 结算（两层，§17） ----------------
+// 第一层：牌桌直显——winner 横幅 + 席位高亮 + 摊牌亮牌（renderSeats 的 revealed 逻辑）；
+// 第二层：查看本局详情——主池边池/每人结果/最佳五张/战绩（result-overlay，手动打开）。
+// 大 Modal 不再自动弹出作为唯一结算方式。
+let resultDetailOpen = false;
+const resultOverlay = document.getElementById('result-overlay');
+const winnerBanner = document.getElementById('winner-banner');
+const resultDetailBtn = document.getElementById('btn-result-detail');
+resultDetailBtn.addEventListener('click', () => {
+  resultDetailOpen = true;
+  renderResults();
+});
+document.getElementById('btn-result-close').addEventListener('click', () => {
+  resultDetailOpen = false;
+  renderResults();
+});
+
 function renderResults() {
-  const overlay = document.getElementById('result-overlay');
   if (state.stage !== 'handover' || !state.results) {
-    overlay.classList.add('hidden');
+    resultOverlay.classList.add('hidden');
+    resultDetailBtn.classList.add('hidden');
+    winnerBanner.classList.add('hidden');
+    if (state.stage !== 'handover') resultDetailOpen = false;
     return;
   }
-  overlay.classList.remove('hidden');
   const r = state.results;
   document.getElementById('result-title').textContent =
     r.forfeit ? '其余玩家全部弃牌' : '摊牌结算';
+
+  // 第一层：牌桌直显横幅（主池赢家 + 赢取金额 + 牌型）
+  const mainPot = r.pots[0];
+  const winnerNames = mainPot.winners.map((w) => escapeHtml(w.name)).join('、');
+  winnerBanner.innerHTML = `<b>${winnerNames}</b> 获胜 <em>+${mainPot.amount}</em>` +
+    `<span>${mainPot.winners[0].handName ? mainPot.winners[0].handName : '对手全部弃牌'}${r.pots.length > 1 ? ` · 含边池 ${r.pots.length - 1} 个` : ''}</span>`;
+  winnerBanner.classList.remove('hidden');
+  resultDetailBtn.classList.remove('hidden');
+  resultOverlay.classList.toggle('hidden', !resultDetailOpen); // 第二层仅在主动查看时显示
 
   const potsDiv = document.getElementById('result-pots');
   potsDiv.innerHTML = '';

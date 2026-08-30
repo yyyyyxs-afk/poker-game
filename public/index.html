@@ -9,11 +9,12 @@
 </head>
 <body>
 
-  <!-- 大厅（Phase 6 再做深度改版，本轮保持结构与功能） -->
+  <!-- 大厅（A1：私人好友局入口，§19） -->
   <div id="lobby" class="screen">
     <div class="lobby-card">
-      <h1>德州扑克</h1>
-      <p class="subtitle">无限注 · 盲注 10/20 · 起始筹码 2000 · 2-6 人</p>
+      <h1>Poker Game</h1>
+      <p class="lobby-tag">好友局的线上牌桌 · 无限注德州扑克</p>
+      <p class="subtitle">盲注 10/20 · 起始筹码 2000 · 2-6 人</p>
       <label>你的昵称
         <input id="nickname" type="text" maxlength="8" placeholder="昵称（每人不同）" />
       </label>
@@ -67,6 +68,7 @@
         <div id="table">
           <div id="table-ring" aria-hidden="true"></div>
           <div id="table-inner">
+            <div id="winner-banner" class="hidden" aria-live="polite"></div>
             <div id="stage-label"></div>
             <div id="pot-display"><span class="pot-label">底池</span><b id="pot-value">0</b></div>
             <div id="community"></div>
@@ -121,6 +123,7 @@
             <button id="btn-start" class="btn btn-primary hidden">开始游戏</button>
             <button id="btn-rebuy" class="btn btn-warning hidden">重新买入（补充 2000 筹码）</button>
             <button id="btn-sit-back" class="btn btn-primary hidden">坐回</button>
+            <button id="btn-result-detail" class="btn btn-secondary hidden">查看本局详情</button>
             <button id="emoji-toggle" class="icon-btn hidden" aria-label="表情互动" aria-expanded="false">
               <img src="assets/a1/icons/emoji-smile.svg" alt="" />
             </button>
@@ -203,14 +206,24 @@
           </table>
         </div>
         <div id="next-tip"></div>
-        <button id="btn-next-hand" class="btn btn-primary hidden">立即开始下一局</button>
+        <div class="result-actions">
+          <button id="btn-result-close" class="btn btn-ghost btn-small">收起，看牌桌</button>
+          <button id="btn-next-hand" class="btn btn-primary hidden">立即开始下一局</button>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- 断线提示遮罩 -->
+  <!-- 断线提示遮罩：自动重连（token 恢复座位），失败给出手动入口 -->
   <div id="conn-overlay" class="overlay hidden">
-    <div class="conn-card">连接断开，正在重连…<br><span>恢复后会自动回到牌局</span></div>
+    <div class="conn-card">
+      <div id="conn-msg">连接断开，正在重连…</div>
+      <span id="conn-sub">恢复后会自动回到牌局</span>
+      <div id="conn-actions" class="hidden">
+        <button id="btn-reconnect" class="btn btn-primary btn-small">立即重连</button>
+        <button id="btn-conn-lobby" class="btn btn-ghost btn-small">返回大厅</button>
+      </div>
+    </div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
