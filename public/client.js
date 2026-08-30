@@ -1,4 +1,6 @@
-/* 德州扑克客户端 */
+/* 德州扑克客户端（A1 Phase 2 视觉结构版）
+ * 牌局数据、Socket.IO 协议与操作逻辑保持不变；
+ * 本轮重写 DOM 渲染：Header / Play Stage（牌桌 + 席位 + 下注层）/ Hero Dock / Raise Controller。 */
 const socket = io();
 
 let mySeat = -1;
@@ -41,8 +43,8 @@ const sfx = {
 };
 const soundBtn = document.getElementById('btn-sound');
 function renderSoundBtn() {
-  soundBtn.textContent = soundOn ? '音效 开' : '音效 关';
   soundBtn.classList.toggle('off', !soundOn);
+  soundBtn.setAttribute('aria-label', soundOn ? '关闭音效' : '开启音效');
 }
 soundBtn.onclick = () => {
   soundOn = !soundOn;
@@ -51,13 +53,45 @@ soundBtn.onclick = () => {
 };
 renderSoundBtn();
 
-// 牌局动态面板：点标题收起/展开；手机端默认收起，减少视觉干扰
-const logPanel = document.getElementById('log-panel');
-logPanel.querySelector('h3').addEventListener('click', () => {
-  logPanel.classList.toggle('collapsed');
+// ---------------- Header 汉堡菜单（复制房号 / 邀请链接 / 退出） ----------------
+const menuBtn = document.getElementById('btn-menu');
+const menuDropdown = document.getElementById('menu-dropdown');
+function closeMenu() {
+  menuDropdown.classList.add('hidden');
+  menuBtn.setAttribute('aria-expanded', 'false');
+}
+menuBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const willOpen = menuDropdown.classList.contains('hidden');
+  menuDropdown.classList.toggle('hidden', !willOpen);
+  menuBtn.setAttribute('aria-expanded', String(willOpen));
 });
+document.addEventListener('click', (e) => {
+  if (menuDropdown.classList.contains('hidden')) return;
+  if (!menuDropdown.contains(e.target)) closeMenu();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeMenu();
+});
+
+// 牌局记录面板：Header 图标与面板标题都可收起；手机端默认收起，减少视觉干扰
+const logPanel = document.getElementById('log-panel');
+const logToggleBtn = document.getElementById('btn-log-toggle');
+function setLogCollapsed(collapsed) {
+  logPanel.classList.toggle('collapsed', collapsed);
+  logToggleBtn.setAttribute('aria-pressed', String(!collapsed));
+  logToggleBtn.setAttribute('aria-label', collapsed ? '展开牌局记录' : '收起牌局记录');
+}
+logToggleBtn.addEventListener('click', () => {
+  setLogCollapsed(!logPanel.classList.contains('collapsed'));
+});
+logPanel.querySelector('.log-head').addEventListener('click', (e) => {
+  if (e.target.closest('#btn-log-collapse')) return;
+  setLogCollapsed(!logPanel.classList.contains('collapsed'));
+});
+document.getElementById('btn-log-collapse').addEventListener('click', () => setLogCollapsed(true));
 if (window.matchMedia('(max-width: 900px)').matches) {
-  logPanel.classList.add('collapsed');
+  setLogCollapsed(true);
 }
 
 // ---------------- 大厅 ----------------
@@ -235,6 +269,7 @@ function render() {
   try {
     renderTableInfo();
     renderSeats();
+    renderBets();
     renderCommunity();
     renderMyArea();
     renderLogs();
@@ -263,28 +298,28 @@ let prevPot = null;
 let prevCurrentBet = null;
 let turnCountdownTimer = null;
 
-/** 思考倒计时（显示用途）：按房间行动时长从本轮开始递减，剩 10 秒转红 */
+/** 思考倒计时（显示用途）：按房间行动时长从本轮开始递减，剩 10 秒转警示色 */
 function startTurnTimer() {
   stopTurnTimer();
   const el = document.getElementById('turn-timer');
   const total = cfg().actionTime || 45;
   let left = total;
-  const render = () => {
+  const paint = () => {
     const pct = Math.max(0, Math.min(100, (left / total) * 100));
-    el.innerHTML = `思考时间 <span class="bar"><i style="width:${pct}%"></i></span> <b>${Math.max(0, left)}s</b>`;
-    el.classList.toggle('urgent', left <= 10);
+    el.innerHTML = `<div class="timer-ring${left <= 10 ? ' urgent' : ''}" style="--p:${pct}" role="timer" aria-label="剩余思考时间 ${Math.max(0, left)} 秒"><b>${Math.max(0, left)}</b></div>`;
   };
-  render();
+  paint();
+  el.classList.remove('hidden');
   turnCountdownTimer = setInterval(() => {
     left--;
     if (left <= 0) { stopTurnTimer(); return; }
-    render();
+    paint();
   }, 1000);
 }
 function stopTurnTimer() {
   if (turnCountdownTimer) { clearInterval(turnCountdownTimer); turnCountdownTimer = null; }
   const el = document.getElementById('turn-timer');
-  if (el) { el.classList.add('hidden'); el.classList.remove('urgent'); }
+  if (el) { el.classList.add('hidden'); el.innerHTML = ''; }
 }
 
 function renderTableInfo() {
@@ -297,7 +332,7 @@ function renderTableInfo() {
   const c = cfg();
   const blindsEl = document.getElementById('blinds-info');
   if (blindsEl) blindsEl.textContent = `盲注 ${c.smallBlind}/${c.bigBlind}`;
-  // 底池变化：数字跳动提示（别人加注/跟注时手机端日志收起也能感知）
+  // 底池变化：数字轻量跳动提示
   const potEl = document.getElementById('pot-value');
   if (prevPot !== null && state.pot > prevPot) {
     const disp = document.getElementById('pot-display');
@@ -330,7 +365,7 @@ function showToast(msg) {
   if (!t) {
     t = document.createElement('div');
     t.id = 'toast';
-    document.getElementById('table-wrap').appendChild(t);
+    document.getElementById('play-stage').appendChild(t);
   }
   t.textContent = msg;
   t.classList.remove('hidden');
@@ -338,24 +373,66 @@ function showToast(msg) {
   toastTimer = setTimeout(() => t.classList.add('hidden'), 1800);
 }
 
-/** 座位围绕椭圆分布，自己固定在底部；横向钳制防止小屏裁切。
- *  注意：传入的 index 已是"相对自己的序号"（renderSeats 里的 relIdx），
- *  自己=0 恒在正下方；此前在这里又减了一次 mySeat，导致非 0 号座位的玩家
- *  看到的布局错乱、座位叠在牌桌中央。 */
-function seatPosition(index, total, isMe) {
+function escapeHtml(v) {
+  return String(v).replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[ch]));
+}
+
+/** 像素头像：Phase 1 的 3 张真实 PNG，按座位号循环复用（同一玩家本局内稳定） */
+const AVATAR_PNGS = [
+  'assets/a1/avatars/avatar-blue-headphones.png',
+  'assets/a1/avatars/avatar-magenta-asym.png',
+  'assets/a1/avatars/avatar-red-cap.png',
+];
+function avatarPng(seat) {
+  return AVATAR_PNGS[((seat % 3) + 3) % 3];
+}
+
+/** 座位围绕椭圆分布，自己固定在底部（Hero Dock），其余席位在桌沿顺时针排布：
+ *  1=左下 2=左上 3=顶部 4=右上 5=右下（6 人时与 A1 效果图一致）。
+ *  注意：传入的 index 已是"相对自己的序号"，自己=0 恒在正下方。 */
+function seatPosition(index, total) {
   const angleDeg = 90 + (index / total) * 360;
   const rad = (angleDeg * Math.PI) / 180;
-  let rx = 46, ry = 42; // 椭圆半轴（百分比）
-  if (isMe) { rx = 0; ry = 44; }
-  // 窄屏收紧横向/纵向钳制：座位堆叠在窄屏会往下压到桌心底池，
-  // 顶部座位上移到 8% 给桌心让位；86% 横向也会把最右座位推出视口
   const narrow = typeof window !== 'undefined' && window.innerWidth <= 900;
-  const maxX = (window.innerWidth <= 420 && !isMe) ? 83 : 86;
-  const yMin = narrow ? 8 : 12;
+  const rx = narrow ? 46 : 44;
+  const ry = narrow ? 42 : 42;
+  const xMin = narrow ? 14 : 9;
+  const xMax = narrow ? 86 : 91;
+  const yMin = narrow ? 8 : 9;
+  const yMax = narrow ? 88 : 71;
   return {
-    x: Math.max(14, Math.min(maxX, 50 + Math.cos(rad) * rx)),
-    y: Math.max(yMin, Math.min(88, 50 + Math.sin(rad) * ry)),
+    x: Math.max(xMin, Math.min(xMax, 50 + Math.cos(rad) * rx)),
+    y: Math.max(yMin, Math.min(yMax, 50 + Math.sin(rad) * ry)),
   };
+}
+
+/** 席位状态徽标（互斥，按优先级取一个） */
+function seatStateBadge(p) {
+  if (p.allIn && ['preflop', 'flop', 'turn', 'river', 'showdown'].includes(state.stage)) return '全押';
+  if (p.folded && state.stage !== 'waiting' && state.stage !== 'handover') return '已弃牌';
+  if (!p.connected) return '离线';
+  if (p.sittingOut) return '暂离';
+  return '';
+}
+
+function seatCardHtml(p, isMe) {
+  const isTurn = p.seat === state.turnSeat && !p.folded &&
+    ['preflop', 'flop', 'turn', 'river'].includes(state.stage);
+  const stateBadge = seatStateBadge(p);
+  const dealer = p.isDealer && state.stage !== 'waiting'
+    ? '<span class="dealer-badge" title="庄家">D</span>' : '';
+  return `
+    ${dealer}
+    <img class="avatar-img" src="${avatarPng(p.seat)}" alt="${escapeHtml(p.name)} 的像素头像" />
+    <div class="seat-copy">
+      <strong>${escapeHtml(p.name)}</strong>
+      <span class="seat-chips">${p.chips}</span>
+    </div>
+    ${stateBadge ? `<span class="state-badge">${stateBadge}</span>` : ''}
+    ${isTurn ? '<span class="turn-dot" aria-label="正在行动"></span>' : ''}
+  `;
 }
 
 function renderSeats() {
@@ -363,42 +440,26 @@ function renderSeats() {
   wrap.innerHTML = '';
   const players = state.players;
   players.forEach((p) => {
+    if (p.seat === mySeat) return; // 自己固定渲染在 Hero Dock
     const relIdx = (p.seat - (mySeat >= 0 ? mySeat : 0) + players.length) % players.length;
-    const pos = seatPosition(relIdx, players.length, p.seat === mySeat);
+    const pos = seatPosition(relIdx, players.length);
 
     const div = document.createElement('div');
     div.className = 'seat' + (p.folded ? ' folded-seat' : '') +
-      (p.seat === state.turnSeat && !p.folded ? ' active-turn' : '') +
-      (p.seat === mySeat ? ' me' : '');
+      (p.seat === state.turnSeat && !p.folded ? ' active-turn' : '');
     div.dataset.seat = p.seat;
 
-    const badges = [];
-    if (p.isDealer && state.stage !== 'waiting') badges.push('<span class="dealer-badge">D</span>');
-
     div.innerHTML = `
-      <div class="avatar">${p.avatar}${badges.length ? `<span class="badges">${badges.join('')}</span>` : ''}</div>
-      <div class="plate">
-        <div class="pname">${p.name}${p.connected ? '' : '<br><span class="offline-mark">离线</span>'}${p.sittingOut ? '<br><span class="sitting-mark">暂离</span>' : ''}</div>
-        <div class="pchips">${p.chips}</div>
-        ${p.totalBet > 0 && state.stage !== 'waiting' ? `<div class="ptotal">本局已投 ${p.totalBet}</div>` : ''}
-      </div>
       <div class="hole-cards"></div>
-      ${p.roundBet > 0 ? `<div class="bet-chip">${p.roundBet}</div>` : ''}
-      ${p.sittingOut ? `<button class="sit-back-btn" data-seat="${p.seat}">坐回</button>` : ''}
+      <div class="seat-card">${seatCardHtml(p, false)}</div>
     `;
 
-    // 手牌：自己的只在底部"我的区域"展示；对手未摊牌时显示牌背（营造对局感），
-    // 摊牌后服务端会公开真实手牌，届时自然亮出
+    // 摊牌后服务端公开手牌：亮出（未摊牌时不显示牌背，保持桌面干净）
     const holeDiv = div.querySelector('.hole-cards');
-    if (p.seat !== mySeat && p.hole && p.hole.length) {
+    if (p.hole && p.hole.length && state.revealed) {
       p.hole.forEach((c) => holeDiv.appendChild(cardEl(c, false)));
-    } else if (p.seat !== mySeat && !p.hole && p.holeCount === 2 && !p.folded && state.stage !== 'waiting') {
-      for (let k = 0; k < 2; k++) {
-        const back = document.createElement('div');
-        back.className = 'card back';
-        holeDiv.appendChild(back);
-      }
     }
+
     div.style.left = pos.x + '%';
     div.style.top = pos.y + '%';
     wrap.appendChild(div);
@@ -419,13 +480,58 @@ function renderSeats() {
     }
   });
 
-  // 坐回按钮
+  // 坐回按钮（暂离对手座位上的快捷入口）
   wrap.querySelectorAll('.sit-back-btn').forEach((btn) => {
     btn.onclick = () => {
       socket.emit('sit_back', null, (res) => {
         if (!res.ok) flashTip(res.err);
       });
     };
+  });
+}
+
+/** Hero 席位：与手牌、操作区同属一个视觉结构锚点 */
+function renderHeroSeat(me) {
+  const box = document.getElementById('hero-seat');
+  if (!me) {
+    box.innerHTML = '<div class="seat-card me-seat seat-empty">未入座</div>';
+    return;
+  }
+  const isTurn = me.seat === state.turnSeat && !me.folded &&
+    ['preflop', 'flop', 'turn', 'river'].includes(state.stage);
+  const stateBadge = seatStateBadge(me);
+  box.innerHTML = `
+    <div class="seat-card me-seat${isTurn ? ' is-current' : ''}${me.folded ? ' folded-seat' : ''}">
+      ${me.isDealer && state.stage !== 'waiting' ? '<span class="dealer-badge" title="庄家">D</span>' : ''}
+      <img class="avatar-img" src="${avatarPng(me.seat)}" alt="我的像素头像" />
+      <div class="seat-copy">
+        <strong>${escapeHtml(me.name)}</strong>
+        <span class="seat-chips">${me.chips}</span>
+      </div>
+      ${stateBadge ? `<span class="state-badge">${stateBadge}</span>` : ''}
+    </div>
+  `;
+}
+
+/** 下注筹码层：显示在席位与桌心之间，不挤进玩家卡片 */
+function renderBets() {
+  const wrap = document.getElementById('bets');
+  wrap.innerHTML = '';
+  if (state.stage === 'waiting') return;
+  const players = state.players;
+  players.forEach((p) => {
+    if (!(p.roundBet > 0)) return;
+    const relIdx = (p.seat - (mySeat >= 0 ? mySeat : 0) + players.length) % players.length;
+    const pos = seatPosition(relIdx, players.length);
+    // 向桌心方向收 42%，落在席位与公共牌之间的桌面上
+    const bx = pos.x + (50 - pos.x) * 0.42;
+    const by = pos.y + (50 - pos.y) * 0.42;
+    const chip = document.createElement('div');
+    chip.className = 'bet-chip';
+    chip.style.left = bx + '%';
+    chip.style.top = by + '%';
+    chip.innerHTML = `<i class="chip-dot" aria-hidden="true"></i><b>${p.roundBet}</b>`;
+    wrap.appendChild(chip);
   });
 }
 
@@ -436,44 +542,60 @@ function cardEl(c, deal) {
   const el = document.createElement('div');
   el.className = 'card' + (deal ? ' deal' : '') + (c.s === 'h' || c.s === 'd' ? ' red' : '');
   const r = RANK_LABEL[c.r] || c.r;
-  el.innerHTML = `<span>${r}<br>${SUIT_CHAR[c.s]}</span>`;
+  const s = SUIT_CHAR[c.s];
+  el.innerHTML = `<span class="idx"><b>${r}</b><i>${s}</i></span><span class="pip">${s}</span><span class="idx flip"><b>${r}</b><i>${s}</i></span>`;
   return el;
 }
 
 const cardKey = (c) => c.r + '_' + c.s;
+const COMMUNITY_SLOTS = 5;
 let communityKeys = [];
+/** 公共牌固定 5 个槽位：已发的填白底真牌，未发的留暗色空位 */
 function renderCommunity() {
   const box = document.getElementById('community');
   const keys = state.community.map(cardKey);
-  const grew = keys.length > communityKeys.length;
-  const isPrefix = keys.length >= communityKeys.length &&
-    communityKeys.every((k, i) => keys[i] === k);
+  let prevKeys = communityKeys;
+  const isPrefix = keys.length >= prevKeys.length &&
+    prevKeys.every((k, i) => keys[i] === k);
+  if (!isPrefix) prevKeys = []; // 新一局：全部按新牌处理
 
-  if (!isPrefix) {
-    // 新一局：整体重建
-    box.innerHTML = '';
-    state.community.forEach((c) => box.appendChild(cardEl(c, true)));
-  } else if (grew) {
-    const hint = box.querySelector('.waiting-hint');
-    if (hint) hint.remove();
-    for (let i = communityKeys.length; i < keys.length; i++) {
-      box.appendChild(cardEl(state.community[i], true));
+  while (box.children.length < COMMUNITY_SLOTS) {
+    const slot = document.createElement('div');
+    slot.className = 'card-slot';
+    box.appendChild(slot);
+  }
+  while (box.children.length > COMMUNITY_SLOTS) {
+    box.removeChild(box.lastChild);
+  }
+
+  for (let i = 0; i < COMMUNITY_SLOTS; i++) {
+    const slot = box.children[i];
+    const want = i < keys.length ? keys[i] : null;
+    if ((slot.dataset.key || null) === want) continue;
+    if (!want) {
+      slot.dataset.key = '';
+      slot.className = 'card-slot empty';
+      slot.innerHTML = '';
+    } else {
+      slot.dataset.key = want;
+      slot.className = 'card-slot filled';
+      slot.innerHTML = '';
+      slot.appendChild(cardEl(state.community[i], i >= prevKeys.length));
     }
   }
+  if (keys.length > prevKeys.length) sfx.deal();
   communityKeys = keys;
-  if (grew) sfx.deal();
-  if (!state.community.length && ['preflop'].includes(state.stage)) {
-    box.innerHTML = '<span class="waiting-hint" style="color:var(--muted);font-size:13px;">等待翻牌…</span>';
-  }
 }
 
-// ---------------- 我的区域 & 操作 ----------------
+// ---------------- Hero 区 & 操作 ----------------
 function renderMyArea() {
   const me = state.players[mySeat];
   const myCards = document.getElementById('my-cards');
   const bar = document.getElementById('action-bar');
+  const hint = document.getElementById('action-hint');
   const tip = document.getElementById('waiting-tip');
-  const timerEl = document.getElementById('turn-timer');
+
+  renderHeroSeat(me);
 
   if (me && me.hole && me.hole.length && state.stage !== 'waiting') {
     myCards.classList.remove('hidden');
@@ -507,6 +629,7 @@ function renderMyArea() {
     ['preflop', 'flop', 'turn', 'river'].includes(state.stage);
   if (inHandActive && state.turnSeat === mySeat) {
     bar.classList.remove('hidden');
+    hint.classList.remove('hidden');
     tip.textContent = '';
     resetFoldBtn(); // 新一轮行动开始时复位弃牌确认态
     updateActionBar(me);
@@ -518,9 +641,9 @@ function renderMyArea() {
       if (navigator.vibrate) navigator.vibrate(120);
       startTurnTimer();
     }
-    timerEl.classList.remove('hidden');
   } else {
     bar.classList.add('hidden');
+    hint.classList.add('hidden');
     hideRaisePanel();
     stopTurnTimer();
     if (inHandActive) tip.textContent = '等待其他玩家行动…';
@@ -539,6 +662,11 @@ function waitingTipText() {
 
 function updateActionBar(me) {
   const toCall = state.currentBet - me.roundBet;
+  // "轮到你 · 跟注 335"式提示：金额数据全部来自服务端状态
+  const hint = document.getElementById('action-hint');
+  hint.innerHTML = toCall <= 0 ? '轮到你 · <b>过牌</b>'
+    : toCall >= me.chips ? `轮到你 · <b>跟注全押 ${me.chips}</b>`
+      : `轮到你 · <b>跟注 ${toCall}</b>`;
   const callBtn = document.getElementById('btn-check-call');
   callBtn.textContent = toCall <= 0 ? '过牌'
     : toCall >= me.chips ? `跟注全押 (${me.chips})` : `跟注 ${toCall}`;
@@ -560,44 +688,74 @@ function updateActionBar(me) {
   input.value = minRaiseTo;
   input.min = minRaiseTo;
   input.max = maxRaiseTo;
+  document.getElementById('raise-confirm-value').textContent = minRaiseTo.toLocaleString('zh-CN');
+  document.getElementById('raise-min-label').textContent = `最小 ${minRaiseTo.toLocaleString('zh-CN')}`;
+  document.getElementById('raise-max-label').textContent = `最大 ${maxRaiseTo.toLocaleString('zh-CN')}`;
+  const isBet = state.currentBet === 0 || state.currentBet <= me.roundBet;
+  document.getElementById('raise-label').textContent = isBet ? '下注到' : '加注到';
 
-  slider.oninput = () => { input.value = slider.value; };
-  input.oninput = () => { if (+input.value >= +slider.min && +input.value <= +slider.max) slider.value = input.value; };
+  const syncFromSlider = () => {
+    input.value = slider.value;
+    document.getElementById('raise-confirm-value').textContent =
+      Number(slider.value).toLocaleString('zh-CN');
+  };
+  slider.oninput = syncFromSlider;
+  input.oninput = () => {
+    if (+input.value >= +slider.min && +input.value <= +slider.max) {
+      slider.value = input.value;
+      document.getElementById('raise-confirm-value').textContent =
+        Number(slider.value).toLocaleString('zh-CN');
+    }
+  };
+  document.getElementById('raise-dec').onclick = () => {
+    slider.value = Number(slider.value) - Number(slider.step);
+    syncFromSlider();
+  };
+  document.getElementById('raise-inc').onclick = () => {
+    slider.value = Number(slider.value) + Number(slider.step);
+    syncFromSlider();
+  };
 
   // 快捷下注：基于服务端权威的 pot / currentBet 计算"跟注后的底池"比例，
   // 低于最小合法加注自动抬到最小值，超出最大金额自动封顶（全押）
   const PRESET_FRAC = { third: 1 / 3, half: 1 / 2, twothird: 2 / 3, pot: 1 };
   document.querySelectorAll('.preset').forEach((btn) => {
     btn.onclick = () => {
-      const frac = PRESET_FRAC[btn.dataset.preset];
-      if (!frac) return;
-      const potAfterCall = state.pot + toCall;
-      const target = state.currentBet + Math.ceil(potAfterCall * frac);
-      const v = Math.max(minRaiseTo, Math.min(maxRaiseTo, target));
+      let v;
+      if (btn.dataset.preset === 'allin') {
+        v = maxRaiseTo;
+      } else {
+        const frac = PRESET_FRAC[btn.dataset.preset];
+        if (!frac) return;
+        const potAfterCall = state.pot + toCall;
+        const target = state.currentBet + Math.ceil(potAfterCall * frac);
+        v = Math.max(minRaiseTo, Math.min(maxRaiseTo, target));
+      }
       slider.value = v; input.value = v;
+      document.getElementById('raise-confirm-value').textContent =
+        Number(slider.value).toLocaleString('zh-CN');
     };
   });
 
-  document.getElementById('btn-toggle-raise').textContent =
-    state.currentBet === 0 || state.currentBet <= me.roundBet ? '下注' : '加注';
-  document.getElementById('btn-toggle-raise').disabled = maxRaiseTo <= state.currentBet;
-  document.getElementById('btn-toggle-raise').onclick = onRaiseToggleClick;
+  const raiseBtn = document.getElementById('btn-toggle-raise');
+  raiseBtn.textContent = isBet ? '下注' : '加注';
+  raiseBtn.disabled = maxRaiseTo <= state.currentBet;
+  raiseBtn.onclick = onRaiseToggleClick;
+  document.getElementById('btn-raise-confirm').onclick = confirmRaise;
+  document.getElementById('btn-raise-cancel').onclick = hideRaisePanel;
 }
 
-/** 加注按钮：面板关闭时点击展开；展开后变为"确认加注" */
+/** 加注按钮：点击展开 Raise Controller 面板，面板内取消或确认 */
 function onRaiseToggleClick() {
-  if (!raiseOpen) {
-    raiseOpen = true;
-    document.getElementById('raise-panel').classList.remove('hidden');
-    const toggle = document.getElementById('btn-toggle-raise');
-    toggle.textContent = '确认加注 ✓';
-  } else {
-    confirmRaise();
-  }
+  raiseOpen = true;
+  document.getElementById('raise-panel').classList.remove('hidden');
+  document.getElementById('btn-toggle-raise').classList.add('is-active');
 }
 function hideRaisePanel() {
   raiseOpen = false;
   document.getElementById('raise-panel').classList.add('hidden');
+  const toggle = document.getElementById('btn-toggle-raise');
+  if (toggle) toggle.classList.remove('is-active');
 }
 document.getElementById('raise-input').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') confirmRaise();
@@ -639,7 +797,17 @@ function confirmRaise() {
 }
 
 function sendAction(type, amount) {
+  const buttons = document.getElementById('action-buttons');
+  buttons.classList.add('is-waiting');
+  buttons.setAttribute('aria-busy', 'true');
+  const clearWaiting = () => {
+    buttons.classList.remove('is-waiting');
+    buttons.removeAttribute('aria-busy');
+  };
+  // 兜底：网络异常收不到回执时 3 秒后自动解除等待态
+  setTimeout(clearWaiting, 3000);
   socket.emit('action', { type, amount }, (res) => {
+    clearWaiting();
     if (res.ok) sfx.bet();
     else flashTip(res.err);
   });
@@ -684,9 +852,9 @@ function renderResults() {
       <div class="pot-label">${label} · ${pot.amount} 筹码</div>
       ${pot.winners.map((w) => `
         <div class="winners">
-          <span class="winner-avatar">${state.players[w.seat] ? state.players[w.seat].avatar : ''}</span>
+          <img class="winner-avatar" src="${avatarPng(w.seat)}" alt="" />
           <div class="winner-info">
-            <div class="winner-name"><b>${w.name}</b> 赢得 ${pot.amount} 筹码</div>
+            <div class="winner-name"><b>${escapeHtml(w.name)}</b> 赢得 ${pot.amount} 筹码</div>
             ${w.handName ? `<div class="hand-name">牌型: ${w.handName}</div>` : '<div class="hand-name">对手全部弃牌</div>'}
             ${winnerCardsHtml(w)}
           </div>
@@ -737,7 +905,7 @@ function renderSession() {
     const plCls = e.pl > 0 ? 'pl-pos' : e.pl < 0 ? 'pl-neg' : '';
     const plText = (e.pl > 0 ? '+' : '') + e.pl;
     return `<tr>
-      <td>${e.name}${e.left ? '（离场）' : ''}</td>
+      <td>${escapeHtml(e.name)}${e.left ? '（离场）' : ''}</td>
       <td>${e.buyIn}</td>
       <td>${chips}</td>
       <td class="${plCls}">${plText}</td>
@@ -752,11 +920,12 @@ function winnerCardsHtml(w) {
   if (!w.hole || !w.hole.length || !state.community || !state.community.length || !w.bestCards) return '';
   const bestKeys = new Set(w.bestCards.map((c) => c.r + '_' + c.s));
   const all = [...w.hole, ...state.community];
-  return `<div class="win-cards">` + all.map((c) => {
-    const hl = bestKeys.has(c.r + '_' + c.s) ? ' hl' : '';
-    const red = c.s === 'h' || c.s === 'd' ? ' red' : '';
-    return `<div class="card mini${red}${hl}"><span>${RANK_LABEL[c.r] || c.r}<br>${SUIT_CHAR[c.s]}</span></div>`;
-  }).join('') + `</div>`;
+  return '<div class="win-cards">' + all.map((c) => {
+    const el = cardEl(c, false);
+    if (bestKeys.has(c.r + '_' + c.s)) el.classList.add('hl');
+    el.classList.add('mini');
+    return el.outerHTML;
+  }).join('') + '</div>';
 }
 let countdown = 8;
 let countdownTimer = null;
@@ -784,7 +953,9 @@ socket.on('emoji', ({ seat, emoji }) => {
   if (seat !== mySeat) showEmojiBubble(seat, emoji); // 自己的已在点击时展示
 });
 function showEmojiBubble(seat, emoji) {
-  const seatEl = document.querySelector(`.seat[data-seat="${seat}"]`);
+  const seatEl = seat === mySeat
+    ? document.querySelector('#hero-seat .seat-card')
+    : document.querySelector(`.seat[data-seat="${seat}"]`);
   if (!seatEl || !state || state.stage === 'waiting') return;
   // 同一座位连发时先清掉上一个，避免堆叠
   const prev = seatEl.querySelector('.emoji-bubble');

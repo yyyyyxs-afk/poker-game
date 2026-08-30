@@ -4,11 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>德州扑克 · 好友局</title>
+  <link rel="stylesheet" href="a1-foundation.css" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-  <!-- 大厅 -->
+  <!-- 大厅（Phase 6 再做深度改版，本轮保持结构与功能） -->
   <div id="lobby" class="screen">
     <div class="lobby-card">
       <h1>德州扑克</h1>
@@ -27,64 +28,114 @@
     </div>
   </div>
 
-  <!-- 牌桌 -->
+  <!-- 牌局：Game Shell → Header → Play Layout（Play Stage + Log Panel） -->
   <div id="game" class="screen hidden">
     <header id="topbar">
-      <span class="room-badge">房号 <b id="room-code-display"></b><button id="btn-copy-code" title="复制房号">复制</button><button id="btn-copy-link" title="复制邀请链接">复制链接</button></span>
-      <span class="blinds" id="blinds-info">盲注 10/20</span>
-      <span id="hand-info"></span>
-      <button id="btn-settings" class="chip-btn hidden">房管设置</button>
-      <button id="btn-sound" class="chip-btn"></button>
-      <button id="btn-leave" class="btn btn-secondary btn-small">退出房间</button>
+      <div class="topbar-group topbar-left">
+        <div class="menu-wrap">
+          <button id="btn-menu" class="icon-btn" aria-label="打开菜单" aria-haspopup="true" aria-expanded="false">
+            <img src="assets/a1/icons/text-indent-left.svg" alt="" />
+          </button>
+          <div id="menu-dropdown" class="hidden" role="menu">
+            <button id="btn-copy-code" role="menuitem">复制房号</button>
+            <button id="btn-copy-link" role="menuitem">复制邀请链接</button>
+            <button id="btn-leave" class="menu-danger" role="menuitem">退出房间</button>
+          </div>
+        </div>
+        <span class="room-meta">房间号 <b id="room-code-display"></b></span>
+        <span class="topbar-sep" aria-hidden="true"></span>
+        <span class="blinds" id="blinds-info">盲注 10/20</span>
+        <span id="hand-info"></span>
+      </div>
+      <div class="topbar-group topbar-right">
+        <button id="btn-sound" class="icon-btn" aria-label="音效">
+          <img class="icon-on" src="assets/a1/icons/volume-up.svg" alt="" />
+          <img class="icon-off" src="assets/a1/icons/volume-mute.svg" alt="" />
+        </button>
+        <button id="btn-settings" class="icon-btn hidden" aria-label="房管设置">
+          <img src="assets/a1/icons/gear.svg" alt="" />
+        </button>
+        <button id="btn-log-toggle" class="icon-btn" aria-label="牌局记录" aria-pressed="true">
+          <img src="assets/a1/icons/journal-text.svg" alt="" />
+        </button>
+      </div>
     </header>
 
-    <main id="table-wrap">
-      <div id="table">
-        <div id="felt-deco"></div>
-        <div id="table-inner">
-          <div id="pot-display">底池 <b id="pot-value">0</b></div>
-          <div id="community"></div>
-          <div id="stage-label"></div>
+    <main id="play-layout">
+      <section id="play-stage">
+        <div id="table">
+          <div id="table-ring" aria-hidden="true"></div>
+          <div id="table-inner">
+            <div id="stage-label"></div>
+            <div id="pot-display"><span class="pot-label">底池</span><b id="pot-value">0</b></div>
+            <div id="community"></div>
+          </div>
+          <!-- 下注筹码层：席位与桌心之间 -->
+          <div id="bets" aria-hidden="true"></div>
+          <!-- 对手席位由 JS 渲染 -->
+          <div id="seats"></div>
         </div>
-        <!-- 玩家座位由 JS 渲染 -->
-        <div id="seats"></div>
-      </div>
+
+        <!-- Hero 一体化：席位 + 手牌 + 倒计时 + 操作区，同一结构锚点 -->
+        <div id="hero-dock">
+          <div id="hero-row">
+            <div id="hero-seat"></div>
+            <div id="my-cards" class="hidden"></div>
+            <div id="turn-timer" class="hidden"></div>
+          </div>
+          <div id="action-hint" class="hidden" aria-live="polite"></div>
+          <div id="action-bar" class="hidden">
+            <div id="raise-panel" class="hidden">
+              <div class="raise-head">
+                <span class="raise-label" id="raise-label">加注到</span>
+                <input id="raise-input" type="number" step="10" inputmode="numeric" aria-label="加注金额" />
+              </div>
+              <div class="raise-presets" role="group" aria-label="快捷加注">
+                <button class="btn preset" data-preset="third">1/3池</button>
+                <button class="btn preset" data-preset="half">1/2池</button>
+                <button class="btn preset" data-preset="twothird">2/3池</button>
+                <button class="btn preset" data-preset="pot">满池</button>
+                <button class="btn preset" data-preset="allin">全押</button>
+              </div>
+              <div class="raise-slider-row">
+                <button id="raise-dec" class="step-btn" aria-label="减少加注额">−</button>
+                <input id="raise-slider" type="range" min="0" max="0" step="10" value="0" aria-label="加注额" />
+                <button id="raise-inc" class="step-btn" aria-label="增加加注额">＋</button>
+              </div>
+              <div class="raise-range"><span id="raise-min-label"></span><span id="raise-max-label"></span></div>
+              <div class="raise-actions">
+                <button id="btn-raise-cancel" class="btn btn-ghost">取消</button>
+                <button id="btn-raise-confirm" class="btn btn-raise">确认加注 <span id="raise-confirm-value">0</span></button>
+              </div>
+            </div>
+            <div id="action-buttons">
+              <button id="btn-fold" class="btn btn-danger">弃牌</button>
+              <button id="btn-check-call" class="btn btn-call">过牌</button>
+              <button id="btn-toggle-raise" class="btn btn-raise">加注</button>
+              <button id="btn-allin" class="btn btn-allin">全押</button>
+            </div>
+          </div>
+          <div class="footer-buttons">
+            <button id="btn-start" class="btn btn-primary hidden">开始游戏</button>
+            <button id="btn-rebuy" class="btn btn-warning hidden">重新买入（补充 2000 筹码）</button>
+            <button id="btn-sit-out" class="btn btn-secondary hidden">暂离（不参与下局）</button>
+            <button id="btn-sit-back" class="btn btn-primary hidden">坐回</button>
+          </div>
+          <div id="emoji-bar" class="hidden"></div>
+          <div id="waiting-tip"></div>
+        </div>
+      </section>
 
       <aside id="log-panel">
-        <h3>牌局动态</h3>
+        <div class="log-head">
+          <h3>牌局记录</h3>
+          <button id="btn-log-collapse" class="icon-btn small" aria-label="收起牌局记录">
+            <img src="assets/a1/icons/chevron-right.svg" alt="" />
+          </button>
+        </div>
         <ul id="log-list"></ul>
       </aside>
     </main>
-
-    <!-- 我的区域 + 操作栏 -->
-    <footer id="my-area">
-      <div id="my-cards" class="hidden"></div>
-      <div id="action-bar" class="hidden">
-        <div id="turn-timer" class="hidden"></div>
-        <div id="raise-panel" class="hidden">
-          <button class="btn preset" data-preset="third">1/3池</button>
-          <button class="btn preset" data-preset="half">1/2池</button>
-          <button class="btn preset" data-preset="twothird">2/3池</button>
-          <button class="btn preset" data-preset="pot">满池</button>
-          <input id="raise-slider" type="range" min="0" max="0" step="10" value="0" />
-          <input id="raise-input" type="number" step="10" />
-        </div>
-        <div id="action-buttons">
-          <button id="btn-fold" class="btn btn-danger">弃牌</button>
-          <button id="btn-check-call" class="btn btn-secondary">过牌</button>
-          <button id="btn-toggle-raise" class="btn btn-primary">加注</button>
-          <button id="btn-allin" class="btn btn-warning">全押</button>
-        </div>
-      </div>
-      <div id="emoji-bar" class="hidden"></div>
-      <div class="footer-buttons">
-        <button id="btn-start" class="btn btn-primary hidden">开始游戏</button>
-        <button id="btn-rebuy" class="btn btn-warning hidden">重新买入（补充 2000 筹码）</button>
-        <button id="btn-sit-out" class="btn btn-secondary hidden">暂离（不参与下局）</button>
-        <button id="btn-sit-back" class="btn btn-primary hidden">坐回</button>
-      </div>
-      <div id="waiting-tip"></div>
-    </footer>
 
     <!-- 房管设置弹窗 -->
     <div id="settings-overlay" class="overlay hidden">
@@ -133,7 +184,7 @@
       </div>
     </div>
 
-    <!-- 结果弹窗 -->
+    <!-- 结果弹窗（Phase 6 改牌桌直显，本轮保持可用） -->
     <div id="result-overlay" class="overlay hidden">
       <div id="result-card">
         <h2 id="result-title"></h2>
