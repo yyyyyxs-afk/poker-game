@@ -27,6 +27,16 @@
   --a1-disabled: #596164;
   --a1-card-red: #a33c3a;
 
+  /* Phase 6 追加（原因：下注筹码归属描边需要 6 席位身份色，
+     色值取自像素头像主色调的低饱和变体，一席一色固定映射；
+     运行时由 client.js 按 seat%6 引用，头像资产扩充到 6 款后与之一一对应） */
+  --a1-seat-1: #5b6f96; /* 藏青蓝（blue-headphones） */
+  --a1-seat-2: #a05c7c; /* 暗洋红（magenta-asym） */
+  --a1-seat-3: #b05a50; /* 砖红（red-cap） */
+  --a1-seat-4: #4e7a72; /* 暗青绿（teal-ponytail，待生成） */
+  --a1-seat-5: #a08a4e; /* 芥末黄（amber-beanie，待生成） */
+  --a1-seat-6: #6e5a8a; /* 暗紫（violet-bangs，待生成） */
+
   --a1-space-1: 4px;
   --a1-space-2: 8px;
   --a1-space-3: 12px;
