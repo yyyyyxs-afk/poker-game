@@ -516,6 +516,33 @@ function renderHeroSeat(me) {
   `;
 }
 
+/** 下注筹码落点：席位→桌心 42% 插值；若落入公共牌保守带则弹出带外。
+ *  保守带比任何断点的真实牌带都宽（手机 40px 牌带 x≈18%~82%，PC 更窄）。
+ *  判定用圆片矩形（含最坏半尺寸，手机 375 宽下的 56×20 圆片）而非中心点，
+ *  保证任何座位在任何街道下注后，圆片与五张公共牌零重叠。
+ *  推出方向：席位居上→推到带上方；居下→推到带下方；
+ *  贴桌沿的席位（手机自己的席位，带下方已无空间）→沿横轴推到带外。 */
+const BET_BAND = { x1: 17, x2: 83, y1: 40, y2: 82 };
+const BET_CHIP_HALF_W = 8; // 圆片半宽（桌宽百分比，取手机最坏情况再留余量）
+const BET_CHIP_HALF_H = 4; // 圆片半高（桌高百分比）
+function betPosition(pos) {
+  const { x, y } = pos;
+  let bx = x + (50 - x) * 0.42;
+  let by = y + (50 - y) * 0.42;
+  const inBand = bx + BET_CHIP_HALF_W > BET_BAND.x1 && bx - BET_CHIP_HALF_W < BET_BAND.x2 &&
+    by + BET_CHIP_HALF_H > BET_BAND.y1 && by - BET_CHIP_HALF_H < BET_BAND.y2;
+  if (inBand) {
+    if (y < 50) {
+      by = BET_BAND.y1 - BET_CHIP_HALF_H - 1;
+    } else if (y <= 78) {
+      by = BET_BAND.y2 + BET_CHIP_HALF_H + 1;
+    } else {
+      bx = bx < 50 ? BET_BAND.x1 - BET_CHIP_HALF_W : BET_BAND.x2 + BET_CHIP_HALF_W;
+    }
+  }
+  return { x: bx, y: by };
+}
+
 /** 下注筹码层：显示在席位与桌心之间，不挤进玩家卡片 */
 function renderBets() {
   const wrap = document.getElementById('bets');
@@ -526,9 +553,7 @@ function renderBets() {
     if (!(p.roundBet > 0)) return;
     const relIdx = (p.seat - (mySeat >= 0 ? mySeat : 0) + players.length) % players.length;
     const pos = seatPosition(relIdx, players.length);
-    // 向桌心方向收 42%，落在席位与公共牌之间的桌面上
-    const bx = pos.x + (50 - pos.x) * 0.42;
-    const by = pos.y + (50 - pos.y) * 0.42;
+    const { x: bx, y: by } = betPosition(pos);
     const chip = document.createElement('div');
     chip.className = 'bet-chip';
     chip.style.left = bx + '%';
