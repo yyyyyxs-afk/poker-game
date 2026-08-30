@@ -284,6 +284,8 @@ body {
   pointer-events: auto;
 }
 .seat.folded-seat, .seat-card.folded-seat { opacity: .45; }
+/* 断线席位：徽标 + 整体降亮度（沿用 Phase 1 is-disconnected 的 0.55），弃牌态优先 */
+.seat.offline:not(.folded-seat) { opacity: .55; }
 
 .seat-card {
   position: relative;

@@ -446,7 +446,8 @@ function renderSeats() {
 
     const div = document.createElement('div');
     div.className = 'seat' + (p.folded ? ' folded-seat' : '') +
-      (p.seat === state.turnSeat && !p.folded ? ' active-turn' : '');
+      (p.seat === state.turnSeat && !p.folded ? ' active-turn' : '') +
+      (p.connected ? '' : ' offline');
     div.dataset.seat = p.seat;
 
     div.innerHTML = `
@@ -674,46 +675,64 @@ function updateActionBar(me) {
 
   document.getElementById('btn-allin').onclick = () => sendAction('allin');
 
-  // 加注面板范围：最小加注到 ~ 全部筹码
-  const minRaiseTo = Math.max(state.currentBet + state.minRaise,
-    Math.min(state.currentBet + 1, me.roundBet + me.chips));
+  // 加注面板范围：最小加注到 ~ 全部筹码。
+  // 筹码不足以最小加注时（rawMin > max）合法动作只剩全押：把下限钳到全部筹码，
+  // 避免 slider 出现 min>max 的非法区间、确认金额超过"最大"标签。
   const maxRaiseTo = me.roundBet + me.chips;
+  const rawMinRaiseTo = Math.max(state.currentBet + state.minRaise,
+    Math.min(state.currentBet + 1, maxRaiseTo));
+  const minRaiseTo = Math.min(rawMinRaiseTo, maxRaiseTo);
+  const allInOnly = rawMinRaiseTo > maxRaiseTo || maxRaiseTo <= state.currentBet;
   const slider = document.getElementById('raise-slider');
   slider.min = minRaiseTo;
   slider.max = maxRaiseTo;
   slider.step = cfg().bigBlind; // 步进跟盲注走，自定义盲注也能整步覆盖
-  slider.value = minRaiseTo;
-  if (maxRaiseTo <= minRaiseTo) slider.disabled = true; else slider.disabled = false;
+  // 面板打开期间不重置用户已调的金额（state 广播如对手表情/结算不丢失输入）
+  if (!raiseOpen) {
+    slider.value = minRaiseTo;
+  }
+  slider.disabled = maxRaiseTo <= minRaiseTo;
   const input = document.getElementById('raise-input');
-  input.value = minRaiseTo;
+  if (!raiseOpen) {
+    input.value = minRaiseTo;
+  }
   input.min = minRaiseTo;
   input.max = maxRaiseTo;
-  document.getElementById('raise-confirm-value').textContent = minRaiseTo.toLocaleString('zh-CN');
-  document.getElementById('raise-min-label').textContent = `最小 ${minRaiseTo.toLocaleString('zh-CN')}`;
+  const currentRaise = Number(slider.value) || minRaiseTo;
+  const confirmValue = document.getElementById('raise-confirm-value');
+  confirmValue.textContent = currentRaise.toLocaleString('zh-CN');
+  // 按钮首个子节点是"确认加注 "文本节点（金额在后面的 span 里），仅在类型正确时改写
+  const confirmBtn = document.getElementById('btn-raise-confirm');
+  if (confirmBtn.firstChild && confirmBtn.firstChild.nodeType === Node.TEXT_NODE) {
+    confirmBtn.firstChild.textContent = allInOnly ? '全押 ' : '确认加注 ';
+  }
+  document.getElementById('raise-min-label').textContent = allInOnly
+    ? '筹码不足以最小加注，仅全押'
+    : `最小 ${minRaiseTo.toLocaleString('zh-CN')}`;
   document.getElementById('raise-max-label').textContent = `最大 ${maxRaiseTo.toLocaleString('zh-CN')}`;
   const isBet = state.currentBet === 0 || state.currentBet <= me.roundBet;
   document.getElementById('raise-label').textContent = isBet ? '下注到' : '加注到';
 
-  const syncFromSlider = () => {
+  /** 滑条/步进/快捷共用：同步数字输入与确认按钮金额 */
+  const syncRaiseViews = () => {
     input.value = slider.value;
-    document.getElementById('raise-confirm-value').textContent =
-      Number(slider.value).toLocaleString('zh-CN');
+    confirmValue.textContent = Number(slider.value).toLocaleString('zh-CN');
   };
-  slider.oninput = syncFromSlider;
+  slider.oninput = syncRaiseViews;
   input.oninput = () => {
-    if (+input.value >= +slider.min && +input.value <= +slider.max) {
-      slider.value = input.value;
-      document.getElementById('raise-confirm-value').textContent =
-        Number(slider.value).toLocaleString('zh-CN');
-    }
+    const v = parseInt(input.value, 10);
+    if (!Number.isFinite(v)) return; // 输入中（空/负号/非数字）：不抖动，确认时统一钳制
+    const clamped = Math.max(+slider.min, Math.min(+slider.max, v));
+    slider.value = clamped;
+    confirmValue.textContent = clamped.toLocaleString('zh-CN');
   };
   document.getElementById('raise-dec').onclick = () => {
     slider.value = Number(slider.value) - Number(slider.step);
-    syncFromSlider();
+    syncRaiseViews();
   };
   document.getElementById('raise-inc').onclick = () => {
     slider.value = Number(slider.value) + Number(slider.step);
-    syncFromSlider();
+    syncRaiseViews();
   };
 
   // 快捷下注：基于服务端权威的 pot / currentBet 计算"跟注后的底池"比例，
@@ -732,8 +751,7 @@ function updateActionBar(me) {
         v = Math.max(minRaiseTo, Math.min(maxRaiseTo, target));
       }
       slider.value = v; input.value = v;
-      document.getElementById('raise-confirm-value').textContent =
-        Number(slider.value).toLocaleString('zh-CN');
+      confirmValue.textContent = Number(slider.value).toLocaleString('zh-CN');
     };
   });
 
