@@ -392,22 +392,31 @@ function avatarPng(seat) {
 
 /** 座位围绕椭圆分布，自己固定在底部（Hero Dock），其余席位在桌沿顺时针排布：
  *  1=左下 2=左上 3=顶部 4=右上 5=右下（6 人时与 A1 效果图一致）。
- *  手机（≤900）收窄钳制范围：席位完整落在 4:3 竖版桌沿内。
+ *  手机（≤900）侧翼席位纵向避开公共牌带，避免卡片压牌；横屏桌更扁，
+ *  牌带相对更靠中部，侧翼收得更高/更低。
+ *  注意：本函数参数与 betPosition 的 BET_BAND 保守带耦合，改动必须
+ *  连带复跑全断点 × 人数 × 席位的落点穷举（见提交 ff4ae98 说明）。
  *  注意：传入的 index 已是"相对自己的序号"，自己=0 恒在正下方。 */
 function seatPosition(index, total) {
   const angleDeg = 90 + (index / total) * 360;
   const rad = (angleDeg * Math.PI) / 180;
   const narrow = typeof window !== 'undefined' && window.innerWidth <= 900;
+  const landscape = typeof window !== 'undefined' && window.innerWidth > window.innerHeight;
   const rx = narrow ? 44 : 44;
   const ry = narrow ? 40 : 42;
   const xMin = narrow ? 14 : 9;
   const xMax = narrow ? 86 : 91;
-  const yMin = narrow ? 11 : 9;
-  const yMax = narrow ? 84 : 71;
-  return {
-    x: Math.max(xMin, Math.min(xMax, 50 + Math.cos(rad) * rx)),
-    y: Math.max(yMin, Math.min(yMax, 50 + Math.sin(rad) * ry)),
-  };
+  let x = Math.max(xMin, Math.min(xMax, 50 + Math.cos(rad) * rx));
+  let y = Math.max(narrow ? 11 : 9, Math.min(narrow ? 80 : 71, 50 + Math.sin(rad) * ry));
+  // 手机侧翼席位：收在公共牌带同一侧之外（卡片半高约 9%~16%，按桌比例分档）
+  if (narrow && index !== 0 && (x <= 30 || x >= 70)) {
+    if (landscape) {
+      y = y < 50 ? Math.min(y, 24) : Math.max(y, 88);
+    } else {
+      y = y < 50 ? Math.min(y, 27) : Math.max(y, 78);
+    }
+  }
+  return { x, y };
 }
 
 /** 席位状态徽标（互斥，按优先级取一个） */
@@ -516,28 +525,39 @@ function renderHeroSeat(me) {
   `;
 }
 
-/** 下注筹码落点：席位→桌心 42% 插值；若落入公共牌保守带则弹出带外。
- *  保守带比任何断点的真实牌带都宽（手机 40px 牌带 x≈18%~82%，PC 更窄）。
- *  判定用圆片矩形（含最坏半尺寸，手机 375 宽下的 56×20 圆片）而非中心点，
- *  保证任何座位在任何街道下注后，圆片与五张公共牌零重叠。
- *  推出方向：席位居上→推到带上方；居下→推到带下方；
- *  贴桌沿的席位（手机自己的席位，带下方已无空间）→沿横轴推到带外。 */
-const BET_BAND = { x1: 17, x2: 83, y1: 40, y2: 82 };
+/** 下注筹码落点：席位→桌心 42% 插值；若落入中央区保守带则弹出带外。
+ *  保守带 y 上界取 30%（stage-label 上沿之上），下界 82%（牌带之下）；
+ *  判定用圆片矩形（含最坏半尺寸 8%/4%，手机 375 宽下的 56×20 圆片）。
+ *  手机上侧翼席位圆片放席位卡正上方（该区域侧翼与桌心文字带之间无净空）。
+ *  注意：与 seatPosition 的手机侧翼参数耦合，改动必须连带复跑
+ *  全断点 × 人数 × 席位的落点穷举（见提交 ff4ae98 说明）。 */
+const BET_BAND = { x1: 17, x2: 83, y1: 30, y2: 82 };
 const BET_CHIP_HALF_W = 8; // 圆片半宽（桌宽百分比，取手机最坏情况再留余量）
 const BET_CHIP_HALF_H = 4; // 圆片半高（桌高百分比）
 function betPosition(pos) {
   const { x, y } = pos;
   let bx = x + (50 - x) * 0.42;
   let by = y + (50 - y) * 0.42;
+  const narrow = typeof window !== 'undefined' && window.innerWidth <= 900;
   const inBand = bx + BET_CHIP_HALF_W > BET_BAND.x1 && bx - BET_CHIP_HALF_W < BET_BAND.x2 &&
     by + BET_CHIP_HALF_H > BET_BAND.y1 && by - BET_CHIP_HALF_H < BET_BAND.y2;
   if (inBand) {
-    if (y < 50) {
+    if (narrow && (x <= 30 || x >= 70)) {
+      // 手机侧翼席位：圆片贴席位卡上/下沿（与卡片保持分离）
+      by = y < 50 ? y - 14 : y + 14;
+      if (by - BET_CHIP_HALF_H < 1 || by + BET_CHIP_HALF_H > 99) {
+        // 贴边无空间（如横屏下侧翼）：沿横轴推到带外、纵轴取带中线
+        bx = bx < 50 ? BET_BAND.x1 - BET_CHIP_HALF_W : BET_BAND.x2 + BET_CHIP_HALF_W;
+        by = 56;
+      }
+    } else if (y < 50) {
       by = BET_BAND.y1 - BET_CHIP_HALF_H - 1;
     } else if (y <= 78) {
       by = BET_BAND.y2 + BET_CHIP_HALF_H + 1;
     } else {
+      // 贴桌沿席位（手机自己的席位，x 居中）：横推到带外、取带中线避开侧翼席位卡
       bx = bx < 50 ? BET_BAND.x1 - BET_CHIP_HALF_W : BET_BAND.x2 + BET_CHIP_HALF_W;
+      by = 56;
     }
   }
   return { x: bx, y: by };
@@ -799,7 +819,8 @@ function updateActionBar(me) {
 }
 
 /** 加注按钮：点击展开 Raise Controller 面板，面板内取消或确认。
- *  .raising 同时挂到 action-bar 上：手机端据此收起四个主按钮（PC 无此样式规则） */
+ *  .raising 同时挂到 action-bar 上：手机端据此收起四个主按钮并显示遮罩
+ *  （PC 无对应样式规则）；点遮罩等同取消。 */
 function onRaiseToggleClick() {
   raiseOpen = true;
   document.getElementById('raise-panel').classList.remove('hidden');
@@ -810,8 +831,21 @@ function hideRaisePanel() {
   raiseOpen = false;
   document.getElementById('raise-panel').classList.add('hidden');
   document.getElementById('action-bar').classList.remove('raising');
+  document.getElementById('raise-panel').style.bottom = ''; // 清键盘兜底偏移
   const toggle = document.getElementById('btn-toggle-raise');
   if (toggle) toggle.classList.remove('is-active');
+}
+// 手机抽屉遮罩：点击等同取消
+document.getElementById('raise-scrim').addEventListener('click', hideRaisePanel);
+// 键盘弹起兜底（仅手机）：软键盘把抽屉盖住时，用 visualViewport 实测
+// 键盘高度把抽屉抬到键盘上方；键盘收起自动归位。主路径（快捷/滑条/步进）不依赖键盘。
+if (window.visualViewport && window.matchMedia('(max-width: 900px)').matches) {
+  const raisePanel = document.getElementById('raise-panel');
+  visualViewport.addEventListener('resize', () => {
+    if (!raiseOpen) return;
+    const keyboard = Math.max(0, window.innerHeight - visualViewport.height - visualViewport.offsetTop);
+    raisePanel.style.bottom = keyboard > 0 ? keyboard + 'px' : '';
+  });
 }
 document.getElementById('raise-input').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') confirmRaise();
