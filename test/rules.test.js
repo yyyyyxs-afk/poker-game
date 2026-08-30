@@ -6,7 +6,9 @@
  * 运行：node test/rules.test.js
  */
 const assert = require('assert');
-const { evaluate7, computePots, score5, newDeck } = require('../server.js');
+const {
+  evaluate7, computePots, score5, newDeck, normalizeNickname, newToken,
+} = require('../server.js');
 
 const C = (r, s) => ({ r, s });
 let passed = 0;
@@ -38,6 +40,30 @@ ok('洗牌：连续多副牌顺序不重复（随机性 sanity）', () => {
   const seen = new Set();
   for (let i = 0; i < 20; i++) seen.add(sig(newDeck()));
   assert.strictEqual(seen.size, 20, '20 次洗牌出现完全相同顺序');
+});
+
+// ---------------- 输入与身份安全 ----------------
+ok('昵称：中文保留、首尾空格裁剪，8 个可见字符为合法上限', () => {
+  assert.deepStrictEqual(normalizeNickname('  张三  '), { name: '张三' });
+  assert.deepStrictEqual(normalizeNickname('甲乙丙丁戊己庚辛'), { name: '甲乙丙丁戊己庚辛' });
+  assert.deepStrictEqual(normalizeNickname('😀😀😀😀😀😀😀😀'), { name: '😀😀😀😀😀😀😀😀' });
+});
+
+ok('昵称：Unicode 等价写法归一，按用户可见字符而非 UTF-16 长度计数', () => {
+  assert.deepStrictEqual(normalizeNickname('Ａ'), { name: 'A' });
+  assert.deepStrictEqual(normalizeNickname('e\u0301'), { name: 'é' });
+});
+
+ok('昵称：拒绝空白、非字符串、控制/零宽字符和 9 个可见字符', () => {
+  for (const value of ['   ', null, '甲\n乙', '甲\u200B乙', '甲乙丙丁戊己庚辛壬']) {
+    assert.ok(normalizeNickname(value).err, `应拒绝昵称 ${JSON.stringify(value)}`);
+  }
+});
+
+ok('身份 token：使用固定强度的 URL 安全随机值且批量不重复', () => {
+  const tokens = Array.from({ length: 100 }, () => newToken());
+  assert.strictEqual(new Set(tokens).size, tokens.length);
+  tokens.forEach((token) => assert.match(token, /^[A-Za-z0-9_-]{32}$/));
 });
 
 // ---------------- 牌力 ----------------

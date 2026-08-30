@@ -4,6 +4,7 @@
  * 2. 场景：对局中主动退出后守恒跨局保持
  * 3. 场景：断线保护窗口（不瞬间弃牌 / 窗口后自动弃牌 / 窗口内重连可继续行动）
  * 4. 场景：房管设置（行动时长 / 局间倒计时 / 禁止重买）校验
+ * 5. 安全：单连接单房、畸形 payload、Unicode 昵称归一与 token 防冒名
  *
  * 运行前先启动服务器：PORT=3456 node server.js
  * 执行：node test/smoke.test.js （或 TEST_URL=http://localhost:3100 npm test）
@@ -32,6 +33,28 @@ function emit(client, event, payload) {
   return new Promise((res, rej) => {
     client.emit(event, payload, (r) => (r && r.ok ? res(r) : rej(new Error((r && r.err) || (event + ' 失败')))));
   });
+}
+
+function request(client, event, payload, timeoutMs = 3000) {
+  return new Promise((res, rej) => {
+    const timer = setTimeout(() => rej(new Error(`${event} 未返回回执（服务端可能异常）`)), timeoutMs);
+    client.emit(event, payload, (reply) => {
+      clearTimeout(timer);
+      res(reply);
+    });
+  });
+}
+
+async function openClient() {
+  const client = io(URL, { transports: ['websocket'] });
+  activeClients.push(client);
+  if (client.connected) return client;
+  await new Promise((res, rej) => {
+    const timer = setTimeout(() => rej(new Error('Socket 连接超时')), 5000);
+    client.once('connect', () => { clearTimeout(timer); res(); });
+    client.once('connect_error', (err) => { clearTimeout(timer); rej(err); });
+  });
+  return client;
 }
 
 /**
@@ -122,6 +145,207 @@ function disconnectAll(clients) {
   activeClients = activeClients.filter((c) => !clients.includes(c));
 }
 
+// ---------- 安全场景：payload / 单连接单房 / Unicode 同名 / token 防冒名 ----------
+async function runSocketHardeningScenario() {
+  const first = await openClient();
+  let firstState = null;
+  first.on('state', (state) => { firstState = state; });
+
+  // 所有需要对象 payload 的事件都必须对 null、非对象、缺字段给出失败回执。
+  const objectEvents = ['create_room', 'join_room', 'update_settings', 'action', 'emoji', 'kick_player'];
+  for (const event of objectEvents) {
+    for (const payload of [null, 'bad-payload', {}]) {
+      const reply = await request(first, event, payload);
+      assert.ok(reply && reply.ok === false && reply.err, `${event} 未拒绝畸形 payload`);
+    }
+  }
+  // 无参数事件只接受 null / 无参数 / 空对象，不能让任意外部结构静默进入处理逻辑。
+  for (const event of ['start_game', 'next_hand', 'rebuy', 'sit_out', 'sit_back', 'leave_room']) {
+    const reply = await request(first, event, 'bad-payload');
+    assert.ok(reply && reply.ok === false && reply.err, `${event} 未拒绝额外 payload`);
+  }
+  console.log('  ✓ 全部 Socket 入口对畸形 payload 返回失败回执，服务仍可继续使用');
+
+  // NFKC 将全角 A 统一为 A；中文原样保留，首尾空格被裁剪。
+  const firstRoom = await emit(first, 'create_room', { name: '  Ａ张三  ' });
+  assert.ok(await waitUntil(() => firstState && firstState.players[0]
+    && firstState.players[0].name === 'A张三', 3000), '昵称未按预期归一/裁剪');
+
+  const duplicateCreate = await request(first, 'create_room', { name: '另一个房主' });
+  assert.strictEqual(duplicateCreate.ok, false, '同一连接重复建房应被拒绝');
+  assert.strictEqual(duplicateCreate.code, firstRoom.code, '重复建房回执应指出当前房间');
+
+  const second = await openClient();
+  const secondRoom = await emit(second, 'create_room', { name: '第二房主' });
+  const crossJoin = await request(first, 'join_room', { code: secondRoom.code, name: '跨房者' });
+  assert.strictEqual(crossJoin.ok, false, '同一连接加入第二个房间应被拒绝');
+  assert.strictEqual(crossJoin.code, firstRoom.code, '跨房回执应保留原房间归属');
+  console.log('  ✓ 同一连接重复 create / join 均被拒绝且返回当前房间');
+
+  const contender = await openClient();
+  const impersonation = await request(contender, 'join_room', { code: firstRoom.code, name: 'A张三' });
+  assert.strictEqual(impersonation.ok, false, 'Unicode 等价昵称不应绕过在线同名保护');
+  assert.match(impersonation.err, /昵称|在线|使用/);
+  await emit(contender, 'join_room', { code: firstRoom.code, name: '李四' });
+  console.log('  ✓ Unicode 等价昵称无法绕过现有在线冒名保护');
+
+  disconnectAll([first, second, contender]);
+}
+
+async function runTokenHijackScenario() {
+  const host = await openClient();
+  const victim = await openClient();
+  const attacker = await openClient();
+  let hostState = null;
+  host.on('state', (state) => { hostState = state; });
+
+  const room = await emit(host, 'create_room', { name: '房主甲' });
+  const victimJoin = await emit(victim, 'join_room', { code: room.code, name: '离线乙' });
+  await emit(host, 'start_game', null);
+  assert.ok(await waitUntil(() => hostState && ['preflop', 'flop', 'turn', 'river'].includes(hostState.stage), 3000),
+    '防冒名场景未正常开局');
+
+  victim.disconnect();
+  assert.ok(await waitUntil(() => hostState && hostState.players.some((p) => p.name === '离线乙' && !p.connected), 3000),
+    '服务端未记录玩家离线');
+
+  const hijack = await request(attacker, 'join_room', {
+    code: room.code, name: '离线乙', token: 'wrong-token',
+  });
+  assert.strictEqual(hijack.ok, false, '错误 token 不应接管离线座位');
+  assert.match(hijack.err, /昵称|使用/);
+
+  const restored = await emit(attacker, 'join_room', {
+    code: room.code, name: '离线乙', token: victimJoin.token,
+  });
+  assert.strictEqual(restored.token, victimJoin.token, '合法重连应沿用原 token');
+  console.log('  ✓ 离线座位拒绝错误 token，合法 token 可恢复且不轮换身份');
+
+  disconnectAll([host, victim, attacker]);
+}
+
+async function runFoldedHolePrivacyScenario() {
+  const fail = (msg) => { throw new Error(msg); };
+  const { clients, states } = await setupTable(3, fail);
+  let foldedSeat = -1;
+  let finalState = null;
+  const deadline = Date.now() + 20000;
+
+  while (!finalState && Date.now() < deadline) {
+    const table = states[0];
+    if (!table) { await sleep(30); continue; }
+    if (table.stage === 'handover' && table.revealed) {
+      const observer = states.find((state) => state && state.youSeat !== foldedSeat
+        && state.players[state.youSeat] && !state.players[state.youSeat].folded);
+      finalState = observer || null;
+      break;
+    }
+    if (!['preflop', 'flop', 'turn', 'river'].includes(table.stage) || table.turnSeat < 0) {
+      await sleep(30);
+      continue;
+    }
+
+    const actorIdx = states.findIndex((state) => state && state.youSeat === table.turnSeat);
+    if (actorIdx < 0) { await sleep(30); continue; }
+    const actor = table.players[table.turnSeat];
+    const type = foldedSeat < 0
+      ? 'fold'
+      : (table.currentBet - actor.roundBet <= 0 ? 'check' : 'call');
+    const reply = await request(clients[actorIdx], 'action', { type });
+    assert.ok(reply && reply.ok, `隐私专项行动失败: ${reply && reply.err}`);
+    if (foldedSeat < 0) foldedSeat = table.turnSeat;
+    await sleep(30);
+  }
+
+  assert.ok(finalState, '三人一人先弃牌场景未在时限内进入摊牌');
+  const folded = finalState.players[foldedSeat];
+  assert.ok(folded && folded.folded, '专项场景未保留先弃牌者');
+  assert.strictEqual(folded.hole, null, '已弃牌者底牌被公开给其他玩家');
+  const shownEligible = finalState.players.filter((p) => p.inHand && !p.folded && Array.isArray(p.hole) && p.hole.length === 2);
+  assert.strictEqual(shownEligible.length, 2, '有摊牌资格的两名玩家应正常亮牌');
+  console.log('  ✓ 三人局一人先弃牌：弃牌者底牌不公开，剩余两家正常亮牌');
+
+  disconnectAll(clients);
+}
+
+async function runDuplicateBusinessRequestScenario() {
+  const fail = (msg) => { throw new Error(msg); };
+  const states = new Array(2).fill(null);
+  const clients = [makeClient(states, 0, 2, fail), makeClient(states, 1, 2, fail)];
+  await sleep(300);
+  const room = await emit(clients[0], 'create_room', { name: '幂等甲' });
+  await emit(clients[1], 'join_room', { code: room.code, name: '幂等乙' });
+  await emit(clients[0], 'update_settings', {
+    startChips: 100, smallBlind: 1, bigBlind: 2,
+    actionTime: 20, nextHandDelay: 20, rebuyAllowed: true,
+  });
+
+  const startReplies = await Promise.all([
+    request(clients[0], 'start_game', null),
+    request(clients[0], 'start_game', null),
+  ]);
+  assert.strictEqual(startReplies.filter((reply) => reply && reply.ok).length, 1, '双 start_game 应仅一次成功');
+  assert.ok(await waitUntil(() => states[0] && states[0].handNumber === 1
+    && ['preflop', 'flop', 'turn', 'river'].includes(states[0].stage), 3000), '双 start_game 后手数异常');
+
+  let duplicateActionChecked = false;
+  let handover = null;
+  const allInDeadline = Date.now() + 30000;
+  for (let attempt = 0; attempt < 10 && !handover && Date.now() < allInDeadline; attempt++) {
+    const hand = states[0].handNumber;
+    while (Date.now() < allInDeadline) {
+      const table = states[0];
+      if (table && table.handNumber === hand && table.stage === 'handover') {
+        const zero = table.players.find((p) => p.chips === 0);
+        if (zero) handover = table;
+        else await emit(clients[0], 'next_hand', null); // 极少数平局，继续下一手
+        break;
+      }
+      if (table && table.handNumber === hand
+        && ['preflop', 'flop', 'turn', 'river'].includes(table.stage) && table.turnSeat >= 0) {
+        const actorIdx = states.findIndex((state) => state && state.youSeat === table.turnSeat);
+        if (actorIdx >= 0) {
+          if (!duplicateActionChecked) {
+            const replies = await Promise.all([
+              request(clients[actorIdx], 'action', { type: 'allin' }),
+              request(clients[actorIdx], 'action', { type: 'allin' }),
+            ]);
+            assert.strictEqual(replies.filter((reply) => reply && reply.ok).length, 1, '双 action 应仅一次成功');
+            duplicateActionChecked = true;
+          } else {
+            const reply = await request(clients[actorIdx], 'action', { type: 'allin' });
+            assert.ok(reply && reply.ok, `全押推进失败: ${reply && reply.err}`);
+          }
+        }
+      }
+      await sleep(30);
+    }
+  }
+
+  assert.ok(handover, '连续全押后未产生可重买玩家');
+  const zeroSeat = handover.players.find((p) => p.chips === 0).seat;
+  const zeroClientIdx = states.findIndex((state) => state && state.youSeat === zeroSeat);
+  const economyBefore = handover.economyTotal;
+  const rebuyReplies = await Promise.all([
+    request(clients[zeroClientIdx], 'rebuy', null),
+    request(clients[zeroClientIdx], 'rebuy', null),
+  ]);
+  assert.strictEqual(rebuyReplies.filter((reply) => reply && reply.ok).length, 1, '双 rebuy 应仅一次成功');
+  assert.ok(await waitUntil(() => states[0] && states[0].players[zeroSeat].chips === 100, 3000), '重买筹码未到账');
+  assert.strictEqual(states[0].economyTotal, economyBefore + 100, '双 rebuy 重复增加经济总盘');
+
+  const beforeNext = states[0].handNumber;
+  const nextReplies = await Promise.all([
+    request(clients[0], 'next_hand', null),
+    request(clients[0], 'next_hand', null),
+  ]);
+  assert.strictEqual(nextReplies.filter((reply) => reply && reply.ok).length, 1, '双 next_hand 应仅一次成功');
+  assert.ok(await waitUntil(() => states[0] && states[0].handNumber === beforeNext + 1, 3000), '双 next_hand 重复或未推进手数');
+  console.log('  ✓ 双 start / action / rebuy / next 请求均最多一次成功，手数与筹码只变更一次');
+
+  disconnectAll(clients);
+}
+
 // ---------- 场景 1：N 人随机对局（N = 2 / 3 / 6），守恒 + 零和 + 流程推进 ----------
 async function runIntegration(n) {
   const fail = (msg) => { throw new Error(msg); };
@@ -179,14 +403,15 @@ async function runIntegration(n) {
   disconnectAll(clients);
 }
 
-// ---------- 场景 2：对局中/局间退出，守恒跨局保持 ----------
+// ---------- 场景 2：对局中明确退出，结算后清退且守恒跨局保持 ----------
 async function runLeaveMidHand() {
   const fail = (msg) => { throw new Error(msg); };
   const actionErrorRef = { err: null };
-  const { clients, states, code, tokens } = await setupTable(3, fail);
+  const { clients, states } = await setupTable(3, fail);
   let bingLeft = false;
-  let yiLeft = false;
-  const drive = makeDriver(states, clients, actionErrorRef, (i) => (i === 2 && bingLeft) || (i === 1 && yiLeft));
+  let leaveHand = 0;
+  let nextRequested = false;
+  const drive = makeDriver(states, clients, actionErrorRef, (i) => i === 2 && bingLeft);
 
   const sumOf = (s, settled) => s.players.reduce((t, p) => t + p.chips + (settled ? 0 : p.totalBet), 0);
 
@@ -195,40 +420,36 @@ async function runLeaveMidHand() {
   while (!bugPathVerified && Date.now() < deadline) {
     const s = states[0];
     if (s) {
-      // 第 1 步：丙在有投入时对局中退出（立即弃牌、座位保留）
+      // 第 1 步：丙在有投入时明确退出；本手暂留 seat 索引，但立即标记 left 且不可行动。
       if (!bingLeft && ['preflop', 'flop', 'turn', 'river'].includes(s.stage)) {
         const p3 = s.players[2];
         if (p3 && p3.totalBet > 0 && !p3.folded) {
           bingLeft = true;
-          console.log('  ✓ 丙在有投入时对局中退出（立即弃牌、座位保留）');
-          clients[2].emit('leave_room');
+          leaveHand = s.handNumber;
+          const reply = await request(clients[2], 'leave_room', null);
+          assert.ok(reply && reply.ok, 'leave_room 未返回明确成功回执');
+          assert.ok(await waitUntil(() => {
+            const cur = states[0];
+            const left = cur && cur.players.find((p) => p.name === NAMES[2]);
+            return left && left.left && !left.connected && left.folded;
+          }, 3000), '主动退出未与普通断线区分（left/folded 状态缺失）');
+          console.log('  ✓ 丙对局中 leave_room：成功回执、立即弃牌并标记明确离场');
         }
       }
-      // 第 2 步：第 1 局结束进入局间 → 丙带 token 重连恢复可玩，
-      // 然后乙带着已结算的残留 totalBet 离场（触发清场扣账路径）
-      if (bingLeft && !yiLeft && s.stage === 'handover' && s.results) {
+      // 第 2 步：本手结算仍守恒，开下一手时清退 left 占位，不留下幽灵座位。
+      if (bingLeft && !nextRequested && s.handNumber === leaveHand && s.stage === 'handover' && s.results) {
         const sum = sumOf(s, true);
-        assert.strictEqual(sum, s.economyTotal, '第 1 局结算筹码不守恒');
-        const reBing = io(URL, { transports: ['websocket'] });
-        activeClients.push(reBing);
-        clients[2] = reBing;
-        await emit(reBing, 'join_room', { code, name: NAMES[2], token: tokens[2] });
-        yiLeft = true;
-        console.log('  ✓ 第 1 局结算守恒；丙重连，乙在局间离场（触发清场）');
-        clients[1].emit('leave_room');
-        // 跨 socket 无顺序保证：等服务端处理完离场广播（left 座位已建）再开下一局
-        await sleep(400);
+        assert.strictEqual(sum, s.economyTotal, '主动退出后的本手结算筹码不守恒');
+        assert.strictEqual(s.session.reduce((t, e) => t + e.pl, 0), 0, '主动退出后的战绩盈亏不为零');
+        nextRequested = true;
         await emit(clients[0], 'next_hand');
       }
-      // 第 3 步：乙被清场（房间只剩 2 座位，可能在等待或新一局）→ 守恒 + 战绩零和
-      if (yiLeft && s.players.length === 2) {
+      if (nextRequested && s.players.length === 2) {
+        assert.ok(!s.players.some((p) => p.name === NAMES[2]), '主动退出玩家在下一手仍占幽灵座位');
         const settled = s.stage === 'handover' || s.stage === 'showdown';
         const sum = sumOf(s, settled);
-        assert.strictEqual(sum, s.economyTotal, '清场后筹码不守恒（经济清退修复失效）');
-        if (Array.isArray(s.session)) {
-          const plSum = s.session.reduce((t, e) => t + e.pl, 0);
-          assert.strictEqual(plSum, 0, '清场后战绩盈亏之和不为零');
-        }
+        assert.strictEqual(sum, s.economyTotal, '清退主动退出玩家后筹码不守恒');
+        assert.strictEqual(s.session.reduce((t, e) => t + e.pl, 0), 0, '清退后战绩盈亏之和不为零');
         bugPathVerified = true;
       }
     }
@@ -237,7 +458,7 @@ async function runLeaveMidHand() {
     await sleep(60);
   }
   assert.ok(bugPathVerified, '超时未完成退出场景验证');
-  console.log('  ✓ 乙离场清场后 economyTotal 守恒 + 战绩零和保持');
+  console.log('  ✓ 下一手已清退主动退出座位，economyTotal 守恒且战绩零和');
 
   disconnectAll(clients);
 }
@@ -391,6 +612,10 @@ async function runSettingsScenario() {
 
 (async () => {
   try {
+    await runSocketHardeningScenario();
+    await runTokenHijackScenario();
+    await runFoldedHolePrivacyScenario();
+    await runDuplicateBusinessRequestScenario();
     await runIntegration(2);
     await runIntegration(3);
     await runIntegration(6);

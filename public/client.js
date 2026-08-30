@@ -6,6 +6,8 @@ const socket = io();
 let mySeat = -1;
 let state = null;
 let raiseOpen = false;
+let raiseContext = '';
+let activeRoomCode = '';
 
 // ---------------- 音效（Web Audio 合成，无外部资源） ----------------
 let audioCtx = null;
@@ -116,22 +118,69 @@ function saveAuth(code, name, token) {
   localStorage.setItem('poker-auth', JSON.stringify(auth));
 }
 
-document.getElementById('btn-create').onclick = () => {
+const createRoomBtn = document.getElementById('btn-create');
+const joinRoomBtn = document.getElementById('btn-join');
+let lobbySubmission = '';
+let lobbyExpectedRoom = '';
+
+/** 大厅请求只允许一个在途：同时锁住创建和加入，避免同一 socket 被快速点进多个房间。 */
+function beginLobbySubmission(kind, expectedRoom = '') {
+  if (lobbySubmission) return false;
+  lobbySubmission = kind;
+  lobbyExpectedRoom = expectedRoom;
+  createRoomBtn.disabled = true;
+  joinRoomBtn.disabled = true;
+  createRoomBtn.textContent = kind === 'create' ? '创建中…' : '创建房间';
+  joinRoomBtn.textContent = kind === 'join' ? '加入中…' : '加入';
+  const busyBtn = kind === 'create' ? createRoomBtn : joinRoomBtn;
+  busyBtn.setAttribute('aria-busy', 'true');
+  showLobbyError('');
+  return true;
+}
+function endLobbySubmission(kind = lobbySubmission) {
+  if (!lobbySubmission || kind !== lobbySubmission) return;
+  lobbySubmission = '';
+  lobbyExpectedRoom = '';
+  createRoomBtn.disabled = false;
+  joinRoomBtn.disabled = false;
+  createRoomBtn.textContent = '创建房间';
+  joinRoomBtn.textContent = '加入';
+  createRoomBtn.removeAttribute('aria-busy');
+  joinRoomBtn.removeAttribute('aria-busy');
+}
+
+createRoomBtn.onclick = () => {
   const name = getName();
   if (!name) return;
+  if (!beginLobbySubmission('create')) return;
   socket.emit('create_room', { name }, (res) => {
-    if (res.ok) { saveAuth(res.code, name, res.token); enterRoom(res.code); }
-    else showLobbyError(res.err);
+    if (lobbySubmission !== 'create') return;
+    if (res && res.ok) {
+      saveAuth(res.code, name, res.token);
+      endLobbySubmission('create');
+      enterRoom(res.code);
+    } else {
+      endLobbySubmission('create');
+      showLobbyError((res && res.err) || '创建失败，请稍后重试');
+    }
   });
 };
-document.getElementById('btn-join').onclick = () => {
+joinRoomBtn.onclick = () => {
   const name = getName();
   const code = document.getElementById('room-code').value.trim().toUpperCase();
   if (!name) return;
   if (!/^[A-Z0-9]{6}$/.test(code)) return showLobbyError('请输入 6 位邀请码');
+  if (!beginLobbySubmission('join', code)) return;
   socket.emit('join_room', { code, name, token: storedToken()[`${code}_${name}`] }, (res) => {
-    if (res.ok) { saveAuth(res.code, name, res.token); enterRoom(res.code); }
-    else showLobbyError(res.err);
+    if (lobbySubmission !== 'join') return;
+    if (res && res.ok) {
+      saveAuth(res.code, name, res.token);
+      endLobbySubmission('join');
+      enterRoom(res.code);
+    } else {
+      endLobbySubmission('join');
+      showLobbyError((res && res.err) || '加入失败，请稍后重试');
+    }
   });
 };
 function getName() {
@@ -142,12 +191,16 @@ function getName() {
 function showLobbyError(msg) { document.getElementById('lobby-error').textContent = msg; }
 
 function enterRoom(code) {
+  const normalizedCode = String(code || '').trim().toUpperCase();
+  if (!normalizedCode) return;
+  activeRoomCode = normalizedCode;
+  hideRaisePanel();
   const name = document.getElementById('nickname').value.trim();
   if (name) localStorage.setItem('poker-nickname', name);
-  saveLastRoom(code, name || localStorage.getItem('poker-nickname') || '');
+  saveLastRoom(normalizedCode, name || localStorage.getItem('poker-nickname') || '');
   document.getElementById('lobby').classList.add('hidden');
   document.getElementById('game').classList.remove('hidden');
-  document.getElementById('room-code-display').textContent = code;
+  document.getElementById('room-code-display').textContent = normalizedCode;
 }
 
 // ---------------- 断线自动重连（token 恢复座位，客户端行为） ----------------
@@ -236,9 +289,21 @@ document.getElementById('btn-copy-link').onclick = () => {
   const url = location.origin + location.pathname + '?room=' + code;
   copyText(url).then((ok) => flashCopied(document.getElementById('btn-copy-link'), ok));
 };
-document.getElementById('btn-leave').onclick = () => {
-  clearLastRoom(); // 主动退出：不留自动重连的恢复信息
-  location.reload();
+const leaveBtn = document.getElementById('btn-leave');
+let leavingRoom = false;
+leaveBtn.onclick = () => {
+  if (leavingRoom) return;
+  leavingRoom = true;
+  leaveBtn.disabled = true;
+  leaveBtn.textContent = '退出中…';
+  closeMenu();
+  clearLastRoom(); // 先断开自动恢复资格，退出期间即使 socket 抖动也不会回座
+  activeRoomCode = '';
+  hideRaisePanel();
+  connOverlay.classList.add('hidden');
+  socket.emit('leave_room');
+  // 现有 leave_room 协议没有 ack；留出发送窗口后回大厅，并以定时跳转兜底。
+  setTimeout(() => location.replace(location.pathname), 300);
 };
 
 // 开始游戏（等待阶段且人数 >= 2 时显示）
@@ -309,6 +374,10 @@ function saveSettings() {
 
 // ---------------- 状态渲染 ----------------
 socket.on('state', (s) => {
+  const incomingCode = String((s && s.code) || '').trim().toUpperCase();
+  // 一个 socket 若因历史重复请求残留在多个房间，只接收当前明确进入的房间状态。
+  if (activeRoomCode && incomingCode && incomingCode !== activeRoomCode) return;
+  if (!activeRoomCode && lobbyExpectedRoom && incomingCode && incomingCode !== lobbyExpectedRoom) return;
   state = s;
   mySeat = s.youSeat;
   document.getElementById('conn-overlay').classList.add('hidden');
@@ -319,12 +388,25 @@ socket.on('state', (s) => {
 let everConnected = false;
 socket.on('connect', () => {
   if (!everConnected) { everConnected = true; return; } // 首次连接不算断线恢复
+  // 只恢复本页已经进入的牌局；大厅里的旧 last-room 不能因网络抖动自行把页面带走。
+  if (!activeRoomCode || document.getElementById('game').classList.contains('hidden')) {
+    connOverlay.classList.add('hidden');
+    endLobbySubmission();
+    return;
+  }
   reconnectAttempts = 0;
   connOverlay.classList.remove('hidden');
   setConnState('连接恢复，正在回到牌局…', '');
   tryRejoin();
 });
 socket.on('disconnect', () => {
+  if (!activeRoomCode || document.getElementById('game').classList.contains('hidden')) {
+    const wasSubmitting = !!lobbySubmission;
+    endLobbySubmission();
+    if (wasSubmitting) showLobbyError('连接中断，请重新提交');
+    return;
+  }
+  hideRaisePanel();
   connOverlay.classList.remove('hidden');
   setConnState('连接断开，正在重连…', '断线期间轮到你时，牌局会保留一段时间');
 });
@@ -445,16 +527,18 @@ function escapeHtml(v) {
   }[ch]));
 }
 
-/** 像素头像：Phase 1 的 3 张真实 PNG 循环复用（同一玩家本局内稳定）。
- *  Phase 6 扩充：待 6 款资产生成后（见 assets/a1/avatars/prompts-phase6.md），
- *  按文件名顺序追加 3 项即可一席一款（数组按座位号取模）。 */
+/** 六款真实透明 PNG 按座位号稳定映射：六人桌一席一款。 */
 const AVATAR_PNGS = [
   'assets/a1/avatars/avatar-blue-headphones.png',
   'assets/a1/avatars/avatar-magenta-asym.png',
   'assets/a1/avatars/avatar-red-cap.png',
+  'assets/a1/avatars/avatar-teal-ponytail.png',
+  'assets/a1/avatars/avatar-amber-beanie.png',
+  'assets/a1/avatars/avatar-violet-bangs.png',
 ];
 function avatarPng(seat) {
-  return AVATAR_PNGS[((seat % 3) + 3) % 3];
+  const count = AVATAR_PNGS.length;
+  return AVATAR_PNGS[((seat % count) + count) % count];
 }
 
 /** 座位围绕椭圆分布，自己固定在底部（Hero Dock），其余席位在桌沿顺时针排布：
@@ -545,10 +629,23 @@ function renderSeats() {
       <div class="seat-card">${seatCardHtml(p, false)}</div>
     `;
 
-    // 摊牌后服务端公开手牌：亮出（未摊牌时不显示牌背，保持桌面干净）
+    // 仅用服务端公开的 holeCount 画牌背；牌面仍只在 revealed 后读取 p.hole，绝不推测底牌。
     const holeDiv = div.querySelector('.hole-cards');
     if (p.hole && p.hole.length && state.revealed) {
       p.hole.forEach((c) => holeDiv.appendChild(cardEl(c, false)));
+    } else if (!state.revealed && p.inHand && !p.folded && p.holeCount > 0 &&
+        ['preflop', 'flop', 'turn', 'river', 'showdown'].includes(state.stage)) {
+      const count = Math.min(2, Math.max(0, Number(p.holeCount) || 0));
+      holeDiv.classList.add('is-facedown');
+      holeDiv.setAttribute('aria-label', `${count} 张未公开底牌`);
+      for (let i = 0; i < count; i++) {
+        const back = document.createElement('img');
+        back.className = 'card-back';
+        back.src = 'assets/a1/card-back.png';
+        back.alt = '';
+        back.setAttribute('aria-hidden', 'true');
+        holeDiv.appendChild(back);
+      }
     }
 
     div.style.left = pos.x + '%';
@@ -831,6 +928,8 @@ function renderMyArea() {
   const inHandActive = me && !me.folded && !me.allIn &&
     ['preflop', 'flop', 'turn', 'river'].includes(state.stage);
   if (inHandActive && state.turnSeat === mySeat) {
+    const currentContext = raiseContextKey(me);
+    if (raiseOpen && raiseContext !== currentContext) hideRaisePanel();
     bar.classList.remove('hidden');
     hint.classList.remove('hidden');
     tip.textContent = '';
@@ -979,18 +1078,34 @@ function updateActionBar(me) {
  *  .raising 同时挂到 action-bar 上：手机端据此收起四个主按钮并显示遮罩
  *  （PC 无对应样式规则）；点遮罩等同取消。 */
 function onRaiseToggleClick() {
+  const me = state && state.players ? state.players[mySeat] : null;
+  const currentContext = raiseContextKey(me);
+  const raiseBtn = document.getElementById('btn-toggle-raise');
+  // 防止旧 DOM 点击、轮次切换或失效状态把抽屉带开；开启必须对应当前可行动轮次。
+  if (!currentContext || raiseBtn.disabled || document.getElementById('action-bar').classList.contains('hidden')) {
+    hideRaisePanel();
+    return;
+  }
   raiseOpen = true;
+  raiseContext = currentContext;
   document.getElementById('raise-panel').classList.remove('hidden');
   document.getElementById('action-bar').classList.add('raising');
   document.getElementById('btn-toggle-raise').classList.add('is-active');
 }
 function hideRaisePanel() {
   raiseOpen = false;
+  raiseContext = '';
   document.getElementById('raise-panel').classList.add('hidden');
   document.getElementById('action-bar').classList.remove('raising');
   document.getElementById('raise-panel').style.bottom = ''; // 清键盘兜底偏移
   const toggle = document.getElementById('btn-toggle-raise');
   if (toggle) toggle.classList.remove('is-active');
+}
+function raiseContextKey(me) {
+  if (!state || !me || me.folded || me.allIn || state.turnSeat !== mySeat ||
+      !['preflop', 'flop', 'turn', 'river'].includes(state.stage)) return '';
+  return [state.code, state.handNumber, state.stage, state.turnSeat,
+    state.currentBet, me.roundBet, me.chips].join('|');
 }
 // 手机抽屉遮罩：点击等同取消
 document.getElementById('raise-scrim').addEventListener('click', hideRaisePanel);
@@ -1109,8 +1224,10 @@ function renderResults() {
   // 第一层：牌桌直显横幅（主池赢家 + 赢取金额 + 牌型）
   const mainPot = r.pots[0];
   const winnerNames = mainPot.winners.map((w) => escapeHtml(w.name)).join('、');
-  winnerBanner.innerHTML = `<b>${winnerNames}</b> 获胜 <em>+${mainPot.amount}</em>` +
-    `<span>${mainPot.winners[0].handName ? mainPot.winners[0].handName : '对手全部弃牌'}${r.pots.length > 1 ? ` · 含边池 ${r.pots.length - 1} 个` : ''}</span>`;
+  const winnerHand = mainPot.winners[0].handName
+    ? escapeHtml(mainPot.winners[0].handName) : '对手全部弃牌';
+  winnerBanner.innerHTML = `<b>${winnerNames}</b><span class="winner-amount">获胜 <em>+${mainPot.amount}</em></span>` +
+    `<span class="winner-hand">${winnerHand}${r.pots.length > 1 ? ` · 含边池 ${r.pots.length - 1} 个` : ''}</span>`;
   winnerBanner.classList.remove('hidden');
   resultDetailBtn.classList.remove('hidden');
   resultOverlay.classList.toggle('hidden', !resultDetailOpen); // 第二层仅在主动查看时显示
@@ -1209,7 +1326,7 @@ document.getElementById('btn-next-hand').onclick = () => {
 };
 
 // ---------------- 表情快捷互动 ----------------
-// 手机端：#emoji-bar 是底部弹层，#emoji-toggle 为入口；PC 端保持一排常驻
+// 手机端是底部弹层，PC 端是同一克制入口旁的轻量浮层，不再常驻一排。
 const EMOJI_LIST = ['😀', '😂', '😭', '👍', '🎉', '🤔', '😈', '🔥'];
 const emojiBar = document.getElementById('emoji-bar');
 const emojiToggle = document.getElementById('emoji-toggle');
@@ -1219,6 +1336,13 @@ function setEmojiOpen(open) {
 }
 emojiToggle.addEventListener('click', () => {
   setEmojiOpen(!emojiBar.classList.contains('open'));
+});
+document.addEventListener('click', (e) => {
+  const wrap = document.getElementById('emoji-wrap');
+  if (emojiBar.classList.contains('open') && wrap && !wrap.contains(e.target)) setEmojiOpen(false);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') setEmojiOpen(false);
 });
 EMOJI_LIST.forEach((e) => {
   const b = document.createElement('button');

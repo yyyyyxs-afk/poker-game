@@ -124,11 +124,14 @@
             <button id="btn-rebuy" class="btn btn-warning hidden">重新买入（补充 2000 筹码）</button>
             <button id="btn-sit-back" class="btn btn-primary hidden">坐回</button>
             <button id="btn-result-detail" class="btn btn-secondary hidden">查看本局详情</button>
-            <button id="emoji-toggle" class="icon-btn hidden" aria-label="表情互动" aria-expanded="false">
-              <img src="assets/a1/icons/emoji-smile.svg" alt="" />
-            </button>
+            <div id="emoji-wrap" class="emoji-wrap">
+              <button id="emoji-toggle" class="icon-btn hidden" aria-label="表情互动" aria-haspopup="true"
+                      aria-controls="emoji-bar" aria-expanded="false">
+                <img src="assets/a1/icons/emoji-smile.svg" alt="" />
+              </button>
+              <div id="emoji-bar" class="hidden" role="group" aria-label="选择表情"></div>
+            </div>
           </div>
-          <div id="emoji-bar" class="hidden"></div>
           <div id="waiting-tip"></div>
         </div>
       </section>
