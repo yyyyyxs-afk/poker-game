@@ -14,6 +14,15 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
 
+// 防御性日志（经总负责人授权的最小改动）：只记录未捕获异常/拒绝，防止
+// 进程无堆栈静默退出、便于事后定位；不改变任何牌局逻辑与错误处理路径。
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err && err.stack ? err.stack : err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason && reason.stack ? reason.stack : reason);
+});
+
 // 静态资源禁用强缓存：客户端 js/css/index 更新后，浏览器刷新即可拿到最新版，
 // 避免"新 client.js + 旧 index.html"混搭导致渲染崩溃（座位全消失等）
 app.use(express.static(path.join(__dirname, 'public'), {
