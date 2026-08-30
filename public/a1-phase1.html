@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>A1 Phase 1 · 设计基础检查页</title>
+  <link rel="stylesheet" href="a1-foundation.css" />
+</head>
+<body class="a1-demo">
+  <header class="demo-topbar">
+    <div class="demo-brand">
+      <span class="demo-brand-mark">A1</span>
+      <span>
+        <strong>Poker Game</strong>
+        <small>设计基础检查页</small>
+      </span>
+    </div>
+
+    <div class="demo-topbar-meta" aria-label="样稿状态">
+      <span class="demo-phase">Phase 1 only</span>
+      <span class="demo-meta-copy">PC · 1440 × 1000 基准</span>
+      <div class="a1-icon-group" aria-label="图标规范示例">
+        <button class="a1-icon-button" type="button" aria-label="牌局记录" data-demo-message="牌局记录：次级入口">
+          <img src="assets/a1/icons/list.svg" alt="" />
+        </button>
+        <button class="a1-icon-button" type="button" aria-label="音效" data-demo-message="音效：默认开启">
+          <img src="assets/a1/icons/volume-up.svg" alt="" />
+        </button>
+        <button class="a1-icon-button" type="button" aria-label="设置" data-demo-message="设置：次级入口">
+          <img src="assets/a1/icons/gear.svg" alt="" />
+        </button>
+        <button class="a1-icon-button" type="button" aria-label="全屏" data-demo-message="全屏：次级入口">
+          <img src="assets/a1/icons/arrows-fullscreen.svg" alt="" />
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="demo-shell">
+    <section class="demo-intro" aria-labelledby="page-title">
+      <div>
+        <p class="demo-kicker">A1 · 简约克制的现代好友德州扑克</p>
+        <h1 id="page-title">基础组件与视觉语言</h1>
+        <p>以牌局信息为主，保留少量 QQ 时代像素个性。此页仅验证设计基础，不承载真实牌局，也不改动现有牌桌逻辑。</p>
+      </div>
+      <dl class="demo-guardrails">
+        <div><dt>主原则</dt><dd>克制、清晰、低饱和</dd></div>
+        <div><dt>强调色</dt><dd>每个组件最多一种</dd></div>
+        <div><dt>明确禁用</dt><dd>赌场金边、霓虹、持续发光</dd></div>
+      </dl>
+    </section>
+
+    <section class="demo-grid demo-grid-main" aria-label="组件主样稿">
+      <article class="a1-panel demo-table-specimen">
+        <div class="a1-panel-heading">
+          <div>
+            <span class="a1-eyebrow">Table primitives</span>
+            <h2>牌桌核心组件</h2>
+          </div>
+          <span class="a1-status a1-status-neutral">静态样稿</span>
+        </div>
+
+        <div class="a1-felt-swatch">
+          <div class="a1-seat-row">
+            <div class="a1-seat is-current">
+              <img class="a1-avatar" src="assets/a1/avatars/avatar-blue-headphones.png" alt="阿飞的蓝发像素头像" />
+              <div class="a1-seat-copy"><strong>阿飞</strong><span>1,980</span></div>
+              <span class="a1-seat-badge">当前</span>
+            </div>
+            <div class="a1-seat">
+              <img class="a1-avatar" src="assets/a1/avatars/avatar-magenta-asym.png" alt="小帆的洋红短发像素头像" />
+              <div class="a1-seat-copy"><strong>小帆</strong><span>2,450</span></div>
+              <span class="a1-dealer-badge" title="庄家">D</span>
+            </div>
+            <div class="a1-seat is-disconnected">
+              <img class="a1-avatar" src="assets/a1/avatars/avatar-red-cap.png" alt="可乐的红发像素头像" />
+              <div class="a1-seat-copy"><strong>可乐</strong><span>1,320</span></div>
+              <span class="a1-seat-badge">断线</span>
+            </div>
+          </div>
+
+          <div class="a1-table-center">
+            <div class="a1-pot"><span>底池</span><strong>1,339</strong></div>
+            <div class="a1-community" aria-label="公共牌示例">
+              <div class="a1-playing-card is-red" aria-label="红桃 A"><span>A</span><b>♥</b></div>
+              <div class="a1-playing-card" aria-label="黑桃 10"><span>10</span><b>♠</b></div>
+              <div class="a1-playing-card is-red" aria-label="方片 K"><span>K</span><b>♦</b></div>
+              <img class="a1-playing-card a1-card-back" src="assets/a1/card-back.png" alt="背面朝上的扑克牌" />
+              <div class="a1-playing-card is-empty" aria-label="未发牌"></div>
+            </div>
+            <div class="a1-bet"><span>筹码</span><strong>335</strong></div>
+          </div>
+        </div>
+
+        <div class="a1-component-note">
+          <strong>Seat 常驻信息</strong>
+          <span>头像、昵称、剩余筹码；下注与状态靠近桌心按需出现。</span>
+        </div>
+      </article>
+
+      <aside class="a1-panel demo-token-panel">
+        <div class="a1-panel-heading">
+          <div><span class="a1-eyebrow">Foundation tokens</span><h2>基础变量</h2></div>
+        </div>
+
+        <section class="a1-token-section">
+          <h3>颜色</h3>
+          <ul class="a1-color-list">
+            <li><i style="--swatch:#11171a"></i><span>Canvas</span><code>#11171A</code></li>
+            <li><i style="--swatch:#1a2225"></i><span>Surface</span><code>#1A2225</code></li>
+            <li><i style="--swatch:#aaa397"></i><span>Warm felt</span><code>#AAA397</code></li>
+            <li><i style="--swatch:#edf0ee"></i><span>Text</span><code>#EDF0EE</code></li>
+            <li><i style="--swatch:#6f9e91"></i><span>Action</span><code>#6F9E91</code></li>
+            <li><i style="--swatch:#a99568"></i><span>Raise</span><code>#A99568</code></li>
+            <li><i style="--swatch:#9a5756"></i><span>Danger</span><code>#9A5756</code></li>
+          </ul>
+        </section>
+
+        <section class="a1-token-section">
+          <h3>形状与层级</h3>
+          <div class="a1-token-row"><span>圆角</span><code>4 / 8 / 12 / 16px</code></div>
+          <div class="a1-token-row"><span>间距</span><code>4 / 8 / 12 / 16 / 24 / 32px</code></div>
+          <div class="a1-token-row"><span>边框</span><code>1px · 低对比</code></div>
+          <div class="a1-token-row"><span>阴影</span><code>仅抬高关键层</code></div>
+        </section>
+
+        <section class="a1-token-section">
+          <h3>图标</h3>
+          <p class="a1-token-copy">统一使用 Bootstrap Icons 线性图标，16–18px、无装饰底色；仅交互按钮保留 36px 点击区。</p>
+        </section>
+      </aside>
+    </section>
+
+    <section class="demo-grid demo-grid-components" aria-label="组件细节样稿">
+      <article class="a1-panel demo-action-panel">
+        <div class="a1-panel-heading">
+          <div><span class="a1-eyebrow">Action hierarchy</span><h2>操作按钮</h2></div>
+          <span id="demo-action-status" class="a1-status a1-status-action" aria-live="polite">轮到你 · 跟注 335</span>
+        </div>
+
+        <div class="a1-action-row" role="group" aria-label="操作按钮样稿">
+          <button class="a1-button a1-button-danger" type="button" data-demo-action="弃牌">弃牌</button>
+          <button class="a1-button a1-button-primary" type="button" data-demo-action="跟注 335">跟注 335</button>
+          <button class="a1-button a1-button-raise" type="button" data-demo-action="加注">加注</button>
+          <button class="a1-button a1-button-secondary" type="button" data-demo-action="全押">全押</button>
+        </div>
+
+        <div class="a1-state-grid" aria-label="按钮状态规范">
+          <div><span>Default</span><button class="a1-button a1-button-primary" type="button">跟注</button></div>
+          <div><span>Hover</span><button class="a1-button a1-button-primary is-hover" type="button">跟注</button></div>
+          <div><span>Pressed</span><button class="a1-button a1-button-primary is-pressed" type="button">跟注</button></div>
+          <div><span>Disabled</span><button class="a1-button a1-button-primary" type="button" disabled>跟注</button></div>
+          <div><span>Waiting</span><button class="a1-button a1-button-primary is-waiting" type="button" aria-busy="true">等待中…</button></div>
+        </div>
+      </article>
+
+      <article class="a1-panel demo-raise-panel">
+        <div class="a1-panel-heading">
+          <div><span class="a1-eyebrow">Raise controller</span><h2>加注控制器</h2></div>
+        </div>
+        <div class="a1-raise-amount"><span>加注到</span><strong id="raise-value">850</strong></div>
+        <div class="a1-preset-row" role="group" aria-label="快捷加注比例">
+          <button type="button" data-raise-value="450">1/3 池</button>
+          <button type="button" data-raise-value="670">1/2 池</button>
+          <button type="button" data-raise-value="850" class="is-selected">2/3 池</button>
+          <button type="button" data-raise-value="1339">满池</button>
+        </div>
+        <div class="a1-slider-row">
+          <button type="button" class="a1-step-button" data-raise-step="-10" aria-label="减少加注额">−</button>
+          <input id="raise-slider-demo" type="range" min="335" max="2080" step="5" value="850" aria-label="加注额" />
+          <output id="raise-output" for="raise-slider-demo">850</output>
+          <button type="button" class="a1-step-button" data-raise-step="10" aria-label="增加加注额">＋</button>
+        </div>
+        <div class="a1-range-labels"><span>最小 335</span><span>最大 2,080</span></div>
+        <div class="a1-raise-actions">
+          <button class="a1-button a1-button-secondary" type="button">取消</button>
+          <button class="a1-button a1-button-raise" type="button">确认加注 <span id="confirm-raise-value">850</span></button>
+        </div>
+      </article>
+
+      <article class="a1-panel demo-type-panel">
+        <div class="a1-panel-heading">
+          <div><span class="a1-eyebrow">Typography</span><h2>排版层级</h2></div>
+        </div>
+        <div class="a1-type-sample a1-type-display"><span>Display · 28 / 1.2</span><strong>底池 1,339</strong></div>
+        <div class="a1-type-sample a1-type-title"><span>Title · 18 / 1.4</span><strong>轮到你 · 跟注 335</strong></div>
+        <div class="a1-type-sample a1-type-body"><span>Body · 14 / 1.6</span><p>字体优先使用 Noto Sans SC / 微软雅黑 / 系统无衬线；数字使用等宽特性。</p></div>
+        <div class="a1-type-sample a1-type-label"><span>Label · 12 / 1.4</span><p>次级标签保持低对比，不使用过宽字距。</p></div>
+      </article>
+    </section>
+
+    <footer class="demo-footer">
+      <span id="demo-message">检查页已就绪：按钮、图标和加注滑杆可交互。</span>
+      <span>边界：未连接 Socket.IO · 未替换现有牌桌 · 未进入 Phase 2</span>
+    </footer>
+  </main>
+
+  <script src="a1-phase1.js"></script>
+</body>
+</html>
