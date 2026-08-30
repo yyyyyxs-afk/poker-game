@@ -512,6 +512,8 @@ body {
 /* 表情入口仅手机（≤900）显示；PC 保持一排常驻 */
 #emoji-toggle { display: none; }
 #emoji-bar { display: flex; gap: 8px; width: 100%; max-width: 440px; }
+/* Raise 遮罩仅手机（≤900）显示，见媒体查询内规则 */
+#raise-scrim { display: none; }
 .emoji-btn {
   flex: 1; min-width: 0;
   background: rgba(255, 255, 255, 0.03); border: 1px solid var(--a1-line-soft);
@@ -705,9 +707,10 @@ body {
 
   /* ---- Poker Table：宽度驱动高度的跑道桌，席位围绕桌沿 ---- */
   #play-layout { padding: 8px 8px 10px; gap: 6px; }
+  #play-stage { justify-content: flex-start; }
   #table {
     width: 100%; flex: none;
-    aspect-ratio: 4 / 3; min-height: 240px;
+    aspect-ratio: 1 / 1; min-height: 260px;
     border-width: 8px;
     margin-top: 2px;
   }
@@ -736,8 +739,8 @@ body {
   .hole-cards { bottom: calc(100% + 6px); }
   .kick-btn { font-size: 9px; padding: 1px 7px; bottom: -9px; }
 
-  /* ---- Hero 区：自己的牌是一屏第一优先级 ---- */
-  #hero-dock { margin-top: 8px; gap: 5px; }
+  /* ---- Hero 区：贴底对齐拇指热区；自己的牌是一屏第一优先级 ---- */
+  #hero-dock { margin-top: auto; gap: 5px; padding-top: 8px; }
   #hero-row { gap: 12px; min-height: 56px; }
   .seat-card.me-seat { min-width: 0; padding: 5px 10px 5px 5px; }
   #my-cards { gap: 6px; }
@@ -763,7 +766,14 @@ body {
   .footer-buttons .btn { min-height: 36px; font-size: 12px; padding: 0 14px; }
   #emoji-toggle { display: grid; } /* 仅手机显示表情入口 */
   #waiting-tip { font-size: 12px; min-height: 16px; }
-  #toast { font-size: 12px; top: 10%; }
+  #toast { font-size: 12px; top: 20%; } /* P2-6：避开顶部席位卡片（y≤18%）与底池（y≥31%） */
+
+  /* ---- Raise 遮罩：抽屉打开时盖住其余内容，点遮罩=取消 ---- */
+  #action-bar.raising #raise-scrim {
+    display: block;
+    position: fixed; inset: 0; z-index: 79;
+    background: rgba(10, 14, 16, 0.55);
+  }
 
   /* ---- Emoji：底部弹层（不再常驻一排） ---- */
   #emoji-bar {
@@ -794,6 +804,13 @@ body {
   #log-panel .log-head h3 { font-size: 13px; }
   #btn-log-collapse img { transform: rotate(90deg); } /* 折叠箭头指向下方 */
   /* 手机默认 collapsed（JS 初始处理），展开即抽屉 */
+
+  /* ---- 摊牌弹窗手机适配：不溢出、战绩表可读、让牌桌隐约可见 ---- */
+  .overlay { background: rgba(10, 14, 16, 0.55); backdrop-filter: none; }
+  #result-card { padding: 18px 16px; max-height: 78vh; }
+  #session-table { font-size: 11px; }
+  #session-table th, #session-table td { padding: 4px 5px; }
+  .result-pot-row { padding: 10px 12px; }
 
   /* ---- Raise Bottom Sheet（§16） ---- */
   #raise-panel {
@@ -833,17 +850,45 @@ body {
   .raise-presets .preset { font-size: 11px; }
 }
 
-/* 手机横屏：压缩顶栏与牌桌高度，保证一屏放下 */
+/* 手机横屏（≤500 高）：左右分区——牌桌占左侧全部高度，
+   Hero + 操作坞贴右列竖排，轮到自己时三主键/全押/倒计时全部在首屏内 */
 @media (orientation: landscape) and (max-height: 500px) {
-  #topbar { padding: 4px 14px; font-size: 12px; min-height: 40px; }
-  #play-layout { flex-direction: row; padding: 4px 12px 6px; }
-  #table { width: min(72vw, 860px); aspect-ratio: 16 / 8; min-height: 0; }
-  /* 日志走手机 Bottom Sheet（不硬隐藏，保持可用） */
-  #hero-dock { margin-top: 4px; }
-  #my-cards .card { width: 42px; height: 60px; }
-  .btn { padding: 8px 16px; font-size: 13px; min-height: 38px; }
-  #action-buttons .btn { min-height: 40px; }
-  #raise-panel { max-height: 78vh; overflow-y: auto; }
+  #topbar { padding: 3px 12px; font-size: 12px; min-height: 36px; }
+  #play-layout { flex-direction: row; padding: 4px 10px 6px; gap: 10px; }
+  #play-stage { flex-direction: row; gap: 10px; }
+  #table {
+    flex: 1; width: auto; min-width: 0; min-height: 0;
+    height: 100%; aspect-ratio: auto; margin: 0;
+    border-width: 8px;
+  }
+  #hero-dock {
+    width: 232px; flex: none; margin-top: 0;
+    justify-content: center; gap: 5px;
+    overflow-y: auto; padding-top: 0;
+  }
+  #hero-row { flex-wrap: wrap; gap: 6px 10px; min-height: 0; }
+  .seat-card.me-seat { min-width: 0; padding: 4px 8px 4px 4px; }
+  .avatar-img { width: 28px; height: 28px; }
+  #my-cards .card { width: 40px; height: 57px; }
+  #my-cards .card .idx b { font-size: 12px; }
+  #my-cards .card .pip { font-size: 19px; }
+  #turn-timer .timer-ring { width: 42px; height: 42px; }
+  #turn-timer .timer-ring b { width: 33px; height: 33px; font-size: 12px; }
+  #action-hint { font-size: 12px; min-height: 16px; }
+  /* 主操作竖排：轮到自己也全部落在右列视口内 */
+  #action-bar { width: 100%; }
+  #action-buttons { display: grid; grid-template-columns: 1fr; gap: 6px; }
+  #action-buttons .btn { min-height: 36px; font-size: 13px; }
+  #action-buttons #btn-allin { grid-column: auto; min-height: 28px; font-size: 11px; }
+  .footer-buttons { gap: 6px; }
+  .footer-buttons .btn { min-height: 30px; font-size: 11px; padding: 0 10px; }
+  #emoji-toggle.icon-btn { width: 30px; height: 30px; }
+  .btn { padding: 8px 12px; font-size: 12px; min-height: 34px; }
+  #waiting-tip { min-height: 14px; font-size: 11px; }
+  /* 横屏动作标签贴桌左下角，避开顶部席位与右列操作坞 */
+  #toast { top: auto; bottom: 6px; left: 24%; }
+  /* 日志走手机 Bottom Sheet；Raise 走手机抽屉（横向高度有限时允许内部滚动） */
+  #raise-panel { max-height: 82vh; overflow-y: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {
