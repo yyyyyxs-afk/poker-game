@@ -392,28 +392,30 @@ function avatarPng(seat) {
 
 /** 座位围绕椭圆分布，自己固定在底部（Hero Dock），其余席位在桌沿顺时针排布：
  *  1=左下 2=左上 3=顶部 4=右上 5=右下（6 人时与 A1 效果图一致）。
- *  手机（≤900）侧翼席位纵向避开公共牌带，避免卡片压牌；横屏桌更扁，
- *  牌带相对更靠中部，侧翼收得更高/更低。
+ *  手机（≤900）侧翼席位纵向避开桌心中央区，避免卡片压牌；≤420 桌与 375
+ *  统一 1:1，但窗口矮、中央区占比更大，下侧翼再压到 y82（真机 320 校准：
+ *  社区带底约 66%，卡片顶需 ≥ 66%+8px 余量）。
  *  注意：本函数参数与 betPosition 的 BET_BAND 保守带耦合，改动必须
  *  连带复跑全断点 × 人数 × 席位的落点穷举（见提交 ff4ae98 说明）。
  *  注意：传入的 index 已是"相对自己的序号"，自己=0 恒在正下方。 */
 function seatPosition(index, total) {
   const angleDeg = 90 + (index / total) * 360;
   const rad = (angleDeg * Math.PI) / 180;
-  const narrow = typeof window !== 'undefined' && window.innerWidth <= 900;
-  const landscape = typeof window !== 'undefined' && window.innerWidth > window.innerHeight;
-  const rx = narrow ? 44 : 44;
+  const w = typeof window !== 'undefined' ? window.innerWidth : 1280;
+  const h = typeof window !== 'undefined' ? window.innerHeight : 800;
+  const narrow = w <= 900;
+  const veryNarrow = narrow && w <= 420;
+  const landscape = w > h;
+  const rx = 44;
   const ry = narrow ? 40 : 42;
-  const xMin = narrow ? 14 : 9;
-  const xMax = narrow ? 86 : 91;
-  let x = Math.max(xMin, Math.min(xMax, 50 + Math.cos(rad) * rx));
+  let x = Math.max(narrow ? 14 : 9, Math.min(narrow ? 86 : 91, 50 + Math.cos(rad) * rx));
   let y = Math.max(narrow ? 11 : 9, Math.min(narrow ? 80 : 71, 50 + Math.sin(rad) * ry));
-  // 手机侧翼席位：收在公共牌带同一侧之外（卡片半高约 9%~16%，按桌比例分档）
+  // 手机侧翼席位：收在中央区同一侧之外（卡片半高约 6%~9%，按桌比例分档）
   if (narrow && index !== 0 && (x <= 30 || x >= 70)) {
     if (landscape) {
       y = y < 50 ? Math.min(y, 24) : Math.max(y, 88);
     } else {
-      y = y < 50 ? Math.min(y, 27) : Math.max(y, 78);
+      y = y < 50 ? Math.min(y, 27) : Math.max(y, veryNarrow ? 82 : 78);
     }
   }
   return { x, y };
@@ -526,9 +528,11 @@ function renderHeroSeat(me) {
 }
 
 /** 下注筹码落点：席位→桌心 42% 插值；若落入中央区保守带则弹出带外。
- *  保守带 y 上界取 30%（stage-label 上沿之上），下界 82%（牌带之下）；
+ *  保守带 y 上界取 28%（320 真机校准：1:1 桌 stage-label 上沿之上，
+ *  同时不碰 375/PC 顶部席位卡下缘），下界 82%（牌带之下）；
  *  判定用圆片矩形（含最坏半尺寸 8%/4%，手机 375 宽下的 56×20 圆片）。
- *  手机上侧翼席位圆片放席位卡正上方（该区域侧翼与桌心文字带之间无净空）。
+ *  手机侧翼席位圆片贴席位卡上/下沿（该区域与桌心文字带之间无净空）；
+ *  ≤420 顶部席位卡与 label 之间不足一个圆片高，横推到带外。
  *  注意：与 seatPosition 的手机侧翼参数耦合，改动必须连带复跑
  *  全断点 × 人数 × 席位的落点穷举（见提交 ff4ae98 说明）。 */
 const BET_BAND = { x1: 17, x2: 83, y1: 30, y2: 82 };
@@ -538,7 +542,9 @@ function betPosition(pos) {
   const { x, y } = pos;
   let bx = x + (50 - x) * 0.42;
   let by = y + (50 - y) * 0.42;
-  const narrow = typeof window !== 'undefined' && window.innerWidth <= 900;
+  const w = typeof window !== 'undefined' ? window.innerWidth : 1280;
+  const narrow = w <= 900;
+  const veryNarrow = narrow && w <= 420;
   const inBand = bx + BET_CHIP_HALF_W > BET_BAND.x1 && bx - BET_CHIP_HALF_W < BET_BAND.x2 &&
     by + BET_CHIP_HALF_H > BET_BAND.y1 && by - BET_CHIP_HALF_H < BET_BAND.y2;
   if (inBand) {
@@ -551,7 +557,13 @@ function betPosition(pos) {
         by = 56;
       }
     } else if (y < 50) {
-      by = BET_BAND.y1 - BET_CHIP_HALF_H - 1;
+      if (veryNarrow) {
+        // ≤420 顶部席位卡与 label 间隙不足一个圆片：横推到带外
+        bx = bx < 50 ? BET_BAND.x1 - BET_CHIP_HALF_W : BET_BAND.x2 + BET_CHIP_HALF_W;
+        by = 56;
+      } else {
+        by = BET_BAND.y1 - BET_CHIP_HALF_H - 1;
+      }
     } else if (y <= 78) {
       by = BET_BAND.y2 + BET_CHIP_HALF_H + 1;
     } else {

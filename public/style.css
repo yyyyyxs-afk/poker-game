@@ -837,9 +837,10 @@ body {
   .btn { padding: 10px 14px; font-size: 13px; }
 }
 
-/* 极窄（320 等）：牌面与席位再收一档，按钮保持可点 */
+/* 极窄（320 等）：桌面与 375 统一 1:1（中央区/席位/圆片几何共用一套参数），
+   牌面与席位保持真机已验证的压缩档；手牌微压保 568 高一屏；
+   下侧翼席位对与社区牌带的纵向避让由 seatPosition 的 veryNarrow 档负责 */
 @media (max-width: 420px) {
-  #table { aspect-ratio: 19 / 15; }
   .seat { width: 92px; }
   .avatar-img { width: 28px; height: 28px; }
   .seat-copy strong { font-size: 10px; }
@@ -848,6 +849,9 @@ body {
   .card-slot, .card { width: 34px; height: 48px; }
   #pot-display b { font-size: 22px; }
   .raise-presets .preset { font-size: 11px; }
+  #my-cards .card { width: 44px; height: 62px; }
+  #my-cards .card .idx b { font-size: 13px; }
+  #my-cards .card .pip { font-size: 22px; }
 }
 
 /* 手机横屏（≤500 高）：左右分区——牌桌占左侧全部高度，
