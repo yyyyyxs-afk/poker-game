@@ -789,12 +789,13 @@ io.on('connection', (socket) => {
       return cb && cb({ ok: false, err: '房间不存在，请核对邀请码' });
     }
     joinAttempts.delete(socket.id);
-    // 满员判断按有效座位算（排除已离开的占位）
-    if (room.players.filter((p) => p && !p.left).length >= MAX_PLAYERS) {
-      return cb && cb({ ok: false, err: '房间已满（最多 6 人）' });
-    }
     // 断线重连：同名匹配到离线玩家时，任何阶段都允许恢复座位
     const offlineSameName = room.players.find((p) => p && !p.left && p.name === name && !p.connected);
+    // 满员判断按有效座位算（排除已离开的占位）；同名断线座位即将被 token 恢复，
+    // 不计入满员，否则满员桌任何玩家刷新后都会被"房间已满"锁在门外（经用户授权的最小修复）
+    if (room.players.filter((p) => p && !p.left && p !== offlineSameName).length >= MAX_PLAYERS) {
+      return cb && cb({ ok: false, err: '房间已满（最多 6 人）' });
+    }
     const stageOpen = ['waiting', 'handover'].includes(room.stage);
     if (!offlineSameName && !stageOpen) {
       return cb && cb({ ok: false, err: '本局进行中，请稍等局结束后加入' });
