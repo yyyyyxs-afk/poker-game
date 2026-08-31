@@ -5,7 +5,10 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node test/rules.test.js && node test/smoke.test.js"
+    "test": "node test/run-all.js",
+    "test:rules": "node test/rules.test.js",
+    "test:geometry": "node test/geometry-check.js",
+    "test:smoke": "node test/smoke.test.js"
   },
   "engines": {
     "node": ">=18"

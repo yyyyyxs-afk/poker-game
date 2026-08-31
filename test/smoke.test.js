@@ -2,12 +2,15 @@
  * 冒烟测试（需先启动服务器）：
  * 1. 集成：2 / 3 / 6 个模拟客户端随机对局，校验筹码守恒 + 战绩盈亏零和
  * 2. 场景：对局中主动退出后守恒跨局保持
- * 3. 场景：断线保护窗口（不瞬间弃牌 / 窗口后自动弃牌 / 窗口内重连可继续行动）
- * 4. 场景：房管设置（行动时长 / 局间倒计时 / 禁止重买）校验
- * 5. 安全：单连接单房、畸形 payload、Unicode 昵称归一与 token 防冒名
+ * 3. 场景：对局中踢出尾号座位后，战绩归档与经济盘跨局守恒
+ * 4. 场景：中间庄家离场后，庄家与盲注按原桌序继续轮转
+ * 5. 场景：handover 尾座庄家离开/被踢后，经济盘与庄家轮转保持正确
+ * 6. 场景：断线保护窗口（不瞬间弃牌 / 窗口后自动弃牌 / 窗口内重连可继续行动）
+ * 7. 场景：房管设置（行动时长 / 局间倒计时 / 禁止重买）校验
+ * 8. 安全：单连接单房、畸形 payload、Unicode 昵称归一与 token 防冒名
  *
- * 运行前先启动服务器：PORT=3456 node server.js
- * 执行：node test/smoke.test.js （或 TEST_URL=http://localhost:3100 npm test）
+ * 推荐执行：npm test（自动启动隔离服务并包含规则、几何与本文件）
+ * 单独调试：先在 3456 端口启动服务，再执行 npm run test:smoke；也可用 TEST_URL 指定地址。
  */
 const assert = require('assert');
 const { io } = require('socket.io-client');
@@ -463,6 +466,208 @@ async function runLeaveMidHand() {
   disconnectAll(clients);
 }
 
+// ---------- 场景 2b：对局中踢出尾号座位，结算归档与经济盘保持一致 ----------
+async function runKickTailMidHand() {
+  const fail = (msg) => { throw new Error(msg); };
+  const actionErrorRef = { err: null };
+  const { clients, states } = await setupTable(3, fail);
+  const drive = makeDriver(states, clients, actionErrorRef, (i) => i === 2);
+
+  const readyToKick = await waitUntil(() => {
+    const s = states[0];
+    const tail = s && s.players[2];
+    return s && ['preflop', 'flop', 'turn', 'river'].includes(s.stage)
+      && tail && tail.name === NAMES[2] && tail.inHand && tail.totalBet > 0;
+  }, 5000, 50);
+  assert.ok(readyToKick, '未等到尾号玩家带投入进入对局');
+
+  const hand = states[0].handNumber;
+  const economyBefore = states[0].economyTotal;
+  const reply = await request(clients[0], 'kick_player', { seat: 2 });
+  assert.ok(reply && reply.ok, '房主踢出尾号座位失败');
+
+  const retained = await waitUntil(() => {
+    const s = states[0];
+    const tail = s && s.players.find((p) => p.name === NAMES[2]);
+    return tail && tail.left && tail.folded && !tail.connected;
+  }, 3000, 50);
+  assert.ok(retained, '对局中被踢的尾号座位被过早删除，无法在结算时归档');
+  assert.strictEqual(states[0].economyTotal, economyBefore, '对局中踢人不应提前缩减经济总盘');
+  assert.strictEqual(states[0].session.reduce((sum, entry) => sum + entry.pl, 0), 0,
+    '对局中踢人后战绩盈亏应继续为零');
+  console.log('  ✓ 对局中踢出尾号座位：保留 left 占位且经济盘、战绩仍守恒');
+
+  let nextRequested = false;
+  let verified = false;
+  const deadline = Date.now() + 60000;
+  while (!verified && Date.now() < deadline) {
+    const s = states[0];
+    if (s && s.handNumber === hand && s.stage === 'handover' && s.results && !nextRequested) {
+      const archived = s.session.find((entry) => entry.name === NAMES[2]);
+      assert.ok(archived && archived.left, '被踢玩家未在结算后进入离场战绩');
+      assert.strictEqual(s.session.reduce((sum, entry) => sum + entry.pl, 0), 0,
+        '尾号玩家归档后战绩盈亏不为零');
+      assert.strictEqual(s.players.reduce((sum, p) => sum + p.chips, 0), s.economyTotal,
+        '尾号玩家归档后的结算筹码不守恒');
+      nextRequested = true;
+      await emit(clients[0], 'next_hand', null);
+    }
+    if (s && nextRequested && s.players.length === 2) {
+      assert.ok(!s.players.some((p) => p.name === NAMES[2]), '下一手仍残留被踢的尾号座位');
+      const settled = ['showdown', 'handover'].includes(s.stage);
+      const owned = s.players.reduce((sum, p) => sum + p.chips + (settled ? 0 : p.totalBet), 0);
+      assert.strictEqual(owned, s.economyTotal, '清退尾号玩家后经济总盘不守恒');
+      assert.strictEqual(s.session.reduce((sum, entry) => sum + entry.pl, 0), 0,
+        '清退尾号玩家后战绩盈亏不为零');
+      verified = true;
+    }
+    if (actionErrorRef.err) fail(actionErrorRef.err);
+    await drive();
+    await sleep(60);
+  }
+
+  assert.ok(verified, '超时未完成对局中踢出尾号座位的跨局验证');
+  console.log('  ✓ 结算后已归档、下一手已清退尾号座位，守恒保持');
+  disconnectAll(clients);
+}
+
+// ---------- 场景 2c：当前庄家/中间座离场后，下一手庄家继续顺时针轮转 ----------
+async function runDealerRemapAfterMiddleKick() {
+  const fail = (msg) => { throw new Error(msg); };
+  const { clients, states } = await setupTable(3, fail);
+
+  async function foldUntilHandover(hand, skipped = new Set()) {
+    const deadline = Date.now() + 15000;
+    while (Date.now() < deadline) {
+      const table = states[0];
+      if (table && table.handNumber === hand && table.stage === 'handover') return table;
+      if (table && table.handNumber === hand
+        && ['preflop', 'flop', 'turn', 'river'].includes(table.stage) && table.turnSeat >= 0) {
+        const actorIdx = states.findIndex((view, idx) => !skipped.has(idx)
+          && view && view.youSeat === table.turnSeat && clients[idx].connected);
+        if (actorIdx >= 0) {
+          const actionReply = await request(clients[actorIdx], 'action', { type: 'fold' });
+          assert.ok(actionReply && actionReply.ok, `推进第 ${hand} 手失败`);
+        }
+      }
+      await sleep(30);
+    }
+    throw new Error(`第 ${hand} 手未在时限内结束`);
+  }
+
+  assert.ok(await waitUntil(() => states[0] && states[0].handNumber === 1
+    && ['preflop', 'flop', 'turn', 'river'].includes(states[0].stage), 3000), '庄家轮转场景未开局');
+  assert.strictEqual(states[0].players[states[0].dealerSeat].name, NAMES[0], '第一手庄家应为甲');
+  await foldUntilHandover(1);
+
+  await emit(clients[0], 'next_hand', null);
+  assert.ok(await waitUntil(() => states[0] && states[0].handNumber === 2
+    && ['preflop', 'flop', 'turn', 'river'].includes(states[0].stage), 3000), '第二手未开始');
+  const secondDealerSeat = states[0].dealerSeat;
+  assert.strictEqual(states[0].players[secondDealerSeat].name, NAMES[1], '第二手庄家应轮到乙');
+
+  const kickReply = await request(clients[0], 'kick_player', { seat: secondDealerSeat });
+  assert.ok(kickReply && kickReply.ok, '未能在第二手踢出当前庄家乙');
+  assert.ok(await waitUntil(() => {
+    const p = states[0] && states[0].players.find((player) => player.name === NAMES[1]);
+    return p && p.left && p.folded;
+  }, 3000), '被踢的中间庄家未保留到本手结算');
+
+  await foldUntilHandover(2, new Set([1]));
+  assert.strictEqual(states[0].session.reduce((sum, entry) => sum + entry.pl, 0), 0,
+    '中间庄家离场后战绩盈亏不为零');
+  await emit(clients[0], 'next_hand', null);
+
+  assert.ok(await waitUntil(() => states[0] && states[0].handNumber === 3
+    && states[0].players.length === 2
+    && ['preflop', 'flop', 'turn', 'river'].includes(states[0].stage), 3000), '第三手未按两人桌开始');
+  const thirdDealer = states[0].players[states[0].dealerSeat];
+  assert.ok(thirdDealer, '第三手庄家索引无效');
+  assert.strictEqual(thirdDealer.name, NAMES[2], '中间庄家离场后，下一手应顺时针轮到丙');
+  console.log('  ✓ 中间庄家被踢后座位正确压缩，下一手顺时针轮到丙');
+
+  disconnectAll(clients);
+}
+
+// ---------- 场景 2d：handover 尾座庄家离开/被踢，延迟清退且庄家顺序不丢 ----------
+async function runHandoverDealerTailRemoval(mode) {
+  const fail = (msg) => { throw new Error(msg); };
+  const { clients, states } = await setupTable(3, fail);
+
+  async function actWhenTurn(hand, clientIdx, type) {
+    const ready = await waitUntil(() => {
+      const table = states[0];
+      const actorView = states[clientIdx];
+      return table && actorView && table.handNumber === hand
+        && ['preflop', 'flop', 'turn', 'river'].includes(table.stage)
+        && table.turnSeat === actorView.youSeat;
+    }, 5000, 30);
+    assert.ok(ready, `第 ${hand} 手未轮到 ${NAMES[clientIdx]} 执行 ${type}`);
+    const actionReply = await request(clients[clientIdx], 'action', { type });
+    assert.ok(actionReply && actionReply.ok, `${NAMES[clientIdx]} 的 ${type} 行动失败`);
+  }
+
+  async function waitHandover(hand) {
+    const done = await waitUntil(() => states[0] && states[0].handNumber === hand
+      && states[0].stage === 'handover' && states[0].results, 5000, 30);
+    assert.ok(done, `第 ${hand} 手未进入结算`);
+  }
+
+  // 第 1 手庄家甲：甲、乙依次弃牌；第 2 手庄家乙：乙、丙依次弃牌。
+  await actWhenTurn(1, 0, 'fold');
+  await actWhenTurn(1, 1, 'fold');
+  await waitHandover(1);
+  await emit(clients[0], 'next_hand', null);
+
+  await actWhenTurn(2, 1, 'fold');
+  await actWhenTurn(2, 2, 'fold');
+  await waitHandover(2);
+  await emit(clients[0], 'next_hand', null);
+
+  // 第 3 手庄家丙先跟注 20，确保 handover 时 totalBet 非零，再让甲、乙弃牌。
+  await actWhenTurn(3, 2, 'call');
+  await actWhenTurn(3, 0, 'fold');
+  await actWhenTurn(3, 1, 'fold');
+  await waitHandover(3);
+
+  const settled = states[0];
+  assert.strictEqual(settled.players[settled.dealerSeat].name, NAMES[2], '第三手庄家应为尾座丙');
+  const tailBefore = settled.players[2];
+  assert.ok(tailBefore.totalBet > 0, '专项场景未保留尾座庄家的已结算投入');
+  const economyBefore = settled.economyTotal;
+
+  const removalReply = mode === 'leave'
+    ? await request(clients[2], 'leave_room', null)
+    : await request(clients[0], 'kick_player', { seat: 2 });
+  assert.ok(removalReply && removalReply.ok, `handover 尾座庄家${mode === 'leave' ? '离开' : '被踢'}失败`);
+
+  const retained = await waitUntil(() => {
+    const tail = states[0] && states[0].players.find((p) => p.name === NAMES[2]);
+    return tail && tail.left && !tail.connected;
+  }, 3000, 30);
+  assert.ok(retained, 'handover 尾座庄家被提前删除，旧桌序无法用于下手轮转');
+  assert.strictEqual(states[0].economyTotal, economyBefore, 'handover 延迟清退前不应缩减经济总盘');
+  assert.strictEqual(states[0].players.reduce((sum, p) => sum + p.chips, 0), economyBefore,
+    'handover 尾座移除后结算筹码不守恒（可能重复扣除 totalBet）');
+  assert.strictEqual(states[0].session.reduce((sum, entry) => sum + entry.pl, 0), 0,
+    'handover 尾座移除后战绩盈亏不为零');
+
+  await emit(clients[0], 'next_hand', null);
+  assert.ok(await waitUntil(() => states[0] && states[0].handNumber === 4
+    && states[0].players.length === 2
+    && ['preflop', 'flop', 'turn', 'river'].includes(states[0].stage), 3000, 30), '第四手未按两人桌开始');
+  const nextDealer = states[0].players[states[0].dealerSeat];
+  assert.ok(nextDealer, '尾座庄家清退后 dealerSeat 无效');
+  assert.strictEqual(nextDealer.name, NAMES[0], '尾座庄家离场后下一手应顺时针轮到甲');
+  const owned = states[0].players.reduce((sum, p) => sum + p.chips + p.totalBet, 0);
+  assert.strictEqual(owned, states[0].economyTotal, '下一手清退尾座庄家后经济总盘不守恒');
+  assert.strictEqual(states[0].session.reduce((sum, entry) => sum + entry.pl, 0), 0,
+    '下一手清退尾座庄家后战绩盈亏不为零');
+  console.log(`  ✓ handover 尾座庄家${mode === 'leave' ? '主动离开' : '被房主踢出'}：只扣 chips，下一手轮到甲`);
+
+  disconnectAll(clients);
+}
+
 // ---------- 场景 3a：断线保护窗口（不瞬间弃牌 → 窗口后自动弃牌 → 重连恢复座位） ----------
 async function runGraceScenario() {
   const fail = (msg) => { throw new Error(msg); };
@@ -620,6 +825,10 @@ async function runSettingsScenario() {
     await runIntegration(3);
     await runIntegration(6);
     await runLeaveMidHand();
+    await runKickTailMidHand();
+    await runDealerRemapAfterMiddleKick();
+    await runHandoverDealerTailRemoval('leave');
+    await runHandoverDealerTailRemoval('kick');
     await runGraceScenario();
     await runGraceReconnectWithinWindow();
     await runSettingsScenario();

@@ -124,7 +124,15 @@ body {
 .lobby-card .btn[aria-busy="true"] { cursor: progress; }
 .divider { color: var(--a1-faint); font-size: 12px; margin: 18px 0; }
 .join-row { display: flex; gap: 10px; }
-.join-row input { text-align: center; letter-spacing: 4px; text-transform: uppercase; }
+.join-row input {
+  min-width: 0; flex: 1 1 auto;
+  text-align: center; letter-spacing: 4px; text-transform: uppercase;
+}
+.join-row .btn {
+  flex: 0 0 64px;
+  padding-inline: 10px;
+  white-space: nowrap;
+}
 .error { color: #d99290; font-size: 13px; margin-top: 14px; min-height: 18px; }
 
 /* ============ Header ============ */

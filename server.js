@@ -204,6 +204,31 @@ function seatCount(room) {
   return room.players.filter((p) => p && !p.left).length;
 }
 
+/**
+ * 在两手之间统一清退 left 座位，并把旧桌序中的庄家锚点映射到新数组。
+ * 只扣玩家尚持有的 chips；totalBet 已在上一手结算进赢家筹码，不能重复扣除。
+ */
+function compactLeftPlayers(room) {
+  let dealerAnchor = null;
+  if (room.handNumber > 0 && room.players.length > 0 && room.dealerSeat >= 0) {
+    const oldCount = room.players.length;
+    for (let offset = 0; offset < oldCount; offset++) {
+      const idx = ((room.dealerSeat - offset) % oldCount + oldCount) % oldCount;
+      const candidate = room.players[idx];
+      if (candidate && !candidate.left) {
+        dealerAnchor = candidate;
+        break;
+      }
+    }
+  }
+
+  room.players.filter((p) => !p || p.left).forEach((p) => {
+    if (p) room.economyTotal -= p.chips;
+  });
+  room.players = room.players.filter((p) => p && !p.left);
+  room.dealerSeat = dealerAnchor ? room.players.indexOf(dealerAnchor) : -1;
+}
+
 function addLog(room, msg) {
   room.logs.push(msg);
   if (room.logs.length > 40) room.logs.shift();
@@ -237,13 +262,9 @@ function startHand(room) {
   const seated = room.players.filter((p) => p && !p.left);
   if (seated.length < MIN_PLAYERS) return;
 
-  // 移除已离开的玩家（在两手之间）；0 筹码玩家保留座位（可重买或 sit out）
-  // 清退只扣玩家真实持有的 chips：其 totalBet 在本手结算时已并入底池由赢家
-  // 获得（仍在经济盘内），若一并扣除会造成 economyTotal 少计、破坏守恒
-  room.players.filter((p) => !p || p.left).forEach((p) => {
-    if (p) room.economyTotal -= p.chips;
-  });
-  room.players = room.players.filter((p) => p && !p.left);
+  // 移除已离开的玩家（在两手之间）；0 筹码玩家保留座位（可重买或 sit out）。
+  // compactLeftPlayers 会在压缩前保存庄家锚点，避免离场导致庄家/盲注错位。
+  compactLeftPlayers(room);
   // 可参与本局的玩家：有筹码、未暂离、已连接
   const playable = room.players.filter((p) => p && p.chips > 0 && !p.sittingOut && p.connected);
   if (playable.length < MIN_PLAYERS) {
@@ -1111,21 +1132,15 @@ io.on('connection', (socket) => {
     if (!target || target.left) return reply({ ok: false, err: '该座位无人' });
     if (target.name === room.hostName) return reply({ ok: false, err: '不能踢自己' });
     addLog(room, `${target.name} 被房主移出房间`);
+    const midHandKick = ['preflop', 'flop', 'turn', 'river'].includes(room.stage);
+    const targetSocketId = target.socketId;
     target.left = true;
     target.connected = false;
-    if (target.socketId) {
-      io.to(target.socketId).emit('kicked', { reason: '房主将你移出房间' });
-      const s = io.sockets.sockets.get(target.socketId);
+    target.socketId = null;
+    if (targetSocketId) {
+      io.to(targetSocketId).emit('kicked', { reason: '房主将你移出房间' });
+      const s = io.sockets.sockets.get(targetSocketId);
       if (s) s.disconnect(true);
-    }
-    // 清理尾部已离开的空位（同时把其资产从经济总盘子中清退）。
-    // 对局中被踢：其 totalBet 还是底池里的活钱（之后按在场玩家重新汇总），
-    // 弹出后需一并扣账；局间清理时 totalBet 已结算并入赢家筹码，只扣 chips。
-    const midHandKick = ['preflop', 'flop', 'turn', 'river'].includes(room.stage);
-    while (room.players.length && (!room.players[room.players.length - 1] || room.players[room.players.length - 1].left)) {
-      const dropped = room.players[room.players.length - 1];
-      if (dropped) room.economyTotal -= dropped.chips + (midHandKick ? dropped.totalBet : 0);
-      room.players.pop();
     }
     // 对局中被踢：标记弃牌并推进行动队列，防止无手牌玩家参与摊牌分池
     if (midHandKick && target.inHand && !target.folded) {
@@ -1133,8 +1148,12 @@ io.on('connection', (socket) => {
       room.queue = room.queue.filter((s) => s !== data.seat);
       consumeQueueAndAdvance(room, data.seat);
     }
-    // 对局中的 left 玩家在 endHand 结算完成后统一入账，避免中途战绩暂时不守恒。
-    if (!midHandKick) bankSession(room, target);
+    if (!midHandKick) {
+      // 局间立即归档；handover 仍保留旧桌序和 results 的 seat 引用，下一手再清退。
+      // waiting 没有待展示的结算结果，可立即统一压缩。
+      bankSession(room, target);
+      if (room.stage === 'waiting') compactLeftPlayers(room);
+    }
     if (room.stage === 'waiting' && room.dealerSeat >= room.players.length) room.dealerSeat = -1;
     clearTimeout(room.nextHandTimer);
     room.nextHandTimer = null;
@@ -1306,12 +1325,9 @@ function handleLeave(socket, isDisconnect = false) {
     bankSession(room, p);
     // 房主离开：转移给剩余玩家中的第一位
     transferHostAfterLeave(room, p);
-    // 清理尾部已离开的空位（同时把其筹码从经济总盘子中清退）
-    while (room.players.length && (!room.players[room.players.length - 1] || room.players[room.players.length - 1].left)) {
-      const dropped = room.players[room.players.length - 1];
-      if (dropped) room.economyTotal -= dropped.chips + dropped.totalBet;
-      room.players.pop();
-    }
+    // handover 需保留旧桌序和 results 的 seat 引用，统一在下一手开始时清退；
+    // waiting 没有待展示的结算结果，可立即压缩并同步庄家锚点。
+    if (room.stage === 'waiting') compactLeftPlayers(room);
     if (room.stage === 'waiting' && room.dealerSeat >= room.players.length) room.dealerSeat = -1;
     // 局间有人离开后要重排自动开局的定时器，否则永远卡在本局结束
     clearTimeout(room.nextHandTimer);
@@ -1337,4 +1353,7 @@ if (require.main === module) {
 }
 
 // 供自动化测试使用
-module.exports = { rooms, evaluate7, computePots, score5, newDeck, normalizeNickname, newToken };
+module.exports = {
+  server, io, rooms,
+  evaluate7, computePots, score5, newDeck, normalizeNickname, newToken,
+};
