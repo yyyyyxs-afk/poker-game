@@ -1,5 +1,7 @@
 # 项目交接单 — 多人在线德州扑克
 
+> 2026-09-04 更新：Cloudflare 免费线上版已部署至 `https://poker-game.poker-game.workers.dev`，迁移代码位于 `codex/cloudflare-workers` 分支；原 Node.js 主版本继续保留。线上版使用 Durable Objects 持久化房间，服务中断时会作废未完成牌局并返还本局投入。
+
 > 接收人：zcode  
 > 交接日期：2026-08-27  
 > 交付人：WorkBuddy（GDHC 用户）
