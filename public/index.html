@@ -141,12 +141,23 @@
 
       <aside id="log-panel">
         <div class="log-head">
-          <h3>牌局记录</h3>
+          <div class="panel-tabs" role="tablist" aria-label="牌桌消息">
+            <button id="panel-tab-log" class="active" role="tab" aria-selected="true">牌局</button>
+            <button id="panel-tab-chat" role="tab" aria-selected="false">聊天 <i id="chat-unread" class="hidden" aria-label="有新消息"></i></button>
+          </div>
           <button id="btn-log-collapse" class="icon-btn small" aria-label="收起牌局记录">
             <img src="assets/a1/icons/chevron-right.svg" alt="" />
           </button>
         </div>
-        <ul id="log-list"></ul>
+        <div id="log-view" class="panel-view"><ul id="log-list"></ul></div>
+        <div id="chat-view" class="panel-view hidden">
+          <ul id="chat-list" aria-live="polite"></ul>
+          <form id="chat-form">
+            <input id="chat-input" type="text" maxlength="80" autocomplete="off" placeholder="和朋友说点什么…" aria-label="聊天消息" />
+            <button id="btn-chat-send" type="submit">发送</button>
+          </form>
+          <div id="chat-error" aria-live="polite"></div>
+        </div>
       </aside>
     </main>
 

@@ -178,6 +178,8 @@ function createRoom(hostName) {
     results: null,         // 摊牌结果
     lastResult: null,      // 最近一局完整复盘；开下一局后仍可回看
     handActions: [],       // 当前一手的结构化行动时间线
+    chatMessages: [],      // 最近 50 条好友聊天
+    nextChatId: 1,
     revealed: false,
     timer: null,
     turnDeadline: 0,       // 当前行动定时器的绝对截止时间（断线保护窗口用于恢复剩余时间）
@@ -805,6 +807,7 @@ function sanitizeState(room, viewerSocketId) {
     ],
     results: room.results,
     lastResult: room.lastResult,
+    chatMessages: room.chatMessages.slice(-50),
     revealed: room.revealed,
     logs: room.logs.slice(-12),
     players: room.players.map((p, seat) => ({
@@ -1120,6 +1123,35 @@ io.on('connection', (socket) => {
     const seat = room.players.findIndex((p) => p && p.socketId === socket.id);
     const res = applyAction(room, seat, data.type, data.amount);
     reply(res);
+  });
+
+  // 好友聊天：仅房内玩家可发，单条最多 80 个字符，2 秒内最多 3 条。
+  const chatTimes = [];
+  onSocketRequest(socket, 'chat_message', (payload, reply) => {
+    const data = requireObjectPayload(payload, reply, ['text']);
+    if (!data) return;
+    if (typeof data.text !== 'string' || data.text.length > 500) {
+      return reply({ ok: false, err: '消息格式错误' });
+    }
+    const room = findRoomBySocket(socket.id);
+    const seat = room && room.players.findIndex((p) => p && p.socketId === socket.id);
+    const player = room && seat >= 0 ? room.players[seat] : null;
+    if (!room || !player) return reply({ ok: false, err: '不在房间中' });
+
+    const text = data.text.normalize('NFKC').trim().replace(/\s+/gu, ' ');
+    if (!text) return reply({ ok: false, err: '消息不能为空' });
+    if (/[\p{Cc}\p{Cf}\p{Cs}]/u.test(text)) return reply({ ok: false, err: '消息包含不可见字符' });
+    if (Array.from(text).length > 80) return reply({ ok: false, err: '消息最多 80 个字符' });
+
+    const now = Date.now();
+    while (chatTimes.length && now - chatTimes[0] >= 2000) chatTimes.shift();
+    if (chatTimes.length >= 3) return reply({ ok: false, err: '消息发得太快了' });
+    chatTimes.push(now);
+
+    room.chatMessages.push({ id: room.nextChatId++, seat, name: player.name, text, at: now });
+    if (room.chatMessages.length > 50) room.chatMessages.shift();
+    reply({ ok: true });
+    broadcast(room);
   });
 
   // 表情快捷互动：转发给全房间，在自己头像上冒泡展示

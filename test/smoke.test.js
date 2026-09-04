@@ -7,7 +7,8 @@
  * 5. 场景：handover 尾座庄家离开/被踢后，经济盘与庄家轮转保持正确
  * 6. 场景：断线保护窗口（不瞬间弃牌 / 窗口后自动弃牌 / 窗口内重连可继续行动）
  * 7. 场景：房管设置（行动时长 / 局间倒计时 / 禁止重买）校验
- * 8. 安全：单连接单房、畸形 payload、Unicode 昵称归一与 token 防冒名
+ * 8. 好友聊天：消息同步、规范化、长度限制与刷屏限制
+ * 9. 安全：单连接单房、畸形 payload、Unicode 昵称归一与 token 防冒名
  *
  * 推荐执行：npm test（自动启动隔离服务并包含规则、几何与本文件）
  * 单独调试：先在 3456 端口启动服务，再执行 npm run test:smoke；也可用 TEST_URL 指定地址。
@@ -155,7 +156,7 @@ async function runSocketHardeningScenario() {
   first.on('state', (state) => { firstState = state; });
 
   // 所有需要对象 payload 的事件都必须对 null、非对象、缺字段给出失败回执。
-  const objectEvents = ['create_room', 'join_room', 'update_settings', 'action', 'emoji', 'kick_player'];
+  const objectEvents = ['create_room', 'join_room', 'update_settings', 'action', 'emoji', 'chat_message', 'kick_player'];
   for (const event of objectEvents) {
     for (const payload of [null, 'bad-payload', {}]) {
       const reply = await request(first, event, payload);
@@ -191,6 +192,20 @@ async function runSocketHardeningScenario() {
   assert.match(impersonation.err, /昵称|在线|使用/);
   await emit(contender, 'join_room', { code: firstRoom.code, name: '李四' });
   console.log('  ✓ Unicode 等价昵称无法绕过现有在线冒名保护');
+
+  const blankChat = await request(first, 'chat_message', { text: '   ' });
+  assert.strictEqual(blankChat.ok, false, '聊天不应接受空白消息');
+  const longChat = await request(first, 'chat_message', { text: '好'.repeat(81) });
+  assert.strictEqual(longChat.ok, false, '聊天不应接受超过 80 字的消息');
+  await emit(first, 'chat_message', { text: '  大家好   开始吧  ' });
+  assert.ok(await waitUntil(() => firstState && firstState.chatMessages
+    && firstState.chatMessages.some((m) => m.text === '大家好 开始吧'), 3000), '聊天消息未同步或未规范化');
+  await emit(first, 'chat_message', { text: '第二条' });
+  await emit(first, 'chat_message', { text: '第三条' });
+  const tooFast = await request(first, 'chat_message', { text: '第四条' });
+  assert.strictEqual(tooFast.ok, false, '聊天刷屏限制未生效');
+  assert.match(tooFast.err, /太快/);
+  console.log('  ✓ 好友聊天同步正常，并限制空白、超长与短时刷屏');
 
   disconnectAll([first, second, contender]);
 }

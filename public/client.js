@@ -88,13 +88,38 @@ logToggleBtn.addEventListener('click', () => {
   setLogCollapsed(!logPanel.classList.contains('collapsed'));
 });
 logPanel.querySelector('.log-head').addEventListener('click', (e) => {
-  if (e.target.closest('#btn-log-collapse')) return;
+  if (e.target.closest('button')) return;
   setLogCollapsed(!logPanel.classList.contains('collapsed'));
 });
 document.getElementById('btn-log-collapse').addEventListener('click', () => setLogCollapsed(true));
 if (window.matchMedia('(max-width: 900px)').matches) {
   setLogCollapsed(true);
 }
+
+// 牌局记录 / 好友聊天共用右侧面板，手机端也沿用同一底部抽屉。
+const panelLogTab = document.getElementById('panel-tab-log');
+const panelChatTab = document.getElementById('panel-tab-chat');
+const chatUnread = document.getElementById('chat-unread');
+let panelMode = 'log';
+let seenChatId = 0;
+function setPanelMode(mode) {
+  panelMode = mode === 'chat' ? 'chat' : 'log';
+  document.getElementById('log-view').classList.toggle('hidden', panelMode !== 'log');
+  document.getElementById('chat-view').classList.toggle('hidden', panelMode !== 'chat');
+  panelLogTab.classList.toggle('active', panelMode === 'log');
+  panelChatTab.classList.toggle('active', panelMode === 'chat');
+  panelLogTab.setAttribute('aria-selected', String(panelMode === 'log'));
+  panelChatTab.setAttribute('aria-selected', String(panelMode === 'chat'));
+  if (panelMode === 'chat') {
+    const chats = (state && state.chatMessages) || [];
+    seenChatId = chats.length ? chats[chats.length - 1].id : seenChatId;
+    chatUnread.classList.add('hidden');
+    logToggleBtn.classList.remove('has-unread');
+    renderChats();
+  }
+}
+panelLogTab.addEventListener('click', () => setPanelMode('log'));
+panelChatTab.addEventListener('click', () => setPanelMode('chat'));
 
 // ---------------- 新手玩法与牌型速查 ----------------
 const rulesOverlay = document.getElementById('rules-overlay');
@@ -478,6 +503,7 @@ function render() {
     renderCommunity();
     renderMyArea();
     renderLogs();
+    renderChats();
     renderResults();
   } catch (e) {
     // 渲染异常不应白屏：把错误显示在提示区，座位区保留上次内容
@@ -1250,6 +1276,48 @@ function renderLogs() {
   });
   ul.scrollTop = ul.scrollHeight;
 }
+
+function renderChats() {
+  const chats = (state && Array.isArray(state.chatMessages)) ? state.chatMessages : [];
+  const ul = document.getElementById('chat-list');
+  ul.innerHTML = chats.length ? chats.map((message) => `
+    <li class="${message.seat === mySeat ? 'mine' : ''}">
+      <span>${escapeHtml(message.name)}</span>
+      <p>${escapeHtml(message.text)}</p>
+    </li>`).join('') : '<li class="chat-empty">还没有消息，先打个招呼吧</li>';
+  ul.scrollTop = ul.scrollHeight;
+
+  const latestId = chats.length ? chats[chats.length - 1].id : 0;
+  if (panelMode === 'chat' && !logPanel.classList.contains('collapsed')) {
+    seenChatId = latestId;
+    chatUnread.classList.add('hidden');
+    logToggleBtn.classList.remove('has-unread');
+  } else if (latestId > seenChatId) {
+    chatUnread.classList.remove('hidden');
+    logToggleBtn.classList.add('has-unread');
+  }
+}
+
+const chatForm = document.getElementById('chat-form');
+const chatInput = document.getElementById('chat-input');
+const chatSendBtn = document.getElementById('btn-chat-send');
+const chatError = document.getElementById('chat-error');
+chatForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const text = chatInput.value.trim();
+  if (!text || chatSendBtn.disabled) return;
+  chatSendBtn.disabled = true;
+  chatError.textContent = '';
+  socket.emit('chat_message', { text }, (res) => {
+    chatSendBtn.disabled = false;
+    if (res && res.ok) {
+      chatInput.value = '';
+      chatInput.focus();
+    } else {
+      chatError.textContent = (res && res.err) || '发送失败，请重试';
+    }
+  });
+});
 
 // ---------------- 结算（两层，§17） ----------------
 // 第一层：牌桌直显——winner 横幅 + 席位高亮 + 摊牌亮牌（renderSeats 的 revealed 逻辑）；

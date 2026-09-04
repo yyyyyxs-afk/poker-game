@@ -9,7 +9,8 @@ const css = fs.readFileSync(path.join(root, 'public', 'style.css'), 'utf8');
 
 for (const id of [
   'btn-rules-lobby', 'btn-rules-game', 'rules-overlay', 'btn-rules-close',
-  'hand-changes', 'result-showdown', 'result-timeline',
+  'hand-changes', 'result-showdown', 'result-timeline', 'panel-tab-chat',
+  'chat-list', 'chat-form', 'chat-input', 'btn-chat-send',
 ]) {
   assert.ok(html.includes(`id="${id}"`), `缺少玩法说明入口或弹窗：${id}`);
 }
@@ -29,5 +30,6 @@ assert.ok(html.includes('本游戏仅供好友娱乐，不涉及真钱交易。'
 assert.ok(client.includes('本局筹码变化') && client.includes('entry.delta'), '结算详情缺少单局筹码变化');
 assert.ok(client.includes('摊牌结果') && client.includes('最佳五张'), '结算详情缺少摊牌牌型复盘');
 assert.ok(client.includes('本局过程') && client.includes('state.lastResult'), '缺少行动时间线或跨局回看');
+assert.ok(client.includes("socket.emit('chat_message'") && client.includes('renderChats()'), '好友聊天未接入发送或渲染');
 
 console.log('界面内容检查通过：双入口、交互、手机样式与牌型顺序正常 ✅');
