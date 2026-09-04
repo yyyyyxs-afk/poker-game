@@ -1,7 +1,7 @@
 /* 德州扑克客户端（A1 Phase 2 视觉结构版）
  * 牌局数据、Socket.IO 协议与操作逻辑保持不变；
  * 本轮重写 DOM 渲染：Header / Play Stage（牌桌 + 席位 + 下注层）/ Hero Dock / Raise Controller。 */
-const socket = io();
+const socket = typeof io === 'function' ? io() : createWorkerSocket();
 
 let mySeat = -1;
 let state = null;
