@@ -8,7 +8,8 @@
     "test": "node test/run-all.js",
     "test:rules": "node test/rules.test.js",
     "test:geometry": "node test/geometry-check.js",
-    "test:smoke": "node test/smoke.test.js"
+    "test:smoke": "node test/smoke.test.js",
+    "test:worker": "node test/worker-smoke.test.js"
   },
   "engines": {
     "node": ">=18"
