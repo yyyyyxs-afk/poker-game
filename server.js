@@ -243,6 +243,32 @@ function canAct(p) {
   return p && !p.folded && !p.allIn && p.connected && p.chips > 0 && p.inHand && !p.sittingOut;
 }
 
+/**
+ * 玩家是否拥有加注权。
+ * - 尚未在本轮行动：可以加注；
+ * - 已行动后遇到不足额全押：仍需跟注/弃牌，但不自动恢复加注权；
+ * - 多个不足额全押累计达到其上次面对的完整最小加注幅度：恢复加注权。
+ */
+function canRaise(room, p) {
+  if (!canAct(p)) return false;
+  if (!Number.isFinite(p.actedBet) || !Number.isFinite(p.actedMinRaise)) return true;
+  return room.currentBet - p.actedBet >= p.actedMinRaise;
+}
+
+function markBettingAction(room, p) {
+  p.actedBet = room.currentBet;
+  p.actedMinRaise = room.minRaise;
+}
+
+function reopenRaiseRights(room, raiser) {
+  room.players.forEach((p) => {
+    if (!p) return;
+    p.actedBet = null;
+    p.actedMinRaise = null;
+  });
+  markBettingAction(room, raiser);
+}
+
 function nextSeat(room, from, filterFn) {
   const n = room.players.length;
   for (let i = 1; i <= n; i++) {
@@ -334,6 +360,8 @@ function startHand(room) {
     p.hole = [];
     p.isSB = false;
     p.isBB = false;
+    p.actedBet = null;
+    p.actedMinRaise = null;
   });
 
   // 本场战绩：参与本手的玩家计一手
@@ -414,7 +442,12 @@ function streetBetsToPot(room) {
 }
 
 function nextStreet(room) {
-  room.players.forEach((p) => { if (p) p.roundBet = 0; });
+  room.players.forEach((p) => {
+    if (!p) return;
+    p.roundBet = 0;
+    p.actedBet = null;
+    p.actedMinRaise = null;
+  });
   room.currentBet = 0;
   room.minRaise = room.settings.bigBlind;
   streetBetsToPot(room);
@@ -475,11 +508,13 @@ function applyAction(room, seat, action, amount, opts = {}) {
   switch (action) {
     case 'fold':
       p.folded = true;
+      markBettingAction(room, p);
       addLog(room, `${p.name} 弃牌`);
       room.handActions.push({ type: 'action', street: room.stage, seat, name: p.name, label: opts.auto ? '自动弃牌' : '弃牌' });
       break;
     case 'check': {
       if (p.roundBet !== room.currentBet) return { ok: false, err: '当前有人加注，不能过牌' };
+      markBettingAction(room, p);
       addLog(room, `${p.name} 过牌`);
       room.handActions.push({ type: 'action', street: room.stage, seat, name: p.name, label: opts.auto ? '自动过牌' : '过牌' });
       break;
@@ -488,6 +523,7 @@ function applyAction(room, seat, action, amount, opts = {}) {
       const need = room.currentBet - p.roundBet;
       if (need <= 0) return { ok: false, err: '无需跟注，可以过牌' };
       const paid = pay(p, need);
+      markBettingAction(room, p);
       addLog(room, `${p.name} 跟注 ${paid}${p.allIn ? '（全押）' : ''}`);
       room.handActions.push({ type: 'action', street: room.stage, seat, name: p.name, label: `跟注 ${paid}${p.allIn ? '（全押）' : ''}`, amount: paid });
       break;
@@ -505,12 +541,22 @@ function applyAction(room, seat, action, amount, opts = {}) {
       const isAllIn = need >= p.chips;
       if (target > room.currentBet) {
         const raiseSize = target - room.currentBet;
+        const fullRaise = raiseSize >= room.minRaise;
+        if (!canRaise(room, p)) {
+          return { ok: false, err: '不足额全押未重新开放加注权，只能跟注或弃牌' };
+        }
         if (!isAllIn && raiseSize < room.minRaise) {
           return { ok: false, err: `最小加注到 ${room.currentBet + room.minRaise}` };
         }
         pay(p, need);
-        room.minRaise = Math.max(room.minRaise, raiseSize);
         room.currentBet = target;
+        if (fullRaise) {
+          room.minRaise = raiseSize;
+          reopenRaiseRights(room, p);
+        } else {
+          // 不足额全押只提高跟注金额，不改变完整最小加注幅度和已行动玩家的加注权。
+          markBettingAction(room, p);
+        }
         addLog(room, `${p.name} 加注到 ${target}${isAllIn ? '（全押）' : ''}`);
         room.handActions.push({ type: 'action', street: room.stage, seat, name: p.name, label: `${isAllIn ? '全押到' : '加注到'} ${target}`, amount: target });
         // 有新加注：其余未弃牌未全押玩家重新获得行动权
@@ -527,6 +573,7 @@ function applyAction(room, seat, action, amount, opts = {}) {
           return { ok: false, err: `加注至少到 ${room.currentBet}` };
         }
         pay(p, need);
+        markBettingAction(room, p);
         addLog(room, `${p.name} 全押跟注 ${need}`);
         room.handActions.push({ type: 'action', street: room.stage, seat, name: p.name, label: `全押跟注 ${need}`, amount: need });
       }
@@ -823,6 +870,7 @@ function sanitizeState(room, viewerSocketId) {
       left: !!p.left,
       inHand: p.inHand,
       sittingOut: !!p.sittingOut,
+      raiseAllowed: canRaise(room, p),
       isDealer: seat === room.dealerSeat,
       // 摊牌只公开仍在本手且未弃牌者；已弃牌者的底牌始终仅本人可见。
       hole: p.hole && (seat === viewerIdx || (room.revealed && p.inHand && !p.folded)) ? p.hole : null,
@@ -1445,4 +1493,5 @@ if (require.main === module) {
 module.exports = {
   server, io, rooms,
   evaluate7, computePots, score5, newDeck, normalizeNickname, newToken,
+  applyAction, canRaise,
 };

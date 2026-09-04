@@ -32,5 +32,7 @@ assert.ok(client.includes('摊牌结果') && client.includes('最佳五张'), '�
 assert.ok(client.includes('本局过程') && client.includes('state.lastResult'), '缺少行动时间线或跨局回看');
 assert.ok(client.includes("socket.emit('chat_message'") && client.includes('renderChats()'), '好友聊天未接入发送或渲染');
 assert.ok(client.includes('p.seat === mySeat') && client.includes('0.82'), '自己的下注筹码缺少桌面下沿专用锚点');
+assert.ok(client.includes('me.raiseAllowed !== false') && client.includes('未重新开放加注权'),
+  '客户端未按服务端加注权禁用操作');
 
 console.log('界面内容检查通过：双入口、交互、手机样式与牌型顺序正常 ✅');

@@ -1062,6 +1062,7 @@ function waitingTipText() {
 
 function updateActionBar(me) {
   const toCall = state.currentBet - me.roundBet;
+  const raiseAllowed = me.raiseAllowed !== false; // 兼容旧服务端：字段缺失时仍按可加注处理
   // "轮到你 · 跟注 335"式提示：金额数据全部来自服务端状态
   const hint = document.getElementById('action-hint');
   hint.innerHTML = toCall <= 0 ? '轮到你 · <b>过牌</b>'
@@ -1072,12 +1073,14 @@ function updateActionBar(me) {
     : toCall >= me.chips ? `跟注全押 (${me.chips})` : `跟注 ${toCall}`;
   callBtn.onclick = () => sendAction(toCall <= 0 ? 'check' : 'call');
 
-  document.getElementById('btn-allin').onclick = () => sendAction('allin');
+  const allInBtn = document.getElementById('btn-allin');
+  allInBtn.onclick = () => sendAction('allin');
 
   // 加注面板范围：最小加注到 ~ 全部筹码。
   // 筹码不足以最小加注时（rawMin > max）合法动作只剩全押：把下限钳到全部筹码，
   // 避免 slider 出现 min>max 的非法区间、确认金额超过"最大"标签。
   const maxRaiseTo = me.roundBet + me.chips;
+  allInBtn.disabled = !raiseAllowed && maxRaiseTo > state.currentBet;
   const rawMinRaiseTo = Math.max(state.currentBet + state.minRaise,
     Math.min(state.currentBet + 1, maxRaiseTo));
   const minRaiseTo = Math.min(rawMinRaiseTo, maxRaiseTo);
@@ -1105,9 +1108,10 @@ function updateActionBar(me) {
   if (confirmBtn.firstChild && confirmBtn.firstChild.nodeType === Node.TEXT_NODE) {
     confirmBtn.firstChild.textContent = allInOnly ? '全押 ' : '确认加注 ';
   }
-  document.getElementById('raise-min-label').textContent = allInOnly
-    ? '筹码不足以最小加注，仅全押'
-    : `最小 ${minRaiseTo.toLocaleString('zh-CN')}`;
+  document.getElementById('raise-min-label').textContent = !raiseAllowed
+    ? '不足额全押未重新开放加注权'
+    : allInOnly ? '筹码不足以最小加注，仅全押'
+      : `最小 ${minRaiseTo.toLocaleString('zh-CN')}`;
   document.getElementById('raise-max-label').textContent = `最大 ${maxRaiseTo.toLocaleString('zh-CN')}`;
   const isBet = state.currentBet === 0 || state.currentBet <= me.roundBet;
   document.getElementById('raise-label').textContent = isBet ? '下注到' : '加注到';
@@ -1166,7 +1170,7 @@ function updateActionBar(me) {
 
   const raiseBtn = document.getElementById('btn-toggle-raise');
   raiseBtn.textContent = isBet ? '下注' : '加注';
-  raiseBtn.disabled = maxRaiseTo <= state.currentBet;
+  raiseBtn.disabled = maxRaiseTo <= state.currentBet || !raiseAllowed;
   raiseBtn.onclick = onRaiseToggleClick;
   document.getElementById('btn-raise-confirm').onclick = confirmRaise;
   document.getElementById('btn-raise-cancel').onclick = hideRaisePanel;

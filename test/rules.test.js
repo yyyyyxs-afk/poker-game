@@ -3,11 +3,13 @@
  * 1. 洗牌：52 张严格唯一、合法牌集合、密码学随机可重复发牌
  * 2. 牌力：牌型类别、A-5 轮子、7 选 5 的 best5 精确性、平分牌
  * 3. 边池：多人全押阶梯（含弃牌者投入）分层与资格
+ * 4. 下注权：不足额全押不重开加注权，足额全押正常重开
  * 运行：node test/rules.test.js
  */
 const assert = require('assert');
 const {
   evaluate7, computePots, score5, newDeck, normalizeNickname, newToken,
+  applyAction, canRaise,
 } = require('../server.js');
 
 const C = (r, s) => ({ r, s });
@@ -154,6 +156,85 @@ ok('边池：零投入玩家不产生池', () => {
   assert.strictEqual(pots.length, 1);
   assert.strictEqual(pots[0].amount, 800);
   assert.deepStrictEqual(pots[0].eligible, [2]);
+});
+
+// ---------------- 不足额全押与加注权 ----------------
+function bettingPlayer(name, chips, acted = false) {
+  return {
+    name, chips, roundBet: 100, totalBet: 100,
+    folded: false, allIn: false, connected: true, inHand: true, sittingOut: false,
+    actedBet: acted ? 100 : null, actedMinRaise: acted ? 100 : null,
+    socketId: `test-${name}`, avatar: '🙂', hole: [], left: false,
+  };
+}
+
+function bettingRoom(allInChips) {
+  return {
+    code: 'TEST01', stage: 'flop', handNumber: 1,
+    players: [
+      bettingPlayer('先行动者', 900, true),
+      bettingPlayer('全押者', allInChips, false),
+      bettingPlayer('未行动者', 900, false),
+    ],
+    turnSeat: 1, queue: [1, 2], currentBet: 100, minRaise: 100,
+    community: [], pot: 300, dealerSeat: 0, logs: [], handActions: [],
+    results: null, lastResult: null, chatMessages: [], revealed: false,
+    gameOver: false, economyTotal: 3000, session: new Map(), sessionLeft: [],
+    settings: { startChips: 1000, smallBlind: 5, bigBlind: 10, actionTime: 60, nextHandDelay: 20 },
+    hostName: '先行动者', timer: null, turnDeadline: 0,
+  };
+}
+
+ok('不足额全押：已行动玩家需再次响应，但不能重新加注', () => {
+  const room = bettingRoom(30); // 加到 130，只增加 30，未达到完整加注幅度 100
+  assert.deepStrictEqual(applyAction(room, 1, 'allin'), { ok: true });
+  clearTimeout(room.timer);
+  assert.strictEqual(room.currentBet, 130);
+  assert.strictEqual(room.minRaise, 100, '不足额全押不应改变完整最小加注幅度');
+  assert.deepStrictEqual(room.queue, [2, 0], '未行动者和已行动者都必须响应新的跟注额');
+  assert.strictEqual(canRaise(room, room.players[0]), false, '已行动玩家不应恢复加注权');
+  assert.strictEqual(canRaise(room, room.players[2]), true, '尚未行动玩家仍保留加注权');
+
+  room.turnSeat = 0;
+  room.queue = [0, 2];
+  const rejected = applyAction(room, 0, 'raise', 230);
+  assert.strictEqual(rejected.ok, false, '已行动玩家不应能在不足额全押后再次加注');
+  assert.match(rejected.err, /未重新开放加注权/);
+  assert.deepStrictEqual(applyAction(room, 0, 'call'), { ok: true }, '已行动玩家仍应能够跟注');
+  clearTimeout(room.timer);
+  assert.strictEqual(room.players[0].roundBet, 130);
+});
+
+ok('足额全押：正常重新开放已行动玩家的加注权', () => {
+  const room = bettingRoom(100); // 加到 200，增加 100，构成完整加注
+  assert.deepStrictEqual(applyAction(room, 1, 'allin'), { ok: true });
+  clearTimeout(room.timer);
+  assert.strictEqual(room.currentBet, 200);
+  assert.strictEqual(canRaise(room, room.players[0]), true, '完整加注应重新开放加注权');
+
+  room.turnSeat = 0;
+  room.queue = [0, 2];
+  assert.deepStrictEqual(applyAction(room, 0, 'raise', 300), { ok: true });
+  clearTimeout(room.timer);
+  assert.strictEqual(room.currentBet, 300);
+});
+
+ok('累计不足额全押：累计达到完整加注幅度后重新开放加注权', () => {
+  const room = bettingRoom(30); // 第一次从 100 加到 130
+  room.players[2].chips = 100;  // 第二次从 130 加到 200，单次仍不足 100
+
+  assert.deepStrictEqual(applyAction(room, 1, 'allin'), { ok: true });
+  clearTimeout(room.timer);
+  assert.strictEqual(canRaise(room, room.players[0]), false,
+    '第一次不足额全押后不应重开加注权');
+
+  assert.strictEqual(room.turnSeat, 2);
+  assert.deepStrictEqual(applyAction(room, 2, 'allin'), { ok: true });
+  clearTimeout(room.timer);
+  assert.strictEqual(room.currentBet, 200);
+  assert.strictEqual(room.minRaise, 100, '两个不足额全押不应改变完整最小加注幅度');
+  assert.strictEqual(canRaise(room, room.players[0]), true,
+    '累计增加达到玩家上次面对的完整加注幅度后应恢复加注权');
 });
 
 console.log(`\n规则回归测试完成：${passed} 项通过${process.exitCode ? '（存在失败）' : ' ✅'}`);
