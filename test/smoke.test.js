@@ -805,14 +805,19 @@ async function runSettingsScenario() {
   assert.strictEqual(bad.ok, false, '非法 actionTime 应被拒绝');
 
   // 合法值生效
-  const good = await emit(clients[0], 'update_settings', { startChips: 2000, smallBlind: 10, bigBlind: 20, actionTime: 30, nextHandDelay: 5, rebuyAllowed: false });
+  const good = await emit(clients[0], 'update_settings', { startChips: 2000, smallBlind: 10, bigBlind: 20, actionTime: 30, nextHandDelay: 5, rebuyAllowed: false, locked: true });
   assert.strictEqual(good.settings.actionTime, 30);
   assert.strictEqual(good.settings.nextHandDelay, 5);
   assert.strictEqual(good.settings.rebuyAllowed, false);
+  assert.strictEqual(good.settings.locked, true);
   assert.ok(await waitUntil(() => states[0] && states[0].settings && states[0].settings.actionTime === 30, 5000), 'state 未同步新设置');
-  console.log('  ✓ 新设置项保存并广播（30s 行动 / 5s 局间 / 禁止重买）');
+  const newcomer = await openClient();
+  const blocked = await request(newcomer, 'join_room', { code: room.code, name: '新玩家' });
+  assert.strictEqual(blocked.ok, false, '锁房后新玩家不应加入');
+  assert.match(blocked.err, /锁定/);
+  console.log('  ✓ 新设置项保存并广播（30s 行动 / 5s 局间 / 禁止重买 / 锁房）');
 
-  disconnectAll(clients);
+  disconnectAll([...clients, newcomer]);
 }
 
 (async () => {

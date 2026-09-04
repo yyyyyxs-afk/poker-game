@@ -188,6 +188,7 @@ function createRoom(hostName) {
       actionTime: 45,      // 行动时长（秒），可选 20/30/45/60
       nextHandDelay: 20,   // 局间自动开局倒计时（秒），可选 5/10/20
       rebuyAllowed: true,  // 是否允许重买
+      locked: false,       // 锁房后拒绝新玩家，但原座位仍可凭 token 重连
     },
     hostName: hostName || null, // 房主（可修改房间设置）
     economyTotal: 0,       // 经济总盘子：所有在场筹码之和。加入/重买增加，
@@ -939,6 +940,9 @@ io.on('connection', (socket) => {
     if (room.players.filter((p) => p && !p.left && p !== offlineSameName).length >= MAX_PLAYERS) {
       return reply({ ok: false, err: '房间已满（最多 6 人）' });
     }
+    if (!offlineSameName && room.settings.locked) {
+      return reply({ ok: false, err: '房主已锁定房间，暂不接受新玩家' });
+    }
     const stageOpen = ['waiting', 'handover'].includes(room.stage);
     if (!offlineSameName && !stageOpen) {
       return reply({ ok: false, err: '本局进行中，请稍等局结束后加入' });
@@ -1008,6 +1012,9 @@ io.on('connection', (socket) => {
     if (!data) return;
     const { startChips, smallBlind, bigBlind, actionTime, nextHandDelay, rebuyAllowed } = data;
     if (typeof rebuyAllowed !== 'boolean') return reply({ ok: false, err: '重买设置格式错误' });
+    if (data.locked !== undefined && typeof data.locked !== 'boolean') {
+      return reply({ ok: false, err: '锁房设置格式错误' });
+    }
     const room = findRoomBySocket(socket.id);
     const p = room && room.players.find((x) => x && x.socketId === socket.id);
     if (!room || !p) return reply({ ok: false, err: '不在房间中' });
@@ -1034,10 +1041,11 @@ io.on('connection', (socket) => {
       return reply({ ok: false, err: '局间倒计时仅支持 5 / 10 / 20 秒' });
     }
     const rb = rebuyAllowed !== false;
+    const locked = data.locked === undefined ? !!room.settings.locked : data.locked;
 
     room.settings = {
       startChips: sc, smallBlind: sb, bigBlind: bb,
-      actionTime: at, nextHandDelay: nh, rebuyAllowed: rb,
+      actionTime: at, nextHandDelay: nh, rebuyAllowed: rb, locked,
     };
     // 还没开过局：已就座玩家统一按新起始筹码重置（战绩买入同步重算）
     if (room.handNumber === 0) {
@@ -1046,7 +1054,7 @@ io.on('connection', (socket) => {
       room.session.forEach((st) => { st.buyIn = sc; });
       room.sessionLeft = [];
     }
-    addLog(room, `房主修改设置：起始筹码 ${sc}，盲注 ${sb}/${bb}，行动 ${at}s，局间 ${nh}s${rb ? '' : '，禁止重买'}`);
+    addLog(room, `房主修改设置：起始筹码 ${sc}，盲注 ${sb}/${bb}，行动 ${at}s，局间 ${nh}s${rb ? '' : '，禁止重买'}${locked ? '，已锁房' : ''}`);
     broadcast(room);
     reply({ ok: true, settings: room.settings });
   });

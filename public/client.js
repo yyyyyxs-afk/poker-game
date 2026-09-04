@@ -289,6 +289,18 @@ document.getElementById('btn-copy-link').onclick = () => {
   const url = location.origin + location.pathname + '?room=' + code;
   copyText(url).then((ok) => flashCopied(document.getElementById('btn-copy-link'), ok));
 };
+document.getElementById('btn-invite').onclick = async () => {
+  const code = state?.code || '';
+  const url = location.origin + location.pathname + '?room=' + code;
+  const share = { title: '德州扑克好友局', text: `加入我的德州扑克房间 ${code}`, url };
+  if (navigator.share) {
+    try { await navigator.share(share); return; } catch (e) {
+      if (e && e.name === 'AbortError') return;
+    }
+  }
+  const ok = await copyText(url);
+  showToast(ok ? '邀请链接已复制，发给朋友即可' : '复制失败，请从左上角菜单复制');
+};
 const leaveBtn = document.getElementById('btn-leave');
 let leavingRoom = false;
 leaveBtn.onclick = () => {
@@ -349,6 +361,7 @@ document.getElementById('btn-settings').onclick = () => {
   document.getElementById('set-action-time').value = String(state.settings.actionTime || 45);
   document.getElementById('set-next-hand').value = String(state.settings.nextHandDelay || 20);
   document.getElementById('set-rebuy').value = String(state.settings.rebuyAllowed !== false);
+  document.getElementById('set-locked').value = String(!!state.settings.locked);
   document.getElementById('settings-error').textContent = '';
   settingsOverlay.classList.remove('hidden');
 };
@@ -362,6 +375,7 @@ function saveSettings() {
     actionTime: parseInt(document.getElementById('set-action-time').value, 10),
     nextHandDelay: parseInt(document.getElementById('set-next-hand').value, 10),
     rebuyAllowed: document.getElementById('set-rebuy').value === 'true',
+    locked: document.getElementById('set-locked').value === 'true',
   };
   socket.emit('update_settings', payload, (res) => {
     if (res.ok) {
@@ -505,6 +519,8 @@ function renderTableInfo() {
     settingsBtn.classList.toggle(
       'hidden', !(state.stage === 'waiting' && state.isHost));
   }
+  const inviteBtn = document.getElementById('btn-invite');
+  if (inviteBtn) inviteBtn.classList.toggle('hidden', state.stage !== 'waiting');
 }
 
 let toastTimer = null;
@@ -1261,7 +1277,7 @@ function renderResults() {
   if (lastResultKey !== resultKey) {
     lastResultKey = resultKey;
     clearInterval(countdownTimer);
-    countdown = 20;
+    countdown = cfg().nextHandDelay || 20;
     countdownTimer = setInterval(() => {
       countdown--;
       if (countdown <= 0) { clearInterval(countdownTimer); nextTip.textContent = '正在开始下一局…'; }

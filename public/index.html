@@ -120,6 +120,7 @@
             </div>
           </div>
           <div class="footer-buttons">
+            <button id="btn-invite" class="btn btn-secondary hidden">邀请好友</button>
             <button id="btn-start" class="btn btn-primary hidden">开始游戏</button>
             <button id="btn-rebuy" class="btn btn-warning hidden">重新买入（补充 2000 筹码）</button>
             <button id="btn-sit-back" class="btn btn-primary hidden">坐回</button>
@@ -183,6 +184,12 @@
           <select id="set-rebuy">
             <option value="true" selected>允许（重买 = 起始筹码）</option>
             <option value="false">禁止（输光即出局）</option>
+          </select>
+        </label>
+        <label>新玩家加入
+          <select id="set-locked">
+            <option value="false" selected>开放加入</option>
+            <option value="true">锁定房间（原玩家仍可重连）</option>
           </select>
         </label>
         <p class="settings-tip">仅开局前可修改；还没开过局时，已入座玩家会按新筹码重置。</p>
