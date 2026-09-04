@@ -176,6 +176,8 @@ function createRoom(hostName) {
     queue: [],             // 本轮待行动座位队列
     logs: [],
     results: null,         // 摊牌结果
+    lastResult: null,      // 最近一局完整复盘；开下一局后仍可回看
+    handActions: [],       // 当前一手的结构化行动时间线
     revealed: false,
     timer: null,
     turnDeadline: 0,       // 当前行动定时器的绝对截止时间（断线保护窗口用于恢复剩余时间）
@@ -306,6 +308,7 @@ function startHand(room) {
   room.currentBet = bbAmt;
   room.minRaise = bbAmt;
   room.results = null;
+  room.handActions = [{ type: 'street', street: 'preflop', cards: [] }];
   room.revealed = false;
   room.queue = [];
   room.preGrace = null; // 新一手开始，旧的断线保护恢复记录作废
@@ -372,6 +375,10 @@ function startHand(room) {
   const sbPaid = pay(sbP, sbAmt);
   const bbPaid = pay(bbP, bbAmt);
   addLog(room, `${sbP.name} 小盲 ${sbPaid}，${bbP.name} 大盲 ${bbPaid}`);
+  room.handActions.push(
+    { type: 'action', street: 'preflop', seat: sbSeat, name: sbP.name, label: `小盲 ${sbPaid}`, amount: sbPaid },
+    { type: 'action', street: 'preflop', seat: bbSeat, name: bbP.name, label: `大盲 ${bbPaid}`, amount: bbPaid },
+  );
   sbP.isSB = true; bbP.isBB = true;
 
   buildQueueFrom(room, nextSeat(room, bbSeat, canAct));
@@ -417,12 +424,15 @@ function nextStreet(room) {
     room.stage = 'flop';
     room.community.push(newDeckPop3(room));
     room.community = room.community.flat();
+    room.handActions.push({ type: 'street', street: 'flop', cards: room.community.slice(-3) });
   } else if (room.stage === 'flop') {
     room.stage = 'turn';
     room.community.push(room.deck.pop());
+    room.handActions.push({ type: 'street', street: 'turn', cards: room.community.slice(-1) });
   } else if (room.stage === 'turn') {
     room.stage = 'river';
     room.community.push(room.deck.pop());
+    room.handActions.push({ type: 'street', street: 'river', cards: room.community.slice(-1) });
   } else if (room.stage === 'river') {
     showdown(room);
     return;
@@ -464,10 +474,12 @@ function applyAction(room, seat, action, amount, opts = {}) {
     case 'fold':
       p.folded = true;
       addLog(room, `${p.name} 弃牌`);
+      room.handActions.push({ type: 'action', street: room.stage, seat, name: p.name, label: opts.auto ? '自动弃牌' : '弃牌' });
       break;
     case 'check': {
       if (p.roundBet !== room.currentBet) return { ok: false, err: '当前有人加注，不能过牌' };
       addLog(room, `${p.name} 过牌`);
+      room.handActions.push({ type: 'action', street: room.stage, seat, name: p.name, label: opts.auto ? '自动过牌' : '过牌' });
       break;
     }
     case 'call': {
@@ -475,6 +487,7 @@ function applyAction(room, seat, action, amount, opts = {}) {
       if (need <= 0) return { ok: false, err: '无需跟注，可以过牌' };
       const paid = pay(p, need);
       addLog(room, `${p.name} 跟注 ${paid}${p.allIn ? '（全押）' : ''}`);
+      room.handActions.push({ type: 'action', street: room.stage, seat, name: p.name, label: `跟注 ${paid}${p.allIn ? '（全押）' : ''}`, amount: paid });
       break;
     }
     case 'raise':
@@ -497,6 +510,7 @@ function applyAction(room, seat, action, amount, opts = {}) {
         room.minRaise = Math.max(room.minRaise, raiseSize);
         room.currentBet = target;
         addLog(room, `${p.name} 加注到 ${target}${isAllIn ? '（全押）' : ''}`);
+        room.handActions.push({ type: 'action', street: room.stage, seat, name: p.name, label: `${isAllIn ? '全押到' : '加注到'} ${target}`, amount: target });
         // 有新加注：其余未弃牌未全押玩家重新获得行动权
         const n = room.players.length;
         room.queue = [];
@@ -512,6 +526,7 @@ function applyAction(room, seat, action, amount, opts = {}) {
         }
         pay(p, need);
         addLog(room, `${p.name} 全押跟注 ${need}`);
+        room.handActions.push({ type: 'action', street: room.stage, seat, name: p.name, label: `全押跟注 ${need}`, amount: need });
       }
       break;
     }
@@ -644,7 +659,17 @@ function showdown(room) {
     room.winMarkedHand = room.handNumber;
   }
 
-  room.results = { pots: potResults, forfeit: false };
+  room.results = {
+    pots: potResults,
+    forfeit: false,
+    showdown: aliveSeats.map((seat) => ({
+      seat,
+      name: room.players[seat].name,
+      handName: evals[seat].name,
+      hole: [...room.players[seat].hole],
+      bestCards: [...evals[seat].best5],
+    })),
+  };
   endHand(room);
 }
 
@@ -654,6 +679,12 @@ function endHand(room) {
   // 只统计实际参与本手的玩家；所有 delta 相加应为 0。
   // 在离场玩家战绩入账前生成，保留完整的本手座位和结算快照。
   if (room.results) {
+    room.results.handNumber = room.handNumber;
+    room.results.community = [...room.community];
+    room.results.actions = room.handActions.map((entry) => ({
+      ...entry,
+      cards: Array.isArray(entry.cards) ? [...entry.cards] : undefined,
+    }));
     room.results.changes = room.players
       .map((p, seat) => ({ p, seat }))
       .filter(({ p }) => p && p.inHand)
@@ -663,6 +694,7 @@ function endHand(room) {
         delta: p.chips - (Number.isFinite(p.handStartChips) ? p.handStartChips : p.chips),
         chips: p.chips,
       }));
+    room.lastResult = room.results;
   }
   // 对局中明确离开的玩家为维持座位索引暂留到本手结束；结算完成后再固化战绩。
   room.players.forEach((p) => { if (p && p.left) bankSession(room, p); });
@@ -772,6 +804,7 @@ function sanitizeState(room, viewerSocketId) {
       ...room.sessionLeft.map((e) => ({ ...e, chips: null, left: true })),
     ],
     results: room.results,
+    lastResult: room.lastResult,
     revealed: room.revealed,
     logs: room.logs.slice(-12),
     players: room.players.map((p, seat) => ({

@@ -433,6 +433,8 @@ socket.on('state', (s) => {
   // 一个 socket 若因历史重复请求残留在多个房间，只接收当前明确进入的房间状态。
   if (activeRoomCode && incomingCode && incomingCode !== activeRoomCode) return;
   if (!activeRoomCode && lobbyExpectedRoom && incomingCode && incomingCode !== lobbyExpectedRoom) return;
+  // 自动开出下一手时收起上一局弹窗，避免遮挡当前行动；之后仍可主动回看。
+  if (state && state.stage === 'handover' && s.stage !== 'handover') resultDetailOpen = false;
   state = s;
   mySeat = s.youSeat;
   document.getElementById('conn-overlay').classList.add('hidden');
@@ -1267,25 +1269,30 @@ document.getElementById('btn-result-close').addEventListener('click', () => {
 });
 
 function renderResults() {
-  if (state.stage !== 'handover' || !state.results) {
+  const isCurrentResult = state.stage === 'handover' && !!state.results;
+  const r = isCurrentResult ? state.results : state.lastResult;
+  if (!r) {
     resultOverlay.classList.add('hidden');
     resultDetailBtn.classList.add('hidden');
     winnerBanner.classList.add('hidden');
-    if (state.stage !== 'handover') resultDetailOpen = false;
     return;
   }
-  const r = state.results;
   document.getElementById('result-title').textContent =
-    r.forfeit ? '其余玩家全部弃牌' : '摊牌结算';
+    `${isCurrentResult ? '' : `第 ${r.handNumber} 局 · `}${r.forfeit ? '其余玩家全部弃牌' : '摊牌结算'}`;
 
   // 第一层：牌桌直显横幅（主池赢家 + 赢取金额 + 牌型）
   const mainPot = r.pots[0];
   const winnerNames = mainPot.winners.map((w) => escapeHtml(w.name)).join('、');
   const winnerHand = mainPot.winners[0].handName
     ? escapeHtml(mainPot.winners[0].handName) : '对手全部弃牌';
-  winnerBanner.innerHTML = `<b>${winnerNames}</b><span class="winner-amount">获胜 <em>+${mainPot.amount}</em></span>` +
-    `<span class="winner-hand">${winnerHand}${r.pots.length > 1 ? ` · 含边池 ${r.pots.length - 1} 个` : ''}</span>`;
-  winnerBanner.classList.remove('hidden');
+  if (isCurrentResult) {
+    winnerBanner.innerHTML = `<b>${winnerNames}</b><span class="winner-amount">获胜 <em>+${mainPot.amount}</em></span>` +
+      `<span class="winner-hand">${winnerHand}${r.pots.length > 1 ? ` · 含边池 ${r.pots.length - 1} 个` : ''}</span>`;
+    winnerBanner.classList.remove('hidden');
+  } else {
+    winnerBanner.classList.add('hidden');
+  }
+  resultDetailBtn.textContent = isCurrentResult ? '查看本局详情' : `回看第 ${r.handNumber} 局`;
   resultDetailBtn.classList.remove('hidden');
   resultOverlay.classList.toggle('hidden', !resultDetailOpen); // 第二层仅在主动查看时显示
 
@@ -1327,19 +1334,22 @@ function renderResults() {
           <div class="winner-info">
             <div class="winner-name"><b>${escapeHtml(w.name)}</b> 赢得 ${pot.amount} 筹码</div>
             ${w.handName ? `<div class="hand-name">牌型: ${w.handName}</div>` : '<div class="hand-name">对手全部弃牌</div>'}
-            ${winnerCardsHtml(w)}
+            ${winnerCardsHtml(w, r.community)}
           </div>
         </div>`).join('')}
     `;
     potsDiv.appendChild(row);
   });
 
+  renderShowdownReview(r);
+  renderActionTimeline(r);
+
   renderSession();
 
   // 我赢钱了：播放胜利音效 + 倒计时只在结算变化时启动一次
   // （否则 handover 阶段每次状态推送都会重置倒计时）
-  const resultKey = `${state.handNumber}_${r.pots.map((p) => p.winners.map((w) => w.seat).join(',')).join('|')}`;
-  if (lastResultKey !== resultKey) {
+  const resultKey = `${r.handNumber}_${r.pots.map((p) => p.winners.map((w) => w.seat).join(',')).join('|')}`;
+  if (isCurrentResult && lastResultKey !== resultKey) {
     lastResultKey = resultKey;
     clearInterval(countdownTimer);
     countdown = cfg().nextHandDelay || 20;
@@ -1354,7 +1364,10 @@ function renderResults() {
 
   const nextTip = document.getElementById('next-tip');
   const nextBtn = document.getElementById('btn-next-hand');
-  if (state.gameOver) {
+  nextTip.classList.toggle('hidden', !isCurrentResult);
+  if (!isCurrentResult) {
+    nextBtn.classList.add('hidden');
+  } else if (state.gameOver) {
     nextTip.textContent = '游戏结束！刷新页面可开新房间。';
     nextBtn.classList.add('hidden');
   } else {
@@ -1387,16 +1400,62 @@ function renderSession() {
 }
 
 /** 赢家的 7 张牌（底牌+公共牌），高亮实际获胜的 5 张 */
-function winnerCardsHtml(w) {
-  if (!w.hole || !w.hole.length || !state.community || !state.community.length || !w.bestCards) return '';
+function winnerCardsHtml(w, community = state.community) {
+  if (!w.hole || !w.hole.length || !community || !community.length || !w.bestCards) return '';
   const bestKeys = new Set(w.bestCards.map((c) => c.r + '_' + c.s));
-  const all = [...w.hole, ...state.community];
+  const all = [...w.hole, ...community];
   return '<div class="win-cards">' + all.map((c) => {
     const el = cardEl(c, false);
     if (bestKeys.has(c.r + '_' + c.s)) el.classList.add('hl');
     el.classList.add('mini');
     return el.outerHTML;
   }).join('') + '</div>';
+}
+
+function miniCardsHtml(cards, highlighted = cards) {
+  if (!Array.isArray(cards) || !cards.length) return '';
+  const keys = new Set((highlighted || []).map((c) => c.r + '_' + c.s));
+  return cards.map((c) => {
+    const el = cardEl(c, false);
+    el.classList.add('mini');
+    if (keys.has(c.r + '_' + c.s)) el.classList.add('hl');
+    return el.outerHTML;
+  }).join('');
+}
+
+function renderShowdownReview(r) {
+  const box = document.getElementById('result-showdown');
+  const players = Array.isArray(r.showdown) ? r.showdown : [];
+  if (!players.length) {
+    box.innerHTML = '';
+    box.classList.add('hidden');
+    return;
+  }
+  box.innerHTML = `<h3>摊牌结果</h3>${players.map((p) => `
+    <div class="showdown-row">
+      <div class="showdown-player"><b>${escapeHtml(p.name)}</b><span>${escapeHtml(p.handName)}</span></div>
+      <div class="showdown-best" aria-label="最佳五张">${miniCardsHtml(p.bestCards)}</div>
+    </div>`).join('')}`;
+  box.classList.remove('hidden');
+}
+
+function renderActionTimeline(r) {
+  const box = document.getElementById('result-timeline');
+  const actions = Array.isArray(r.actions) ? r.actions : [];
+  if (!actions.length) {
+    box.innerHTML = '';
+    box.classList.add('hidden');
+    return;
+  }
+  const streetNames = { preflop: '翻牌前', flop: '翻牌', turn: '转牌', river: '河牌' };
+  box.innerHTML = `<h3>本局过程</h3><div class="timeline-list">${actions.map((entry) => {
+    if (entry.type === 'street') {
+      const cards = miniCardsHtml(entry.cards || []);
+      return `<div class="timeline-street"><b>${streetNames[entry.street] || escapeHtml(entry.street)}</b>${cards ? `<span class="timeline-cards">${cards}</span>` : ''}</div>`;
+    }
+    return `<div class="timeline-action"><span>${escapeHtml(entry.name)}</span><b>${escapeHtml(entry.label)}</b></div>`;
+  }).join('')}</div>`;
+  box.classList.remove('hidden');
 }
 let countdown = 8;
 let countdownTimer = null;

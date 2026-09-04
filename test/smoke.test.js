@@ -361,6 +361,7 @@ async function runIntegration(n) {
   const handsPlayed = [];
   let gameEnded = false;
   let lastResult = null;
+  let previousResultSeenDuringPlay = false;
   const deadline = Date.now() + (n >= 6 ? 90000 : 60000);
 
   while (handsPlayed.length < 2 && !gameEnded && Date.now() < deadline) {
@@ -368,6 +369,10 @@ async function runIntegration(n) {
       const s = states[i];
       if (!s) continue;
       const me = s.players[s.youSeat];
+      if (s.handNumber > 1 && ['preflop', 'flop', 'turn', 'river'].includes(s.stage)
+        && s.lastResult && s.lastResult.handNumber === s.handNumber - 1) {
+        previousResultSeenDuringPlay = true;
+      }
 
       // 输光玩家自动重买；凑齐后由房主重新开局
       if ((s.stage === 'handover' || s.stage === 'waiting') && !s.gameOver && me && me.chips === 0) {
@@ -395,12 +400,16 @@ async function runIntegration(n) {
   if (!gameEnded) assert.strictEqual(handsPlayed.length, 2, `${n} 人局未完成两手`);
   assert.ok(lastResult && lastResult.results, '缺少摊牌结果');
   assert.ok(Array.isArray(lastResult.results.changes), '缺少本局筹码变化');
-  assert.strictEqual(lastResult.results.changes.length, n, `${n} 人局筹码变化人数错误`);
+  const participants = lastResult.players.filter((p) => p.inHand).length;
+  assert.ok(Array.isArray(lastResult.results.actions) && lastResult.results.actions.length >= participants + 1,
+    '缺少完整本局行动时间线');
+  assert.strictEqual(lastResult.results.changes.length, participants, `${n} 人桌实际参局人数记录错误`);
   assert.strictEqual(
     lastResult.results.changes.reduce((sum, entry) => sum + entry.delta, 0),
     0,
     `${n} 人局单局盈亏不守恒`,
   );
+  if (handsPlayed.length >= 2) assert.ok(previousResultSeenDuringPlay, `${n} 人局开下一手后无法回看上一局`);
   // 战绩：参与手数合计 ≥ n（每名参与玩家至少打了一手）
   if (Array.isArray(lastResult.session)) {
     assert.ok(lastResult.session.reduce((t, e) => t + e.hands, 0) >= n, '战绩参与手数异常');
