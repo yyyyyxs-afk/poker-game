@@ -312,6 +312,9 @@ function startHand(room) {
 
   room.players.forEach((p) => {
     if (!p) return;
+    // 记录本手开局时的筹码，结算后用于生成“本局筹码变化”。
+    // 必须在扣除盲注前记录，才能反映这一整手的真实盈亏。
+    p.handStartChips = p.chips;
     // 暂离或 0 筹码玩家不参与本局
     if (p.sittingOut || p.chips <= 0 || !p.connected) {
       p.inHand = false;
@@ -648,6 +651,19 @@ function showdown(room) {
 function endHand(room) {
   room.stage = 'handover';
   clearTurnTimer(room);
+  // 只统计实际参与本手的玩家；所有 delta 相加应为 0。
+  // 在离场玩家战绩入账前生成，保留完整的本手座位和结算快照。
+  if (room.results) {
+    room.results.changes = room.players
+      .map((p, seat) => ({ p, seat }))
+      .filter(({ p }) => p && p.inHand)
+      .map(({ p, seat }) => ({
+        seat,
+        name: p.name,
+        delta: p.chips - (Number.isFinite(p.handStartChips) ? p.handStartChips : p.chips),
+        chips: p.chips,
+      }));
+  }
   // 对局中明确离开的玩家为维持座位索引暂留到本手结束；结算完成后再固化战绩。
   room.players.forEach((p) => { if (p && p.left) bankSession(room, p); });
   broadcast(room);

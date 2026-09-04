@@ -735,6 +735,20 @@ body.modal-open { overflow: hidden; }
   animation: popIn .2s ease-out;
 }
 #result-title { color: var(--a1-text); margin-bottom: 14px; font-size: 18px; letter-spacing: 2px; }
+.hand-change-title {
+  color: var(--a1-muted); font-size: 12px; text-align: left; margin-bottom: 8px;
+}
+.hand-change-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.hand-change {
+  flex: 1 1 120px; display: flex; justify-content: space-between; gap: 10px;
+  padding: 9px 11px; border: 1px solid var(--a1-line-soft);
+  border-radius: var(--a1-radius-sm); background: var(--a1-surface-quiet);
+  color: var(--a1-text-soft); font-size: 13px; font-variant-numeric: tabular-nums;
+}
+.hand-change b { font-size: 14px; }
+.hand-change.gain b { color: #8fc7ad; }
+.hand-change.loss b { color: #dc9391; }
+.hand-change.flat b { color: var(--a1-muted); }
 .result-pot-row {
   background: var(--a1-surface-quiet);
   border: 1px solid var(--a1-line-soft);
@@ -952,6 +966,7 @@ body.modal-open { overflow: hidden; }
   #result-card { padding: 18px 16px; max-height: 78vh; }
   #session-table { font-size: 11px; }
   #session-table th, #session-table td { padding: 4px 5px; }
+  .hand-change { flex-basis: calc(50% - 4px); padding: 8px 10px; }
   .result-pot-row { padding: 10px 12px; }
 
   /* ---- Raise Bottom Sheet（§16） ---- */

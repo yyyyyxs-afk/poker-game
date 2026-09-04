@@ -1289,6 +1289,30 @@ function renderResults() {
   resultDetailBtn.classList.remove('hidden');
   resultOverlay.classList.toggle('hidden', !resultDetailOpen); // 第二层仅在主动查看时显示
 
+  const changesDiv = document.getElementById('hand-changes');
+  const changes = Array.isArray(r.changes)
+    ? [...r.changes].sort((a, b) => b.delta - a.delta)
+    : [];
+  if (changes.length) {
+    changesDiv.innerHTML = `
+      <div class="hand-change-title">本局筹码变化</div>
+      <div class="hand-change-list">
+        ${changes.map((entry) => {
+          const delta = Number(entry.delta) || 0;
+          const tone = delta > 0 ? 'gain' : (delta < 0 ? 'loss' : 'flat');
+          const label = delta > 0 ? `+${delta}` : `${delta}`;
+          return `<div class="hand-change ${tone}">
+            <span>${escapeHtml(entry.name)}</span>
+            <b>${label}</b>
+          </div>`;
+        }).join('')}
+      </div>`;
+    changesDiv.classList.remove('hidden');
+  } else {
+    changesDiv.innerHTML = '';
+    changesDiv.classList.add('hidden');
+  }
+
   const potsDiv = document.getElementById('result-pots');
   potsDiv.innerHTML = '';
   r.pots.forEach((pot, i) => {

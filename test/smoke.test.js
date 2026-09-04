@@ -394,6 +394,13 @@ async function runIntegration(n) {
   assert.ok(handsPlayed.length >= 1, `${n} 人局超时未完成任何一局`);
   if (!gameEnded) assert.strictEqual(handsPlayed.length, 2, `${n} 人局未完成两手`);
   assert.ok(lastResult && lastResult.results, '缺少摊牌结果');
+  assert.ok(Array.isArray(lastResult.results.changes), '缺少本局筹码变化');
+  assert.strictEqual(lastResult.results.changes.length, n, `${n} 人局筹码变化人数错误`);
+  assert.strictEqual(
+    lastResult.results.changes.reduce((sum, entry) => sum + entry.delta, 0),
+    0,
+    `${n} 人局单局盈亏不守恒`,
+  );
   // 战绩：参与手数合计 ≥ n（每名参与玩家至少打了一手）
   if (Array.isArray(lastResult.session)) {
     assert.ok(lastResult.session.reduce((t, e) => t + e.hands, 0) >= n, '战绩参与手数异常');
