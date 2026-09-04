@@ -7,6 +7,7 @@
     "start": "node server.js",
     "test": "node test/run-all.js",
     "test:rules": "node test/rules.test.js",
+    "test:ui": "node test/ui-content.test.js",
     "test:geometry": "node test/geometry-check.js",
     "test:smoke": "node test/smoke.test.js"
   },

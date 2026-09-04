@@ -198,6 +198,7 @@ installSignalHandler('SIGTERM', 143);
 
 (async () => {
   try {
+    await runNode('test/ui-content.test.js', {}, { timeoutMs: 60000 });
     await runNode('test/rules.test.js', {}, { timeoutMs: 60000 });
     await runNode('test/geometry-check.js', {}, { timeoutMs: 60000 });
 

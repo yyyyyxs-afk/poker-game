@@ -96,6 +96,47 @@ if (window.matchMedia('(max-width: 900px)').matches) {
   setLogCollapsed(true);
 }
 
+// ---------------- 新手玩法与牌型速查 ----------------
+const rulesOverlay = document.getElementById('rules-overlay');
+const rulesCloseBtn = document.getElementById('btn-rules-close');
+const rulesTabs = [...document.querySelectorAll('[data-rules-tab]')];
+const rulesPanels = [...document.querySelectorAll('[data-rules-panel]')];
+let rulesReturnFocus = null;
+
+function selectRulesTab(name) {
+  rulesTabs.forEach((tab) => {
+    const active = tab.dataset.rulesTab === name;
+    tab.classList.toggle('active', active);
+    tab.setAttribute('aria-selected', String(active));
+  });
+  rulesPanels.forEach((panel) => panel.classList.toggle('hidden', panel.dataset.rulesPanel !== name));
+}
+
+function openRules(tab = 'quick', trigger = document.activeElement) {
+  rulesReturnFocus = trigger;
+  selectRulesTab(tab);
+  rulesOverlay.classList.remove('hidden');
+  document.body.classList.add('modal-open');
+  rulesCloseBtn.focus();
+}
+
+function closeRules() {
+  if (rulesOverlay.classList.contains('hidden')) return;
+  rulesOverlay.classList.add('hidden');
+  document.body.classList.remove('modal-open');
+  if (rulesReturnFocus && typeof rulesReturnFocus.focus === 'function') rulesReturnFocus.focus();
+}
+
+document.getElementById('btn-rules-lobby').addEventListener('click', (event) => openRules('quick', event.currentTarget));
+document.getElementById('btn-rules-game').addEventListener('click', () => {
+  closeMenu();
+  openRules('quick', menuBtn);
+});
+rulesTabs.forEach((tab) => tab.addEventListener('click', () => selectRulesTab(tab.dataset.rulesTab)));
+rulesCloseBtn.addEventListener('click', closeRules);
+rulesOverlay.addEventListener('click', (event) => { if (event.target === rulesOverlay) closeRules(); });
+document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeRules(); });
+
 // ---------------- 大厅 ----------------
 // 记住昵称：进页自动预填；URL 带 ?room=XXXXXX 时自动填邀请码（邀请链接直达）
 (function initLobby() {
