@@ -2,7 +2,7 @@
 
 多人在线无限注德州扑克（No-Limit Texas Hold'em）游戏。服务端为权威逻辑节点，客户端仅负责渲染与输入，天然防作弊。
 
-固定在线地址：**https://poker-game.poker-game.workers.dev**（Cloudflare 免费版，本机关机后仍可访问）
+Cloudflare 备用地址：**https://poker-game.poker-game.workers.dev**（免费且本机关机后仍可访问，但中国大陆部分网络需要代理；国内正式入口待绑定自有域名）
 
 ## 功能特性
 
