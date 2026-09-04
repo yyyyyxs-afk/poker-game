@@ -31,5 +31,6 @@ assert.ok(client.includes('本局筹码变化') && client.includes('entry.delta'
 assert.ok(client.includes('摊牌结果') && client.includes('最佳五张'), '结算详情缺少摊牌牌型复盘');
 assert.ok(client.includes('本局过程') && client.includes('state.lastResult'), '缺少行动时间线或跨局回看');
 assert.ok(client.includes("socket.emit('chat_message'") && client.includes('renderChats()'), '好友聊天未接入发送或渲染');
+assert.ok(client.includes('p.seat === mySeat') && client.includes('0.82'), '自己的下注筹码缺少桌面下沿专用锚点');
 
 console.log('界面内容检查通过：双入口、交互、手机样式与牌型顺序正常 ✅');

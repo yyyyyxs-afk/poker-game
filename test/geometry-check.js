@@ -92,6 +92,8 @@ function seatPosition(index, total, L) {
  */
 const BAND = { x1: 17, x2: 83, y1: 30, y2: 82 }; // 保守带（轴搜索的粗判据）
 function betPosition(seat, index, total, L) {
+  // seat0 是桌外 Hero Dock；运行时固定锚定在桌面下沿内侧。
+  if (index === 0) return { x: 50, y: 82, degenerate: false, hero: true };
   const { x, y } = seat;
   let vx = 50 - x, vy = 50 - y;
   const len = Math.hypot(vx, vy) || 1;
@@ -188,7 +190,8 @@ for (const L of LAYOUTS) {
         if (i === idx) continue;
         if (rectsOverlap(betRect, rect(seatPosition(i, total, L), L.seatHalfW, L.seatHalfH), HIT_MARGIN_OTHER)) hits.push('圆片压席位' + i);
       }
-      if (rectsOverlap(betRect, rect(seat, L.seatHalfW, L.seatHalfH), HIT_MARGIN_SELF)) hits.push('圆片压自家卡');
+      // seat0 的真实 Hero 卡在牌桌 DOM 外，不应拿桌内虚拟坐标判碰撞。
+      if (idx !== 0 && rectsOverlap(betRect, rect(seat, L.seatHalfW, L.seatHalfH), HIT_MARGIN_SELF)) hits.push('圆片压自家卡');
       if (betRect.x1 < 0 || betRect.x2 > 100 || betRect.y1 < 0 || betRect.y2 > 100) hits.push('圆片出界');
       const weakOnly = hits.every((h) => h === '圆片压label' || h === '圆片压pot' || h === '圆片压自家卡');
       if (hits.length && !(bet.degenerate && weakOnly)) {
@@ -208,7 +211,7 @@ for (const L of LAYOUTS) {
       }
       // 归属判据：极度拥挤桌（如 320×568 六人顶部席位）可能无解，
       // 此时降级为 WARN——运行时靠席位色描边（--a1-seat-N）兜底归属。
-      if (!ownershipOk(bet, seat, others, L)) {
+      if (idx !== 0 && !ownershipOk(bet, seat, others, L)) {
         warns++;
         console.log('WARN', L.name, total + '人 seat' + idx,
           'bet=(' + bet.x.toFixed(1) + ',' + bet.y.toFixed(1) + ') 归属距离差不足（拥挤豁免，色描边兜底）');

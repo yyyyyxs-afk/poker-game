@@ -862,6 +862,19 @@ function renderBets() {
       chip.style.visibility = '';
     };
 
+    // 自己的席位在牌桌外的 Hero Dock。不能从 Hero 卡中心做有限距离搜索，
+    // 否则在手机竖屏的大间距布局中搜索不到桌内点，最终会回退到手牌附近。
+    // 固定优先放在桌面下沿内侧，既表达“来自自己”，也与底牌保持明显间隔。
+    if (p.seat === mySeat) {
+      const heroX = tableRect.left + tableRect.width / 2;
+      for (const ratio of [0.82, 0.78, 0.86, 0.74]) {
+        const heroY = tableRect.top + tableRect.height * ratio;
+        if (!blocked(heroX, heroY)) { place(heroX, heroY); return; }
+      }
+      place(heroX, tableRect.top + tableRect.height * 0.82);
+      return;
+    }
+
     // 1) 沿"席位→桌心"轴：从贴卡缘向外找第一个可行点（最贴近自家席位）。
     //    起始距离用卡矩形在轴上的投影半径（正上/正下席位远小于对角半径）。
     const dMin = Math.abs(vx) * (selfRect.width / 2) + Math.abs(vy) * (selfRect.height / 2) + 2;
