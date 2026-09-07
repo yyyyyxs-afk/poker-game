@@ -62,13 +62,15 @@ poker-game/
 - [x] 7 选 5 最优牌力评估（含 A-5 轮子顺子）
 - [x] 摊牌高亮赢家最优 5 张牌（`evaluate7` 返回 `best5`）
 - [x] 行动超时 45 秒自动过牌/弃牌
-- [x] 摊牌后 20 秒自动开下一局（可手动跳过）
+- [x] 摊牌后 20 秒自动开下一局（仅房主可手动跳过）
+- [x] 平分底池的零头筹码从庄家左侧起按顺时针发放（主池、边池分别计算）
 
 ### 房间管理
 - [x] 6 位字母数字邀请码（排除 0/O/1/I/L），crypto 随机生成 + 碰撞重试 + 加入限频
 - [x] 2–6 人同桌
 - [x] 房管设置（仅房主 + 仅等待阶段）：起始筹码 / 小盲 / 大盲
 - [x] 房主离开自动转移给首位剩余玩家
+- [x] 仅房主可开始游戏或立即开始下一局
 - [x] 踢人功能（仅房主，`kick_player` 事件）
 - [x] 邀请链接（`?room=XXXXXX` URL 参数预填邀请码，不区分大小写）
 
@@ -171,8 +173,8 @@ function canAct(p) {
 |---|---|---|---|
 | `create_room` | `{ name }` | `{ ok, code, token }` | 创建房间 |
 | `join_room` | `{ code, name, token }` | `{ ok, code, token, err }` | 加入房间（含断线重连） |
-| `start_game` | `null` | `{ ok, err }` | 开局（仅 waiting/handover 阶段） |
-| `next_hand` | `null` | `{ ok, err }` | 立即开下一局（跳过倒计时） |
+| `start_game` | `null` | `{ ok, err }` | 房主开局（仅 waiting/handover 阶段） |
+| `next_hand` | `null` | `{ ok, err }` | 房主立即开下一局（跳过倒计时） |
 | `action` | `{ type, amount }` | `{ ok, err }` | 行动：fold/check/call/raise/allin |
 | `rebuy` | `null` | `{ ok, err }` | 重买筹码（仅 chips=0 且 waiting/handover） |
 | `update_settings` | `{ startChips, smallBlind, bigBlind }` | `{ ok, settings, err }` | 房主修改设置 |
@@ -305,7 +307,7 @@ Git Bash 的 heredoc 内 `${}` 模板字符串会被 bash 报 `Bad substitution`
 - 房间数据在内存中，进程重启即清空（无持久化）
 - 未做用户鉴权，同名 + token 即视为同一玩家（便于重连，但有冒名风险）
 - 未做观战模式
-- 未做聊天功能
+- 好友文字聊天已完成；当前未做禁言、举报和管理员审计
 - 未做房间 TTL 回收（空房间在最后一人离开时自动销毁）
 - `cloudflared.exe` 在 OneDrive 副本中不存在（54MB 二进制不同步）
 

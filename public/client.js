@@ -384,7 +384,7 @@ leaveBtn.onclick = () => {
   setTimeout(() => location.replace(location.pathname), 300);
 };
 
-// 开始游戏（等待阶段且人数 >= 2 时显示）
+// 开始游戏（仅房主在等待阶段且人数 >= 2 时显示）
 document.getElementById('btn-start').onclick = () => {
   socket.emit('start_game', null, (res) => {
     if (!res.ok) flashTip(res.err);
@@ -999,7 +999,8 @@ function renderMyArea() {
   const rebuyBtn = document.getElementById('btn-rebuy');
   const sitOutBtn = document.getElementById('btn-sit-out');
   const sitBackBtn = document.getElementById('btn-sit-back');
-  const showStart = state.stage === 'waiting' && !state.gameOver && state.players.length >= 2;
+  const showStart = state.stage === 'waiting' && state.isHost
+    && !state.gameOver && state.players.length >= 2;
   startBtn.classList.toggle('hidden', !showStart);
   const showRebuy = !state.gameOver && ['waiting', 'handover'].includes(state.stage)
     && me && me.chips === 0;
@@ -1057,7 +1058,8 @@ function waitingTipText() {
   if (state.gameOver) return '游戏已结束';
   const count = state.players.length;
   if (count < 2) return `把房号 ${state.code} 发给朋友，凑齐 2 人即可开局`;
-  return `${count} 名玩家已就绪`;
+  return state.isHost ? `${count} 名玩家已就绪，可以开始游戏`
+    : `${count} 名玩家已就绪，等待房主开始`;
 }
 
 function updateActionBar(me) {
@@ -1457,7 +1459,7 @@ function renderResults() {
     nextBtn.classList.add('hidden');
   } else {
     nextTip.textContent = `${countdown} 秒后自动开始下一局…`;
-    nextBtn.classList.remove('hidden');
+    nextBtn.classList.toggle('hidden', !state.isHost);
   }
 }
 

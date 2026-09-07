@@ -9,7 +9,7 @@
 const assert = require('assert');
 const {
   evaluate7, computePots, score5, newDeck, normalizeNickname, newToken,
-  applyAction, canRaise,
+  applyAction, canRaise, oddChipWinnerOrder, awardPot,
 } = require('../server.js');
 
 const C = (r, s) => ({ r, s });
@@ -156,6 +156,18 @@ ok('边池：零投入玩家不产生池', () => {
   assert.strictEqual(pots.length, 1);
   assert.strictEqual(pots[0].amount, 800);
   assert.deepStrictEqual(pots[0].eligible, [2]);
+});
+
+ok('平分底池：零头筹码从庄家左侧起按顺时针发放', () => {
+  const room = {
+    dealerSeat: 2,
+    players: Array.from({ length: 5 }, () => ({ chips: 0 })),
+  };
+  const winners = [0, 2, 4];
+  assert.deepStrictEqual(oddChipWinnerOrder(room, winners), [4, 0, 2]);
+  awardPot(room, 8, winners); // 每人 2，两个零头依次给 4 号与 0 号座位
+  assert.deepStrictEqual(room.players.map((p) => p.chips), [3, 0, 2, 0, 3]);
+  assert.strictEqual(room.players.reduce((sum, p) => sum + p.chips, 0), 8);
 });
 
 // ---------------- 不足额全押与加注权 ----------------

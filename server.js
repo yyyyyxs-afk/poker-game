@@ -642,6 +642,34 @@ function computePots(room) {
   return pots;
 }
 
+/**
+ * 平分底池时，零头筹码从庄家左侧起按顺时针发给最先遇到的赢家。
+ * 每个主池/边池都独立使用同一顺序。
+ */
+function oddChipWinnerOrder(room, winners) {
+  const n = room.players.length;
+  if (!n || !Number.isInteger(room.dealerSeat) || room.dealerSeat < 0) {
+    return [...winners].sort((a, b) => a - b);
+  }
+  const distance = (seat) => {
+    const d = (seat - room.dealerSeat + n) % n;
+    return d === 0 ? n : d;
+  };
+  return [...winners].sort((a, b) => distance(a) - distance(b));
+}
+
+function awardPot(room, amount, winners) {
+  const share = Math.floor(amount / winners.length);
+  let remainder = amount - share * winners.length;
+  const oddChipOrder = oddChipWinnerOrder(room, winners);
+  for (const s of winners) room.players[s].chips += share;
+  for (const s of oddChipOrder) {
+    if (remainder <= 0) break;
+    room.players[s].chips++;
+    remainder--;
+  }
+}
+
 function showdown(room) {
   room.stage = 'showdown';
   room.revealed = true;
@@ -674,12 +702,7 @@ function showdown(room) {
       }
       winners = eligibleAlive.filter((s) => cmpScore(evals[s].score, bestScore) === 0);
     }
-    const share = Math.floor(pot.amount / winners.length);
-    let remainder = pot.amount - share * winners.length;
-    for (const s of winners) {
-      room.players[s].chips += share + (remainder > 0 ? 1 : 0);
-      if (remainder > 0) remainder--;
-    }
+    awardPot(room, pot.amount, winners);
     potResults.push({
       amount: pot.amount,
       winners: winners.map((s) => ({
@@ -1056,6 +1079,8 @@ io.on('connection', (socket) => {
     if (!requireEmptyPayload(payload, reply)) return;
     const room = findRoomBySocket(socket.id);
     if (!room) return reply({ ok: false, err: '不在房间中' });
+    const p = room.players.find((x) => x && x.socketId === socket.id);
+    if (!p || p.name !== room.hostName) return reply({ ok: false, err: '只有房主可以开始游戏' });
     // 只能在等待/局间开局，防止对局中重复开局重扣盲注
     if (!['waiting', 'handover'].includes(room.stage)) {
       return reply({ ok: false, err: '本局正在进行中' });
@@ -1073,6 +1098,8 @@ io.on('connection', (socket) => {
     if (!requireEmptyPayload(payload, reply)) return;
     const room = findRoomBySocket(socket.id);
     if (!room || room.stage !== 'handover') return reply({ ok: false, err: '当前不能开局' });
+    const p = room.players.find((x) => x && x.socketId === socket.id);
+    if (!p || p.name !== room.hostName) return reply({ ok: false, err: '只有房主可以立即开始下一局' });
     clearTimeout(room.nextHandTimer);
     room.nextHandTimer = null;
     startHand(room);
@@ -1493,5 +1520,5 @@ if (require.main === module) {
 module.exports = {
   server, io, rooms,
   evaluate7, computePots, score5, newDeck, normalizeNickname, newToken,
-  applyAction, canRaise,
+  applyAction, canRaise, oddChipWinnerOrder, awardPot,
 };

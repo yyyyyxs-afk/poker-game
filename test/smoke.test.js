@@ -298,6 +298,10 @@ async function runDuplicateBusinessRequestScenario() {
     actionTime: 20, nextHandDelay: 20, rebuyAllowed: true,
   });
 
+  const guestStart = await request(clients[1], 'start_game', null);
+  assert.strictEqual(guestStart.ok, false, '非房主不应能开始游戏');
+  assert.match(guestStart.err, /只有房主/);
+
   const startReplies = await Promise.all([
     request(clients[0], 'start_game', null),
     request(clients[0], 'start_game', null),
@@ -353,13 +357,16 @@ async function runDuplicateBusinessRequestScenario() {
   assert.strictEqual(states[0].economyTotal, economyBefore + 100, '双 rebuy 重复增加经济总盘');
 
   const beforeNext = states[0].handNumber;
+  const guestNext = await request(clients[1], 'next_hand', null);
+  assert.strictEqual(guestNext.ok, false, '非房主不应能立即开始下一局');
+  assert.match(guestNext.err, /只有房主/);
   const nextReplies = await Promise.all([
     request(clients[0], 'next_hand', null),
     request(clients[0], 'next_hand', null),
   ]);
   assert.strictEqual(nextReplies.filter((reply) => reply && reply.ok).length, 1, '双 next_hand 应仅一次成功');
   assert.ok(await waitUntil(() => states[0] && states[0].handNumber === beforeNext + 1, 3000), '双 next_hand 重复或未推进手数');
-  console.log('  ✓ 双 start / action / rebuy / next 请求均最多一次成功，手数与筹码只变更一次');
+  console.log('  ✓ 仅房主可开局/立即下一局，重复请求均最多一次成功');
 
   disconnectAll(clients);
 }

@@ -34,5 +34,8 @@ assert.ok(client.includes("socket.emit('chat_message'") && client.includes('rend
 assert.ok(client.includes('p.seat === mySeat') && client.includes('0.82'), '自己的下注筹码缺少桌面下沿专用锚点');
 assert.ok(client.includes('me.raiseAllowed !== false') && client.includes('未重新开放加注权'),
   '客户端未按服务端加注权禁用操作');
+assert.ok(client.includes("state.stage === 'waiting' && state.isHost")
+  && client.includes("nextBtn.classList.toggle('hidden', !state.isHost)"),
+  '开局和立即下一局入口未限制为仅房主可见');
 
 console.log('界面内容检查通过：双入口、交互、手机样式与牌型顺序正常 ✅');
