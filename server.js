@@ -14,13 +14,24 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
 
-// 防御性日志（经总负责人授权的最小改动）：只记录未捕获异常/拒绝，防止
-// 进程无堆栈静默退出、便于事后定位；不改变任何牌局逻辑与错误处理路径。
-process.on('uncaughtException', (err) => {
-  console.error('[uncaughtException]', err && err.stack ? err.stack : err);
-});
-process.on('unhandledRejection', (reason) => {
-  console.error('[unhandledRejection]', reason && reason.stack ? reason.stack : reason);
+// 严重异常必须记录并退出，避免在未知状态下继续裁决牌局。
+// 仅直接运行时安装进程处理器；测试夹具负责自己的退出路径。
+if (require.main === module) {
+  const fatal = (kind, reason) => {
+    // 同步写入，确保退出前保留诊断；不记录房间状态或身份 token。
+    require('fs').writeSync(2, JSON.stringify({
+      time: new Date().toISOString(), level: 'fatal', event: kind,
+      error: reason instanceof Error ? reason.stack : String(reason),
+    }) + '\n');
+    process.exit(1);
+  };
+  process.on('uncaughtException', (err) => fatal('uncaughtException', err));
+  process.on('unhandledRejection', (err) => fatal('unhandledRejection', err));
+}
+
+app.get('/healthz', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ status: 'ok' });
 });
 
 // 静态资源禁用强缓存：客户端 js/css/index 更新后，浏览器刷新即可拿到最新版，

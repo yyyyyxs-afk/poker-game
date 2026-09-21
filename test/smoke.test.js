@@ -133,6 +133,9 @@ function makeDriver(states, clients, actionErrorRef, isSkipped) {
             act = roll < 0.15 ? ['fold'] : roll < 0.75 ? ['call'] : roll < 0.9 ? ['raise', minTo] : ['allin'];
           }
           if (act[0] === 'raise' && act[1] > maxTo) act = ['allin'];
+          if (p.raiseAllowed === false && (act[0] === 'raise' || (act[0] === 'allin' && maxTo > cur.currentBet))) {
+            act = [toCall > 0 ? 'call' : 'check'];
+          }
           clients[me].emit('action', { type: act[0], amount: act[1] }, (r) => {
             if (!r.ok && r.err !== '还没轮到你行动') actionErrorRef.err = `客户端${me} 行动被拒: ${r.err}`;
           });
