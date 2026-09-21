@@ -9,10 +9,17 @@ const http = require('http');
 const path = require('path');
 const crypto = require('crypto');
 const { Server } = require('socket.io');
+const { createNetworkPolicy, createGuards } = require('./network-guard');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' } });
+const networkPolicy = createNetworkPolicy();
+const guards = createGuards();
+const io = new Server(server, {
+  cors: { origin: (origin, callback) => callback(null, networkPolicy.allowsOrigin(origin)) },
+  // CORS 只限制浏览器长轮询，WebSocket 也必须检查初始请求来源。
+  allowRequest: (request, callback) => callback(null, networkPolicy.allowsOrigin(request.headers.origin)),
+});
 
 // 严重异常必须记录并退出，避免在未知状态下继续裁决牌局。
 // 仅直接运行时安装进程处理器；测试夹具负责自己的退出路径。
@@ -1017,13 +1024,23 @@ function rejectExistingRoom(socket, reply) {
   return true;
 }
 
+function allowRequestRate(limiter, key, reply, message) {
+  const result = limiter.take(key);
+  if (result.ok) return true;
+  reply({ ok: false, err: message, retryAfterMs: result.retryAfterMs });
+  return false;
+}
+
 io.on('connection', (socket) => {
+  const clientKey = networkPolicy.clientKey(socket.request);
   onSocketRequest(socket, 'create_room', (payload, reply) => {
     const data = requireObjectPayload(payload, reply, ['name']);
     if (!data) return;
     const nick = normalizeNickname(data.name);
     if (nick.err) return reply({ ok: false, err: nick.err });
     if (rejectExistingRoom(socket, reply)) return;
+
+    if (!allowRequestRate(guards.create, clientKey, reply, '创建房间过于频繁，请稍后再试')) return;
 
     const room = createRoom(nick.name);
     const res = joinPlayer(room, socket, nick.name);
@@ -1033,16 +1050,6 @@ io.on('connection', (socket) => {
     }
     reply({ ok: true, code: room.code, token: res.token });
   });
-
-  // 加入限频：同一 socket 短时间内大量尝试不存在的房间视为扫房，拒绝
-  const joinAttempts = new Map(); // socketId -> { count, resetAt }
-  function registerFailedJoin(sid) {
-    const now = Date.now();
-    let rec = joinAttempts.get(sid);
-    if (!rec || now > rec.resetAt) { rec = { count: 0, resetAt: now + 60000 }; joinAttempts.set(sid, rec); }
-    rec.count++;
-    return rec.count <= 15;
-  }
 
   onSocketRequest(socket, 'join_room', (payload, reply) => {
     const data = requireObjectPayload(payload, reply, ['code', 'name']);
@@ -1060,13 +1067,20 @@ io.on('connection', (socket) => {
     // 统一大写、去空格：邀请码不区分大小写输入
     const normalized = data.code.trim().toUpperCase();
     const room = rooms.get(normalized);
+    const returning = room && room.players.find((p) => p && !p.left && p.name === nick.name
+      && p.token && p.token === data.token
+      && !(p.socketId && io.sockets.sockets.has(p.socketId)));
+    // 正确 token 只能恢复自己的原座位，不因同网络有人刷房而失去断线保护。
+    if (returning) {
+      const res = joinPlayer(room, socket, nick.name, data.token);
+      if (res.err) return reply({ ok: false, err: res.err });
+      return reply({ ok: true, code: room.code, token: res.token });
+    }
+    if (!allowRequestRate(guards.join, clientKey, reply, '加入房间过于频繁，请稍后再试')) return;
     if (!room) {
-      if (!registerFailedJoin(socket.id)) {
-        return reply({ ok: false, err: '尝试过于频繁，请稍后再试' });
-      }
+      if (!allowRequestRate(guards.missingRoom, clientKey, reply, '尝试过于频繁，请稍后再试')) return;
       return reply({ ok: false, err: '房间不存在，请核对邀请码' });
     }
-    joinAttempts.delete(socket.id);
     // 断线重连：同名匹配到离线玩家时，任何阶段都允许恢复座位
     const offlineSameName = room.players.find((p) => p && !p.left && p.name === nick.name && !p.connected);
     // 满员判断按有效座位算（排除已离开的占位）；同名断线座位即将被 token 恢复，
@@ -1211,8 +1225,7 @@ io.on('connection', (socket) => {
     reply(res);
   });
 
-  // 好友聊天：仅房内玩家可发，单条最多 80 个字符，2 秒内最多 3 条。
-  const chatTimes = [];
+  // 原 token 重连保留个人配额；换身份/换房仍共用网络配额。
   onSocketRequest(socket, 'chat_message', (payload, reply) => {
     const data = requireObjectPayload(payload, reply, ['text']);
     if (!data) return;
@@ -1230,9 +1243,8 @@ io.on('connection', (socket) => {
     if (Array.from(text).length > 80) return reply({ ok: false, err: '消息最多 80 个字符' });
 
     const now = Date.now();
-    while (chatTimes.length && now - chatTimes[0] >= 2000) chatTimes.shift();
-    if (chatTimes.length >= 3) return reply({ ok: false, err: '消息发得太快了' });
-    chatTimes.push(now);
+    if (!allowRequestRate(guards.chatPlayer, player.token, reply, '消息发得太快了')) return;
+    if (!allowRequestRate(guards.chatAddress, clientKey, reply, '当前网络消息过于频繁，请稍后再试')) return;
 
     room.chatMessages.push({ id: room.nextChatId++, seat, name: player.name, text, at: now });
     if (room.chatMessages.length > 50) room.chatMessages.shift();
@@ -1344,7 +1356,6 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    joinAttempts.delete(socket.id);
     handleLeave(socket, true);
   });
 });
