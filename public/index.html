@@ -12,21 +12,27 @@
   <!-- 大厅（A1：私人好友局入口，§19） -->
   <div id="lobby" class="screen">
     <div class="lobby-card">
-      <h1>Poker Game</h1>
-      <p class="lobby-tag">好友局的线上牌桌 · 无限注德州扑克</p>
-      <p class="subtitle">盲注 10/20 · 起始筹码 2000 · 2-6 人</p>
+      <div class="lobby-brand"><img src="assets/a1/card-back.png" alt="" /><span>POKER GAME<span>私人好友局</span></span></div>
+      <h1>和朋友，开一局。</h1>
+      <p class="lobby-tag">不必坐在一起，也能同桌尽兴。</p>
+      <div class="lobby-facts" aria-label="默认牌局设置">
+        <div><b>2–6</b><span>同桌人数</span></div>
+        <div><b>2,000</b><span>起始筹码</span></div>
+        <div><b>10 / 20</b><span>默认盲注</span></div>
+      </div>
       <label>你的昵称
         <input id="nickname" type="text" maxlength="8" placeholder="昵称（每人不同）" />
       </label>
       <button id="btn-create" class="btn btn-primary">创建房间</button>
       <div class="divider">或加入好友房间</div>
       <div class="join-row">
-        <input id="room-code" type="text" maxlength="6" placeholder="6 位邀请码"
+        <input id="room-code" type="text" maxlength="6" placeholder="6 位邀请码" aria-label="好友房间邀请码"
                autocapitalize="characters" autocomplete="off" spellcheck="false" />
         <button id="btn-join" class="btn btn-secondary">加入</button>
       </div>
-      <div id="lobby-error" class="error"></div>
+      <div id="lobby-error" class="error" role="status"></div>
       <button id="btn-rules-lobby" class="lobby-help-btn" type="button">第一次玩？查看 2 分钟说明</button>
+      <p class="lobby-footnote">无限注德州扑克 · 仅供虚拟筹码娱乐</p>
     </div>
   </div>
 
