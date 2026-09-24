@@ -679,6 +679,8 @@ body {
   backdrop-filter: blur(4px);
   display: flex; align-items: center; justify-content: center;
 }
+/* Dialogs must stay above the mobile log/chat bottom sheet (z-index: 65). */
+#settings-overlay, #result-overlay { z-index: 90; }
 @keyframes popIn {
   from { transform: scale(.96); opacity: 0; }
   to { transform: none; opacity: 1; }
