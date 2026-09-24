@@ -614,12 +614,16 @@ function consumeQueueAndAdvance(room, actedSeat) {
     // 其余全部弃牌，直接赢池
     streetBetsToPot(room);
     const winner = alive[0];
-    winner.chips += room.pot;
+    const winnerSeat = room.players.indexOf(winner);
+    const awards = awardPot(room, room.pot, [winnerSeat]);
     const wst = room.session.get(winner.name);
     if (wst && room.winMarkedHand !== room.handNumber) { wst.wins++; room.winMarkedHand = room.handNumber; }
     addLog(room, `${winner.name} 赢得底池 ${room.pot}（其余玩家均弃牌）`);
     room.results = {
-      pots: [{ amount: room.pot, winners: [{ seat: room.players.indexOf(winner), name: winner.name, chips: winner.chips, handName: null }] }],
+      pots: [{ amount: room.pot, winners: [{
+        seat: winnerSeat, name: winner.name, chips: winner.chips,
+        amountWon: awards.get(winnerSeat), handName: null,
+      }] }],
       forfeit: true,
     };
     endHand(room);
@@ -680,12 +684,18 @@ function awardPot(room, amount, winners) {
   const share = Math.floor(amount / winners.length);
   let remainder = amount - share * winners.length;
   const oddChipOrder = oddChipWinnerOrder(room, winners);
-  for (const s of winners) room.players[s].chips += share;
+  const awards = new Map();
+  for (const s of winners) {
+    room.players[s].chips += share;
+    awards.set(s, share);
+  }
   for (const s of oddChipOrder) {
     if (remainder <= 0) break;
     room.players[s].chips++;
+    awards.set(s, awards.get(s) + 1);
     remainder--;
   }
+  return awards;
 }
 
 function showdown(room) {
@@ -720,13 +730,14 @@ function showdown(room) {
       }
       winners = eligibleAlive.filter((s) => cmpScore(evals[s].score, bestScore) === 0);
     }
-    awardPot(room, pot.amount, winners);
+    const awards = awardPot(room, pot.amount, winners);
     potResults.push({
       amount: pot.amount,
       winners: winners.map((s) => ({
         seat: s,
         name: room.players[s].name,
         chips: room.players[s].chips,
+        amountWon: awards.get(s),
         handName: evals[s] ? evals[s].name : null,
         bestCards: evals[s] ? evals[s].best5 : null,
         hole: room.players[s].hole,
@@ -1543,4 +1554,5 @@ module.exports = {
   server, io, rooms,
   evaluate7, computePots, score5, newDeck, normalizeNickname, newToken,
   applyAction, canRaise, oddChipWinnerOrder, awardPot,
+  __test: { showdown, consumeQueueAndAdvance },
 };

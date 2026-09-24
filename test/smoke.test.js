@@ -425,6 +425,14 @@ async function runIntegration(n) {
   if (!gameEnded) assert.strictEqual(handsPlayed.length, 2, `${n} 人局未完成两手`);
   assert.ok(lastResult && lastResult.results, '缺少摊牌结果');
   assert.ok(Array.isArray(lastResult.results.changes), '缺少本局筹码变化');
+  assert.ok(Array.isArray(lastResult.results.pots) && lastResult.results.pots.length > 0, '缺少逐池结算结果');
+  lastResult.results.pots.forEach((pot, potIndex) => {
+    assert.ok(pot.winners.length > 0, `第 ${potIndex + 1} 池缺少赢家`);
+    assert.ok(pot.winners.every((winner) => Number.isSafeInteger(winner.amountWon)),
+      `第 ${potIndex + 1} 池未向联机客户端发送个人到账金额`);
+    assert.strictEqual(pot.winners.reduce((sum, winner) => sum + winner.amountWon, 0), pot.amount,
+      `第 ${potIndex + 1} 池的个人到账金额与池额不守恒`);
+  });
   const participants = lastResult.players.filter((p) => p.inHand).length;
   assert.ok(Array.isArray(lastResult.results.actions) && lastResult.results.actions.length >= participants + 1,
     '缺少完整本局行动时间线');
@@ -444,6 +452,30 @@ async function runIntegration(n) {
     const sum = lastResult.players.reduce((t, p) => t + p.chips, 0);
     assert.strictEqual(sum, lastResult.economyTotal, `${n} 人局结算筹码不守恒`);
   }
+  disconnectAll(clients);
+}
+
+// ---------- 场景 1b：弃牌单赢时联机结果发送整池个人到账 ----------
+async function runForfeitPayoutResult() {
+  const fail = (msg) => { throw new Error(msg); };
+  const { clients, states } = await setupTable(2, fail);
+  const actorReady = await waitUntil(() => states.some((s) => s
+    && ['preflop', 'flop', 'turn', 'river'].includes(s.stage)
+    && s.turnSeat === s.youSeat), 5000);
+  assert.ok(actorReady, '弃牌结算场景未轮到可行动玩家');
+
+  const actorIndex = states.findIndex((s) => s
+    && ['preflop', 'flop', 'turn', 'river'].includes(s.stage)
+    && s.turnSeat === s.youSeat);
+  await emit(clients[actorIndex], 'action', { type: 'fold' });
+  const resultReady = await waitUntil(() => states[0]
+    && states[0].stage === 'handover' && states[0].results && states[0].results.forfeit, 5000);
+  assert.ok(resultReady, '弃牌后未收到服务器单赢结果');
+
+  const pot = states[0].results.pots[0];
+  assert.strictEqual(pot.winners.length, 1, '其余玩家弃牌时应只有一位赢家');
+  assert.strictEqual(pot.winners[0].amountWon, pot.amount, '单赢者个人到账应等于整池');
+  console.log('  ✓ 联机弃牌单赢：结果中个人到账与整池金额一致');
   disconnectAll(clients);
 }
 
@@ -868,6 +900,7 @@ async function runSettingsScenario() {
     await runFoldedHolePrivacyScenario();
     await runDuplicateBusinessRequestScenario();
     await runIntegration(2);
+    await runForfeitPayoutResult();
     await runIntegration(3);
     await runIntegration(6);
     await runLeaveMidHand();

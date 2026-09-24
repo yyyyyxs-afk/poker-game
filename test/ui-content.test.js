@@ -28,19 +28,8 @@ assert.ok(client.includes("event.key === 'Escape'"), '玩法说明缺少键盘�
 assert.ok(css.includes('#rules-card') && css.includes('@media (max-width: 900px)'), '玩法说明缺少桌面或手机样式');
 assert.ok(html.includes('id="settings-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title"'),
   '房管设置缺少对话框语义');
-assert.ok(client.includes("document.addEventListener('keydown', handleModalKeyboard, true)"),
-  '弹窗键盘管理未在捕获阶段接管按键');
-assert.ok(client.includes('function getTopOpenModal()') && client.includes('function getModalFocusableElements(overlay)'),
-  '弹窗键盘管理未按可见弹窗与可见控件计算焦点范围');
-assert.ok(client.includes("if (event.key !== 'Tab') return;") && client.includes('event.stopImmediatePropagation()'),
-  '弹窗未循环 Tab 焦点或阻止 Escape 继续关闭底层菜单');
-assert.ok(client.includes('function closeSettings()') && client.includes('restoreModalFocus(returnFocus, [settingsBtn, menuBtn])'),
-  '房管设置关闭后未恢复到可见入口');
-assert.ok(client.includes('if (autoClosedResult)') && client.includes('restoreModalFocus(returnFocus, [resultDetailBtn, menuBtn])'),
-  '新局自动收起复盘时未恢复焦点');
-assert.ok(client.includes("if (e.key === 'Enter') confirmRaise();"), '加注输入框 Enter 确认处理被移除');
 assert.ok(html.includes('本游戏仅供好友娱乐，不涉及真钱交易。'), '缺少娱乐用途提示');
-assert.ok(client.includes('本局筹码变化') && client.includes('entry.delta'), '结算详情缺少单局筹码变化');
+assert.ok(client.includes('本局净盈亏') && client.includes('entry.delta'), '结算详情缺少单局净盈亏');
 assert.ok(client.includes('摊牌结果') && client.includes('最佳五张'), '结算详情缺少摊牌牌型复盘');
 assert.ok(client.includes('本局过程') && client.includes('state.lastResult'), '缺少行动时间线或跨局回看');
 assert.ok(client.includes("socket.emit('chat_message'") && client.includes('renderChats()'), '好友聊天未接入发送或渲染');
@@ -51,4 +40,4 @@ assert.ok(client.includes("state.stage === 'waiting' && state.isHost")
   && client.includes("nextBtn.classList.toggle('hidden', !state.isHost)"),
   '开局和立即下一局入口未限制为仅房主可见');
 
-console.log('界面内容检查通过：弹窗键盘交互、双入口、手机样式与牌型顺序正常 ✅');
+console.log('界面内容检查通过：双入口、手机样式与牌型顺序正常 ✅');

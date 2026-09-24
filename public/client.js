@@ -1499,8 +1499,11 @@ function renderResults() {
   const winnerNames = mainPot.winners.map((w) => escapeHtml(w.name)).join('、');
   const winnerHand = mainPot.winners[0].handName
     ? escapeHtml(mainPot.winners[0].handName) : '对手全部弃牌';
+  const mainPotWinnerAmount = Number.isFinite(mainPot.winners[0].amountWon)
+    ? mainPot.winners[0].amountWon : mainPot.amount;
+  const mainPotAmountLabel = mainPot.winners.length > 1 ? '赢家合计分得' : '分得底池';
   if (isCurrentResult) {
-    winnerBanner.innerHTML = `<b>${winnerNames}</b><span class="winner-amount">获胜 <em>+${mainPot.amount}</em></span>` +
+    winnerBanner.innerHTML = `<b>${winnerNames}</b><span class="winner-amount">${mainPotAmountLabel} <em>+${mainPot.winners.length > 1 ? mainPot.amount : mainPotWinnerAmount}</em></span>` +
       `<span class="winner-hand">${winnerHand}${r.pots.length > 1 ? ` · 含边池 ${r.pots.length - 1} 个` : ''}</span>`;
     winnerBanner.classList.remove('hidden');
   } else {
@@ -1516,7 +1519,7 @@ function renderResults() {
     : [];
   if (changes.length) {
     changesDiv.innerHTML = `
-      <div class="hand-change-title">本局筹码变化</div>
+      <div class="hand-change-title">本局净盈亏</div>
       <div class="hand-change-list">
         ${changes.map((entry) => {
           const delta = Number(entry.delta) || 0;
@@ -1540,13 +1543,18 @@ function renderResults() {
     const row = document.createElement('div');
     row.className = 'result-pot-row';
     const label = r.pots.length > 1 ? (i === 0 ? '主池' : `边池 ${i}`) : '底池';
+    const winnerAmountLabel = (winner) => {
+      if (Number.isFinite(winner.amountWon)) return `分得 ${winner.amountWon} 筹码`;
+      if (pot.winners.length === 1) return `分得底池 ${pot.amount} 筹码`;
+      return `与 ${pot.winners.length - 1} 位赢家共享底池（个人分配未记录）`;
+    };
     row.innerHTML = `
       <div class="pot-label">${label} · ${pot.amount} 筹码</div>
       ${pot.winners.map((w) => `
         <div class="winners">
           <img class="winner-avatar" src="${avatarPng(w.seat)}" alt="" />
           <div class="winner-info">
-            <div class="winner-name"><b>${escapeHtml(w.name)}</b> 赢得 ${pot.amount} 筹码</div>
+            <div class="winner-name"><b>${escapeHtml(w.name)}</b> ${winnerAmountLabel(w)}</div>
             ${w.handName ? `<div class="hand-name">牌型: ${w.handName}</div>` : '<div class="hand-name">对手全部弃牌</div>'}
             ${winnerCardsHtml(w, r.community)}
           </div>

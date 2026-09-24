@@ -3,13 +3,15 @@
  * 1. 洗牌：52 张严格唯一、合法牌集合、密码学随机可重复发牌
  * 2. 牌力：牌型类别、A-5 轮子、7 选 5 的 best5 精确性、平分牌
  * 3. 边池：多人全押阶梯（含弃牌者投入）分层与资格
- * 4. 下注权：不足额全押不重开加注权，足额全押正常重开
+ * 4. 结算：每池个人到账、奇数零头、边池平分与弃牌单赢
+ * 5. 下注权：不足额全押不重开加注权，足额全押正常重开
  * 运行：node test/rules.test.js
  */
 const assert = require('assert');
 const {
   evaluate7, computePots, score5, newDeck, normalizeNickname, newToken,
   applyAction, canRaise, oddChipWinnerOrder, awardPot,
+  __test: { showdown, consumeQueueAndAdvance },
 } = require('../server.js');
 
 const C = (r, s) => ({ r, s });
@@ -168,6 +170,80 @@ ok('平分底池：零头筹码从庄家左侧起按顺时针发放', () => {
   awardPot(room, 8, winners); // 每人 2，两个零头依次给 4 号与 0 号座位
   assert.deepStrictEqual(room.players.map((p) => p.chips), [3, 0, 2, 0, 3]);
   assert.strictEqual(room.players.reduce((sum, p) => sum + p.chips, 0), 8);
+});
+
+function payoutPlayer(name, totalBet, { folded = false, hole = [] } = {}) {
+  return {
+    name, totalBet, roundBet: 0, chips: 2000 - totalBet, handStartChips: 2000,
+    folded, inHand: true, allIn: false, connected: false, left: false, sittingOut: false,
+    hole: [...hole],
+  };
+}
+
+function payoutRoom(players, dealerSeat = 0) {
+  return {
+    code: 'PAY001', stage: 'river', handNumber: 1, dealerSeat, players,
+    community: [C(14, 's'), C(13, 's'), C(12, 's'), C(11, 's'), C(10, 's')],
+    pot: 0, currentBet: 0, minRaise: 20, turnSeat: -1, queue: [],
+    logs: [], handActions: [], results: null, lastResult: null, revealed: false,
+    timer: null, nextHandTimer: null, winMarkedHand: -1, gameOver: false,
+    session: new Map(players.map((p) => [p.name, { wins: 0, hands: 1 }])), sessionLeft: [],
+    settings: { bigBlind: 20, nextHandDelay: 20, actionTime: 45 },
+    economyTotal: players.reduce((sum, p) => sum + p.chips + p.totalBet, 0),
+  };
+}
+
+ok('底池到账：100 两人平分时服务端记录 50/50', () => {
+  const room = { dealerSeat: 0, players: [{ chips: 0 }, { chips: 0 }] };
+  const awards = awardPot(room, 100, [0, 1]);
+  assert.deepStrictEqual([awards.get(0), awards.get(1)], [50, 50]);
+  assert.deepStrictEqual(room.players.map((p) => p.chips), [50, 50]);
+});
+
+ok('底池到账：101 两人平分时庄家左侧赢家取得零头', () => {
+  const room = { dealerSeat: 0, players: [{ chips: 0 }, { chips: 0 }] };
+  const awards = awardPot(room, 101, [0, 1]);
+  assert.deepStrictEqual([awards.get(0), awards.get(1)], [50, 51]);
+  assert.deepStrictEqual(room.players.map((p) => p.chips), [50, 51]);
+});
+
+ok('复盘到账：多层边池逐池记录个人分配，分配合计等于池额', () => {
+  const room = payoutRoom([
+    payoutPlayer('甲', 100, { hole: [C(2, 'h'), C(3, 'd')] }),
+    payoutPlayer('乙', 200, { folded: true, hole: [C(4, 'c'), C(5, 'h')] }),
+    payoutPlayer('丙', 300, { hole: [C(6, 'c'), C(7, 'd')] }),
+    payoutPlayer('丁', 300, { hole: [C(8, 'c'), C(9, 'd')] }),
+  ], 1);
+  showdown(room);
+  const pots = room.results.pots;
+  assert.deepStrictEqual(pots.map((pot) => pot.amount), [400, 300, 200]);
+  pots.forEach((pot) => {
+    assert.ok(pot.winners.every((winner) => Number.isInteger(winner.amountWon)), '每位赢家需记录整数到账');
+    assert.strictEqual(pot.winners.reduce((sum, winner) => sum + winner.amountWon, 0), pot.amount,
+      `第 ${pot.amount} 筹码底池的到账总和应等于池额`);
+  });
+  assert.deepStrictEqual(pots.map((pot) => pot.winners.map((winner) => [winner.seat, winner.amountWon])), [
+    [[0, 133], [2, 134], [3, 133]],
+    [[2, 150], [3, 150]],
+    [[2, 100], [3, 100]],
+  ]);
+});
+
+ok('弃牌单赢：整池到账字段与实发筹码一致，净盈亏单独计算', () => {
+  const room = payoutRoom([
+    payoutPlayer('赢家', 40),
+    payoutPlayer('弃牌者', 60, { folded: true }),
+  ]);
+  room.stage = 'preflop';
+  room.queue = [1];
+  consumeQueueAndAdvance(room, 1);
+  const pot = room.results.pots[0];
+  assert.strictEqual(room.results.forfeit, true);
+  assert.strictEqual(pot.amount, 100);
+  assert.deepStrictEqual(pot.winners.map((winner) => winner.amountWon), [100]);
+  assert.strictEqual(room.players[0].chips, 2060, '赢家实际筹码应增加整池 100');
+  assert.deepStrictEqual(room.results.changes.map((entry) => entry.delta), [60, -60],
+    '本局净盈亏仍扣除赢家自己的投入');
 });
 
 // ---------------- 不足额全押与加注权 ----------------
