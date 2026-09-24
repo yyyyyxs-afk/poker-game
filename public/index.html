@@ -168,9 +168,9 @@
     </main>
 
     <!-- 房管设置弹窗 -->
-    <div id="settings-overlay" class="overlay hidden">
-      <div id="settings-card">
-        <h2>房管设置</h2>
+    <div id="settings-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div id="settings-card" tabindex="-1">
+        <h2 id="settings-title">房管设置</h2>
         <label>每人起始筹码
           <input id="set-start-chips" type="number" min="100" max="1000000" step="100" />
         </label>
@@ -222,7 +222,7 @@
 
     <!-- 结果弹窗（Phase 6 改牌桌直显，本轮保持可用） -->
     <div id="result-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="result-title">
-      <div id="result-card">
+      <div id="result-card" tabindex="-1">
         <div class="result-sticky-head">
           <h2 id="result-title"></h2>
           <button id="btn-result-close-top" type="button" class="result-close-top" aria-label="关闭复盘并返回牌桌" title="关闭复盘">×</button>
@@ -251,7 +251,7 @@
 
   <!-- 新手玩法与牌型速查：大厅和牌桌内均可打开 -->
   <div id="rules-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="rules-title">
-    <div id="rules-card">
+    <div id="rules-card" tabindex="-1">
       <div class="rules-head">
         <div>
           <span class="rules-kicker">好友局速查</span>

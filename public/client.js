@@ -128,6 +128,90 @@ const rulesTabs = [...document.querySelectorAll('[data-rules-tab]')];
 const rulesPanels = [...document.querySelectorAll('[data-rules-panel]')];
 let rulesReturnFocus = null;
 
+const MODAL_FOCUSABLE_SELECTOR = [
+  'a[href]', 'button:not([disabled])', 'input:not([disabled]):not([type="hidden"])',
+  'select:not([disabled])', 'textarea:not([disabled])', '[contenteditable="true"]',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',');
+
+function isVisibleAndEnabled(element) {
+  if (!element || !element.isConnected || element.disabled || element.closest('.hidden')) return false;
+  const style = getComputedStyle(element);
+  return style.display !== 'none' && style.visibility !== 'hidden' && element.getClientRects().length > 0;
+}
+
+function getModalFocusableElements(overlay) {
+  return [...overlay.querySelectorAll(MODAL_FOCUSABLE_SELECTOR)].filter(isVisibleAndEnabled);
+}
+
+function getTopOpenModal() {
+  const overlays = [settingsOverlay, resultOverlay, rulesOverlay]
+    .filter((overlay) => overlay && isVisibleAndEnabled(overlay));
+  return overlays.reduce((top, candidate) => {
+    if (!top) return candidate;
+    const topZ = Number.parseInt(getComputedStyle(top).zIndex, 10) || 0;
+    const candidateZ = Number.parseInt(getComputedStyle(candidate).zIndex, 10) || 0;
+    if (candidateZ !== topZ) return candidateZ > topZ ? candidate : top;
+    return top.compareDocumentPosition(candidate) & Node.DOCUMENT_POSITION_FOLLOWING
+      ? candidate : top;
+  }, null);
+}
+
+function focusFirstModalControl(overlay) {
+  const first = getModalFocusableElements(overlay)[0];
+  const fallback = overlay.querySelector('[tabindex="-1"]');
+  (first || fallback)?.focus();
+}
+
+function restoreModalFocus(preferred, fallbacks = []) {
+  const activeModal = getTopOpenModal();
+  if (activeModal) {
+    if (activeModal.contains(preferred) && isVisibleAndEnabled(preferred)) preferred.focus();
+    else focusFirstModalControl(activeModal);
+    return;
+  }
+  const candidates = [
+    preferred, ...fallbacks,
+    document.getElementById('btn-menu'), document.getElementById('btn-rules-lobby'),
+    document.getElementById('btn-create'),
+  ];
+  candidates.find(isVisibleAndEnabled)?.focus();
+}
+
+function handleModalKeyboard(event) {
+  const activeModal = getTopOpenModal();
+  if (!activeModal) return;
+
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (activeModal === rulesOverlay) closeRules();
+    else if (activeModal === resultOverlay) closeResultDetail();
+    else if (activeModal === settingsOverlay) closeSettings();
+    return;
+  }
+
+  if (event.key !== 'Tab') return;
+  const focusable = getModalFocusableElements(activeModal);
+  if (!focusable.length) {
+    event.preventDefault();
+    focusFirstModalControl(activeModal);
+    return;
+  }
+
+  const currentIndex = focusable.indexOf(document.activeElement);
+  if (event.shiftKey && currentIndex <= 0) {
+    event.preventDefault();
+    focusable[focusable.length - 1].focus();
+  } else if (!event.shiftKey && (currentIndex < 0 || currentIndex === focusable.length - 1)) {
+    event.preventDefault();
+    focusable[0].focus();
+  }
+}
+
+// 只在当前最上层对话框打开时接管 Tab 与 Esc，其余按键继续交给原有交互。
+document.addEventListener('keydown', handleModalKeyboard, true);
+
 function selectRulesTab(name) {
   rulesTabs.forEach((tab) => {
     const active = tab.dataset.rulesTab === name;
@@ -138,7 +222,9 @@ function selectRulesTab(name) {
 }
 
 function openRules(tab = 'quick', trigger = document.activeElement) {
-  rulesReturnFocus = trigger;
+  const activeModal = getTopOpenModal();
+  rulesReturnFocus = activeModal && activeModal.contains(document.activeElement)
+    ? document.activeElement : trigger;
   selectRulesTab(tab);
   rulesOverlay.classList.remove('hidden');
   document.body.classList.add('modal-open');
@@ -149,7 +235,9 @@ function closeRules() {
   if (rulesOverlay.classList.contains('hidden')) return;
   rulesOverlay.classList.add('hidden');
   document.body.classList.remove('modal-open');
-  if (rulesReturnFocus && typeof rulesReturnFocus.focus === 'function') rulesReturnFocus.focus();
+  const returnFocus = rulesReturnFocus;
+  rulesReturnFocus = null;
+  restoreModalFocus(returnFocus, [document.getElementById('btn-rules-lobby'), menuBtn]);
 }
 
 document.getElementById('btn-rules-lobby').addEventListener('click', (event) => openRules('quick', event.currentTarget));
@@ -419,7 +507,14 @@ socket.on('kicked', ({ reason }) => {
 
 // ---------------- 房管设置 ----------------
 const settingsOverlay = document.getElementById('settings-overlay');
-document.getElementById('btn-settings').onclick = () => {
+const settingsBtn = document.getElementById('btn-settings');
+const settingsFirstControl = document.getElementById('set-start-chips');
+let settingsReturnFocus = null;
+
+settingsBtn.onclick = () => {
+  const activeModal = getTopOpenModal();
+  settingsReturnFocus = activeModal && activeModal.contains(document.activeElement)
+    ? document.activeElement : settingsBtn;
   document.getElementById('set-start-chips').value = state.settings.startChips;
   document.getElementById('set-sb').value = state.settings.smallBlind;
   document.getElementById('set-bb').value = state.settings.bigBlind;
@@ -430,8 +525,16 @@ document.getElementById('btn-settings').onclick = () => {
   document.getElementById('set-locked').value = String(!!state.settings.locked);
   document.getElementById('settings-error').textContent = '';
   settingsOverlay.classList.remove('hidden');
+  settingsFirstControl.focus();
 };
-document.getElementById('btn-settings-close').onclick = () => settingsOverlay.classList.add('hidden');
+function closeSettings() {
+  if (settingsOverlay.classList.contains('hidden')) return;
+  settingsOverlay.classList.add('hidden');
+  const returnFocus = settingsReturnFocus;
+  settingsReturnFocus = null;
+  restoreModalFocus(returnFocus, [settingsBtn, menuBtn]);
+}
+document.getElementById('btn-settings-close').onclick = closeSettings;
 document.getElementById('btn-settings-save').onclick = saveSettings;
 function saveSettings() {
   const payload = {
@@ -445,7 +548,7 @@ function saveSettings() {
   };
   socket.emit('update_settings', payload, (res) => {
     if (res.ok) {
-      settingsOverlay.classList.add('hidden');
+      closeSettings();
     } else {
       document.getElementById('settings-error').textContent = res.err;
     }
@@ -459,11 +562,17 @@ socket.on('state', (s) => {
   if (activeRoomCode && incomingCode && incomingCode !== activeRoomCode) return;
   if (!activeRoomCode && lobbyExpectedRoom && incomingCode && incomingCode !== lobbyExpectedRoom) return;
   // 自动开出下一手时收起上一局弹窗，避免遮挡当前行动；之后仍可主动回看。
+  const autoClosedResult = !!(state && state.stage === 'handover' && s.stage !== 'handover' && resultDetailOpen);
   if (state && state.stage === 'handover' && s.stage !== 'handover') resultDetailOpen = false;
   state = s;
   mySeat = s.youSeat;
   document.getElementById('conn-overlay').classList.add('hidden');
   render();
+  if (autoClosedResult) {
+    const returnFocus = resultReturnFocus;
+    resultReturnFocus = null;
+    restoreModalFocus(returnFocus, [resultDetailBtn, menuBtn]);
+  }
 });
 
 // 断线感知：掉线全屏提示；socket 自动重连成功后用 token 恢复座位
@@ -1353,14 +1462,15 @@ resultDetailBtn.addEventListener('click', (event) => {
   resultDetailOpen = true;
   renderResults();
   if (!resultOverlay.classList.contains('hidden')) resultCloseTopBtn.focus();
+  else restoreModalFocus(resultReturnFocus, [menuBtn]);
 });
 function closeResultDetail() {
   if (!resultDetailOpen) return;
   resultDetailOpen = false;
   renderResults();
-  if (resultReturnFocus && resultReturnFocus.isConnected && !resultReturnFocus.classList.contains('hidden')) {
-    resultReturnFocus.focus();
-  }
+  const returnFocus = resultReturnFocus;
+  resultReturnFocus = null;
+  restoreModalFocus(returnFocus, [resultDetailBtn, menuBtn]);
 }
 resultCloseTopBtn.addEventListener('click', closeResultDetail);
 document.getElementById('btn-result-close').addEventListener('click', closeResultDetail);
@@ -1369,9 +1479,16 @@ function renderResults() {
   const isCurrentResult = state.stage === 'handover' && !!state.results;
   const r = isCurrentResult ? state.results : state.lastResult;
   if (!r) {
+    const wasOpen = resultDetailOpen;
+    resultDetailOpen = false;
     resultOverlay.classList.add('hidden');
     resultDetailBtn.classList.add('hidden');
     winnerBanner.classList.add('hidden');
+    if (wasOpen) {
+      const returnFocus = resultReturnFocus;
+      resultReturnFocus = null;
+      restoreModalFocus(returnFocus, [resultDetailBtn, menuBtn]);
+    }
     return;
   }
   document.getElementById('result-title').textContent =
