@@ -1346,14 +1346,24 @@ let resultDetailOpen = false;
 const resultOverlay = document.getElementById('result-overlay');
 const winnerBanner = document.getElementById('winner-banner');
 const resultDetailBtn = document.getElementById('btn-result-detail');
-resultDetailBtn.addEventListener('click', () => {
+const resultCloseTopBtn = document.getElementById('btn-result-close-top');
+let resultReturnFocus = null;
+resultDetailBtn.addEventListener('click', (event) => {
+  resultReturnFocus = event.currentTarget;
   resultDetailOpen = true;
   renderResults();
+  if (!resultOverlay.classList.contains('hidden')) resultCloseTopBtn.focus();
 });
-document.getElementById('btn-result-close').addEventListener('click', () => {
+function closeResultDetail() {
+  if (!resultDetailOpen) return;
   resultDetailOpen = false;
   renderResults();
-});
+  if (resultReturnFocus && resultReturnFocus.isConnected && !resultReturnFocus.classList.contains('hidden')) {
+    resultReturnFocus.focus();
+  }
+}
+resultCloseTopBtn.addEventListener('click', closeResultDetail);
+document.getElementById('btn-result-close').addEventListener('click', closeResultDetail);
 
 function renderResults() {
   const isCurrentResult = state.stage === 'handover' && !!state.results;

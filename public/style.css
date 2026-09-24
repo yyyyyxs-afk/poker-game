@@ -784,7 +784,21 @@ body.modal-open { overflow: hidden; }
   box-shadow: var(--a1-shadow-panel);
   animation: popIn .2s ease-out;
 }
-#result-title { color: var(--a1-text); margin-bottom: 14px; font-size: 18px; letter-spacing: 2px; }
+.result-sticky-head {
+  position: sticky; top: -24px; z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+  min-height: 48px; margin: -24px -28px 14px; padding: 10px 48px;
+  background: var(--a1-surface); border-bottom: 1px solid var(--a1-line-soft);
+}
+#result-title { color: var(--a1-text); margin: 0; font-size: 18px; letter-spacing: 2px; }
+.result-close-top {
+  position: absolute; top: 50%; right: 12px; transform: translateY(-50%);
+  width: 32px; height: 32px; padding: 0; border: 1px solid var(--a1-line);
+  border-radius: 50%; background: transparent; color: var(--a1-muted);
+  font: 400 24px/1 var(--a1-font-sans); cursor: pointer;
+}
+.result-close-top:hover { color: var(--a1-text); background: var(--a1-surface-raised); }
+.result-close-top:focus-visible { outline: none; box-shadow: var(--a1-focus); }
 .hand-change-title {
   color: var(--a1-muted); font-size: 12px; text-align: left; margin-bottom: 8px;
 }
@@ -1045,6 +1059,7 @@ body.modal-open { overflow: hidden; }
   .rules-action-grid { grid-template-columns: 1fr; }
   .hand-ranks { grid-template-columns: 1fr; }
   #result-card { padding: 18px 16px; max-height: 78vh; }
+  .result-sticky-head { top: -18px; margin: -18px -16px 14px; padding: 9px 48px; }
   #session-table { font-size: 11px; }
   #session-table th, #session-table td { padding: 4px 5px; }
   .hand-change { flex-basis: calc(50% - 4px); padding: 8px 10px; }

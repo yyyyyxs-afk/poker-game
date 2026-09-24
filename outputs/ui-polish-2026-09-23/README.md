@@ -1,45 +1,47 @@
-# UI polish review — 2026-09-23
+# UI 返工验收报告
 
-Scope: visual and interaction polish in the isolated worktree, preserving poker rules, seat/chip positions, and the main checkout. Baseline: `9bb5659c8b3f59c92e8071d41b3d6848c8bf165d`.
+日期：2026-09-24
+工作区基线：`9bb5659c8b3f59c92e8071d41b3d6848c8bf165d`
 
-## Baseline observations
+## 本轮变更
 
-- The 1366×768 lobby, waiting room, active table, desktop replay, and settings are legible and keep their main controls available.
-- At 375×812 and 320×568, the fixed mobile log/chat sheet (z-index 65) draws above the replay and room settings overlays (z-index 50). It covers part of each dialog, including lower controls. The rules dialog already uses z-index 90 and is not affected.
-- Mobile table views are compact and use a bottom-sheet chat/log panel. The log collapse control is operable. Table/seat geometry is out of scope for this polish pass.
-- In live Socket.IO play, a six-player room was created and joined, robot and browser chat exchanged, the browser completed a raise action, and replay/settings/log toggles were exercised.
+- **弹窗层级**：设置与复盘弹窗的样式层级设为 90，高于手机端消息抽屉的 65，避免抽屉覆盖弹窗。
+- **复盘关闭入口**：复盘标题栏新增固定关闭按钮，名称为“关闭复盘并返回牌桌”；复盘弹窗声明为对话框，并由标题提供名称。打开时焦点移到关闭按钮；顶部按钮和原有底部按钮共用关闭逻辑，关闭后焦点返回“查看本局详情／回看”触发按钮。
+- **牌局规则**：未改动发牌、行动、结算或筹码规则；座位、筹码位置也未调整。
 
-## Baseline artifacts
+## 浏览器实测
 
-- `01` lobby at 1366×768
-- `02` completed table at 1366×768
-- `03` turn-expired table at 1366×768 (the action timer advanced while capturing, so this is not a raise-drawer image)
-- `04`–`05` desktop replay, top and lower timeline
-- `06`–`07` replay at 375×812 and 320×568
-- `08`–`11` desktop and mobile settings, including a six-player waiting room
-- `12` chat in a six-player waiting room
-- `13` active six-player table at 1366×768
-- `14` after a confirmed raise at 1366×768
-- `15b`–`16` active table at 375×812 and 320×568
+每次切换视口后读取页面 `innerWidth`、`innerHeight`；截图文件尺寸也逐张核对，截图均为 JPEG 并使用 `.jpg` 扩展名。
 
-## Change and verification
+| 视口 | 复盘实测 | 截图 |
+|---|---|---|
+| 1366×768 | 打开长复盘，顶部关闭入口可见；滚动到底部后入口仍固定可见。点击顶部入口关闭弹窗，焦点回到触发按钮。原底部“收起，看牌桌”按钮在滚动后仍可见且可关闭。 | `after-replay-1366x768.jpg`、`after-replay-1366x768-lower.jpg` |
+| 375×812 | 页面尺寸读数为 375×812。长复盘顶部和滚动后截图均为 375×812；滚动后点击固定关闭入口，弹窗关闭且焦点回到触发按钮。 | `after-replay-375x812.jpg`、`after-replay-375x812-lower.jpg` |
+| 320×568 | 页面尺寸读数为 320×568。标题关闭入口在顶部与滚动到底部后都可见；从底部关闭后，焦点回到触发按钮。正文可在弹窗内部滚动。 | `after-replay-320x568.jpg`、`after-replay-320x568-lower.jpg` |
 
-Only one product rule changed in this pass: `public/style.css` gives `#settings-overlay` and `#result-overlay` z-index 90, above the mobile `#log-panel` bottom sheet at z-index 65. No poker logic, chip math, or seat/table coordinates changed.
+关闭后页面仍停留在原牌桌，当前行动提示未改变，没有触发牌桌操作。375×812 与 320×568 下也确认了复盘弹窗显示在消息抽屉上方。设置弹窗层级的桌面、375×812、320×568 截图见下方索引。
 
-### Browser and Socket.IO checks
+## 检查结果
 
-- Desktop: 1366×768 room settings dialog opens with every field and both footer actions visible (`after-settings-1366x768.png`).
-- Mobile: 375×812 settings remains fully visible above the expanded log sheet; the 375×812 replay modal also draws above the sheet (`after-settings-375x812.png`, `after-replay-375x812.png`).
-- Small mobile: 320×568 settings can scroll internally to expose Cancel and Save while the log sheet stays behind it (`after-settings-320x568.png`, `after-settings-320x568-lower.png`). The replay modal is visually above the chat/log sheet at this size (`after-replay-320x568.png`).
-- Fresh mobile load at 320×568 starts with the log sheet collapsed and the invite control visible. A six-player local Socket.IO room joined by room code. In a live hand, the browser raised to 40 and the stack reflected 1,960; robot and browser chat messages arrived across clients. The log collapse, replay, and settings controls were exercised; the invitation control was confirmed visible.
-- At 320×568 the dialogs are taller than the viewport and require their own scroll area for the lowest content; the settings action row remains reachable. Existing mobile table geometry was left alone.
+- `npm run test:ui`：通过。
+- `git diff --check`：通过。
+- 本轮只运行与新增对话框标记、关闭按钮相关的界面检查；按要求没有重跑全量回归。
+- 上一轮 `npm test` 的几何检查记录了既有的 4 个 320×568 拥挤／归属豁免；本轮没有改动桌面或座位几何，也未重新运行几何检查。
 
-### Automated checks
+## 截图索引
 
-- `npm test` — passed the full existing suite: UI content, rules, runtime, network guards, multiplayer/socket behavior, and geometry.
-- Geometry reported exactly the existing four 320×568 crowding/ownership exceptions; all tested layouts stayed in bounds and had zero intersections.
-- `git diff --check` — passed.
+### 修复前
 
-## Screenshot index
+`01`–`06`、`09`–`14`、`15b`、`16` 为基线截图，现已统一使用 `.jpg` 扩展名。文件尺寸核验发现 3 张旧采集与文件名不符，已按实际尺寸更名：
 
-Before images: `01`–`16` (with `03` labeled as a turn-expired capture and `15` ignored in favor of the correctly sized `15b`). After images: settings at 1366×768, 375×812, and 320×568 (top and lower scroll); replay at 375×812 and 320×568; plus supplementary waiting-room/invite and table-log captures. All are in this directory.
+- `07-replay-262x568-before.jpg`：实际 262×568，不作为精确 320×568 对照。
+- `08-settings-1280x720-before.jpg`：实际 1280×720。
+- `15-active-table-cropped-375x211-before.jpg`：实际为裁切图；375×812 对照使用 `15b-active-table-375x812-before.jpg`。
+
+### 修复后
+
+- 复盘：1366×768、375×812、320×568 各有顶部与滚动后截图。
+- 设置：`after-settings-1366x768.jpg`、`after-settings-375x812.jpg`、`after-settings-320x568.jpg`、`after-settings-320x568-lower.jpg`。
+- 等待房间、邀请入口及消息抽屉的补充截图也已改为与实际 JPEG 编码相符的 `.jpg`。
+
+所有文件均在本目录。`join-test-guests.js` 是本地六人 Socket.IO 验收使用的虚拟玩家辅助脚本。

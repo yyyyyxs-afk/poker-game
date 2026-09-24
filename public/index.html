@@ -221,9 +221,12 @@
     </div>
 
     <!-- 结果弹窗（Phase 6 改牌桌直显，本轮保持可用） -->
-    <div id="result-overlay" class="overlay hidden">
+    <div id="result-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="result-title">
       <div id="result-card">
-        <h2 id="result-title"></h2>
+        <div class="result-sticky-head">
+          <h2 id="result-title"></h2>
+          <button id="btn-result-close-top" type="button" class="result-close-top" aria-label="关闭复盘并返回牌桌" title="关闭复盘">×</button>
+        </div>
         <div id="hand-changes" class="hidden"></div>
         <div id="result-pots"></div>
         <div id="result-showdown" class="hidden"></div>
