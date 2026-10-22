@@ -4,6 +4,12 @@
 
 基于 **Node.js + Express + Socket.IO** 的多人在线无限注德州扑克（No-Limit Texas Hold'em）游戏。服务端为权威逻辑节点，客户端仅负责渲染与输入，天然防作弊。
 
+## 游戏截图
+
+| 大厅 | 等待房间 | 对局中 |
+| --- | --- | --- |
+| ![大厅](docs/screenshots/lobby.png) | ![等待房间](docs/screenshots/waiting-room.png) | ![对局中](docs/screenshots/gameplay.png) |
+
 ## 功能特性
 
 - 🎴 完整牌局流程：发牌 → 翻牌前 → 翻牌 → 转牌 → 河牌 → 摊牌
