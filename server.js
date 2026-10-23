@@ -344,6 +344,8 @@ function startHand(room) {
     room.queue = [];
     setTurn(room, -1);
     room.stage = 'waiting';
+    ensureConnectedHost(room);
+    scheduleRetainedRoomCleanup(room);
     broadcast(room);
     return;
   }
@@ -804,6 +806,7 @@ function endHand(room) {
   // 对局中明确离开的玩家为维持座位索引暂留到本手结束；结算完成后再固化战绩。
   room.players.forEach((p) => { if (p && p.left) bankSession(room, p); });
   scheduleNextHandIfReady(room);
+  scheduleRetainedRoomCleanup(room);
   broadcast(room);
 }
 
@@ -1570,9 +1573,27 @@ function bankSession(room, p) {
   room.session.delete(p.name);
 }
 
+// 等待/局间保留身份的房间无人在线时，最多保留10分钟。
+// 不重复排期，避免阶段切换延长保留时间；返回者由joinPlayer取消。
+function scheduleRetainedRoomCleanup(room) {
+  if (!['waiting', 'handover'].includes(room.stage) || room.players.some(p => p && !p.left && p.connected) || room.waitingCleanupTimer) return;
+  const timer = setTimeout(() => {
+    if (room.waitingCleanupTimer !== timer) return;
+    room.waitingCleanupTimer = null;
+    if (rooms.get(room.code) !== room || !['waiting', 'handover'].includes(room.stage) || room.players.some(p => p && !p.left && p.connected)) return;
+    clearTurnTimer(room);
+    clearTimeout(room.nextHandTimer);
+    room.nextHandTimer = null;
+    room.nextHandDeadline = 0;
+    rooms.delete(room.code);
+  }, 10 * 60 * 1000);
+  room.waitingCleanupTimer = timer;
+  timer.unref();
+}
+
 // 保留断线身份的阶段，管理权交给在线有效玩家。
 function ensureConnectedHost(room) {
-  if (!(room.stage === 'waiting' && room.handNumber === 0) && room.stage !== 'handover') return;
+  if (!['waiting', 'handover'].includes(room.stage)) return;
   const online = p => p && !p.left && p.connected;
   if (room.players.some(p => online(p) && p.name === room.hostName)) return;
   const nextHost = room.players.find(online);
@@ -1581,7 +1602,7 @@ function ensureConnectedHost(room) {
 }
 
 function transferHostAfterLeave(room, p) {
-  if ((room.stage === 'waiting' && room.handNumber === 0) || room.stage === 'handover') { ensureConnectedHost(room); return; }
+  if (['waiting', 'handover'].includes(room.stage)) { ensureConnectedHost(room); return; }
   if (p.name !== room.hostName) return;
   const nextHost = room.players.find((x) => x && !x.left);
   room.hostName = nextHost ? nextHost.name : null;
@@ -1595,17 +1616,11 @@ function handleLeave(socket, isDisconnect = false) {
   if (idx < 0) return;
   const p = room.players[idx];
 
-  if (isDisconnect && ((room.stage === 'waiting' && room.handNumber === 0) || room.stage === 'handover')) {
+  if (isDisconnect && ['waiting', 'handover'].includes(room.stage)) {
     p.connected = false; p.socketId = null;
     ensureConnectedHost(room);
     addLog(room, `${p.name} 离线，保留座位`);
-    if (room.stage === 'waiting' && !room.players.some(x => x && x.connected)) {
-      clearTimeout(room.waitingCleanupTimer);
-      room.waitingCleanupTimer = setTimeout(() => {
-        if (room.stage === 'waiting' && room.handNumber === 0 && !room.players.some(x => x && x.connected)) rooms.delete(room.code);
-      }, 10 * 60 * 1000);
-      room.waitingCleanupTimer.unref();
-    }
+    scheduleRetainedRoomCleanup(room);
     broadcast(room); return;
   }
   const midHand = !['waiting', 'handover'].includes(room.stage);
@@ -1655,12 +1670,14 @@ function handleLeave(socket, isDisconnect = false) {
     room.nextHandTimer = null;
     scheduleNextHandIfReady(room);
   }
+  scheduleRetainedRoomCleanup(room);
   broadcast(room);
 
   // 房间空了就销毁
   if (seatCount(room) === 0) {
     clearTurnTimer(room);
     clearTimeout(room.nextHandTimer);
+    clearTimeout(room.waitingCleanupTimer);
     rooms.delete(room.code);
   }
 }
