@@ -73,6 +73,7 @@
 
     <main id="play-layout">
       <section id="play-stage">
+        <div id="squid-progress" class="hidden" aria-live="polite"></div>
         <div id="table">
           <div id="table-ring" aria-hidden="true"></div>
           <div id="table-inner">
@@ -131,6 +132,15 @@
           </div>
           <details id="identity-controls" class="hidden"><summary>我的头像与座位</summary><div id="identity-avatars"></div><label>我的座位 <select id="identity-seat"></select></label><p id="identity-seat-tip"></p></details>
           <div id="next-hand-status" aria-live="polite"></div>
+          <div id="squid-summary" class="hidden" aria-live="polite"></div>
+          <details id="squid-controls" class="hidden">
+            <summary>经典鱿鱼 · 默认关闭</summary>
+            <p>3–6 人（建议 4–6 人）。每轮固定人员与大盲；主池独赢得标记，弃牌单赢也算，无需亮牌。平分、仅赢边池及退回未跟注额不算。</p>
+            <p>开轮每人冻结（人数−1）×大盲，得标记即解冻；最后未得标记者向其余每人支付 1 大盲。冻结仍属本人，不能下注。有人主动离场或被移出则取消本轮、解冻；断线保留资格。新加入者下轮参加。</p>
+            <button id="btn-squid-toggle" class="btn btn-secondary btn-small">开启经典鱿鱼</button>
+            <button id="btn-squid-cancel" class="btn btn-secondary btn-small hidden">取消本轮并解冻</button>
+            <p id="squid-control-tip"></p>
+          </details>
           <div class="footer-buttons">
             <button id="btn-pause-next" class="btn btn-secondary hidden">暂停下一局</button>
             <button id="btn-invite" class="btn btn-secondary hidden">邀请好友</button>
@@ -233,6 +243,7 @@
           <button id="btn-result-close-top" type="button" class="result-close-top" aria-label="关闭复盘并返回牌桌" title="关闭复盘">×</button>
         </div>
         <div id="hand-changes" class="hidden"></div>
+        <div id="squid-result" class="hidden"></div>
         <div id="result-pots"></div>
         <div id="result-showdown" class="hidden"></div>
         <div id="result-timeline" class="hidden"></div>
@@ -242,7 +253,7 @@
           <p id="export-session-tip">仅在局间导出已结算战绩，包含已离场记录。</p>
           <table id="session-table">
             <thead>
-              <tr><th>玩家</th><th>买入</th><th>筹码</th><th>盈亏</th><th>手数</th><th>胜场</th></tr>
+              <tr><th>玩家</th><th>买入</th><th>总资产</th><th>盈亏</th><th>手数</th><th>胜场</th></tr>
             </thead>
             <tbody></tbody>
           </table>

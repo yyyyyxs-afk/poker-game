@@ -12,6 +12,7 @@
     "test:show-cards": "node test/show-cards.test.js",
     "test:identity": "node test/identity.test.js",
     "test:friends": "node test/friends.test.js",
+    "test:squid": "node test/squid.test.js",
     "test:smoke": "node test/smoke.test.js"
   },
   "engines": {

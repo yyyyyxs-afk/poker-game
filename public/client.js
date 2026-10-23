@@ -606,6 +606,7 @@ function render() {
   if (!state) return;
   try {
     renderForfeitShowcase();
+    updateSquidMarks();
     updateWinnerSeats();
     renderTableInfo();
     renderSeats();
@@ -618,6 +619,7 @@ function render() {
     renderIdentityControls();
     renderNextHandStatus();
     renderResults();
+    renderSquid();
   } catch (e) {
     // 渲染异常不应白屏：把错误显示在提示区，座位区保留上次内容
     console.error(e);
@@ -795,10 +797,10 @@ function seatCardHtml(p, isMe) {
     ? '<span class="dealer-badge" title="庄家">D</span>' : '';
   return `
     ${dealer}
-    <img class="avatar-img" src="${avatarPng(p.seat)}" alt="${escapeHtml(p.name)} 的头像" />
+    <img class="avatar-img" src="${avatarPng(p.seat)}" alt="${escapeHtml(p.name)} 的头像" />${squidMarkHtml(p)}
     <div class="seat-copy">
       <strong>${escapeHtml(p.name)}</strong>
-      <span class="seat-chips">${p.chips}</span>
+      <span class="seat-chips">${p.chips}${p.frozen ? `<small class="frozen-chips"> 冻${p.frozen}</small>` : ''}</span>
 
     </div>
     ${stateBadge ? `<span class="state-badge">${stateBadge}</span>` : ''}
@@ -903,10 +905,10 @@ function renderHeroSeat(me) {
   box.innerHTML = `
     <div class="seat-card me-seat${isTurn ? ' is-current' : ''}${me.folded ? ' folded-seat' : ''}${winnerSeats.has(me.seat) ? ' winner-seat' : ''}">
       ${me.isDealer && state.stage !== 'waiting' ? '<span class="dealer-badge" title="庄家">D</span>' : ''}
-      <img class="avatar-img" src="${avatarPng(me.seat)}" alt="我的头像" />
+      <img class="avatar-img" src="${avatarPng(me.seat)}" alt="我的头像" />${squidMarkHtml(me)}
       <div class="seat-copy">
         <strong>${escapeHtml(me.name)}</strong>
-        <span class="seat-chips">${me.chips}</span>
+        <span class="seat-chips">${me.chips}${me.frozen ? `<small class="frozen-chips"> 冻${me.frozen}</small>` : ''}</span>
       </div>
       ${stateBadge ? `<span class="state-badge">${stateBadge}</span>` : ''}
     </div>
@@ -1130,7 +1132,7 @@ function renderMyArea() {
     && !state.gameOver && state.players.length >= 2;
   startBtn.classList.toggle('hidden', !showStart);
   const showRebuy = !state.gameOver && ['waiting', 'handover'].includes(state.stage)
-    && me && me.chips === 0;
+    && me && cfg().rebuyAllowed !== false && (me.chips === 0 || (state.squid?.enabled && !state.squid.current && state.squid.waitingReason && me.chips <= (state.players.filter(p=>p.connected&&!p.sittingOut&&!p.left).length-1)*cfg().bigBlind));
   rebuyBtn.classList.toggle('hidden', !showRebuy);
   rebuyBtn.textContent = `重新买入（补充 ${cfg().startChips} 筹码）`;
   // 暂离/坐回按钮：对局中或局间都可以暂离；暂离状态显示坐回按钮
@@ -1629,7 +1631,7 @@ function renderSession() {
   box.classList.remove('hidden');
   const tbody = box.querySelector('tbody');
   tbody.innerHTML = list.map((e) => {
-    const chips = e.left ? '已离场' : e.chips;
+    const chips = e.left ? '已离场' : `${e.estate ?? e.chips}${e.frozen ? `（冻${e.frozen}）` : ''}`;
     const plCls = e.pl > 0 ? 'pl-pos' : e.pl < 0 ? 'pl-neg' : '';
     const plText = (e.pl > 0 ? '+' : '') + e.pl;
     return `<tr>
@@ -1874,3 +1876,53 @@ function renderForfeitShowcase() {
 }
 setInterval(()=>{if(isForfeitIntermission()) document.getElementById('next-hand-status').textContent=forfeitStatus();},1000);
 window.addEventListener('resize', () => { if (isForfeitIntermission()) { renderSeats(); renderBets(); } });
+
+// 鱿鱼仅使用服务器公开的标记与资产，不读取或推测底牌。
+let squidSeenRoom='', squidSeenSeq=null;
+const squidGlow=new Map();
+function updateSquidMarks(){
+  const s=state.squid;if(!s)return;
+  if(squidSeenRoom!==state.code){squidSeenRoom=state.code;squidSeenSeq=null;squidGlow.clear();}
+  const history=s.history||[],seq=history.at(-1)?.seq||0;
+  if(squidSeenSeq!==null)for(const e of history)if(e.seq>squidSeenSeq&&e.type==='mark')squidGlow.set(e.name,Date.now());
+  squidSeenSeq=seq;
+}
+function squidMarkHtml(p){
+  const s=state.squid;if(!s?.enabled)return '';
+  let marked=s.current?.members.some(m=>m.name===p.name&&m.marked);
+  if(!s.current&&state.stage==='handover'&&state.results?.squidEvents?.some(e=>e.type==='payment'&&e.round===s.round))
+    marked=(s.history||[]).some(e=>e.round===s.round&&e.type==='mark'&&e.name===p.name);
+  if(!marked)return '';
+  const elapsed=Date.now()-(squidGlow.get(p.name)||0),glow=elapsed<650;
+  return `<span class="squid-mark${glow?' squid-glow':''}" ${glow?`style="animation-delay:-${elapsed}ms"`:''} title="本轮已得鱿鱼标记" aria-label="本轮已得鱿鱼标记">◆</span>`;
+}
+function squidEventText(e){
+  if(e.type==='round')return `第${e.round}轮开始：${e.names.join('、')}；大盲${e.bb}，每人冻结${(e.names.length-1)*e.bb}`;
+  if(e.type==='mark')return `${e.name} 主池独赢，得到标记并解冻`;
+  if(e.type==='payment')return `${e.from} 支付${e.total}，${e.to.join('、')}各收${e.bb}（1大盲）`;
+  return `第${e.round}轮取消并解冻：${e.reason}`;
+}
+function renderSquid(){
+  const s=state.squid||{enabled:false},safe=['waiting','handover'].includes(state.stage);
+  const progress=document.getElementById('squid-progress');
+  progress.classList.toggle('hidden',!s.enabled);
+  progress.textContent=s.current?`鱿鱼第${s.current.round}轮 · ${s.current.members.filter(m=>m.marked).length}/${s.current.members.length}`:`鱿鱼 · ${s.round?`第${s.round}轮已结束`:'等待开轮'}`;
+  const controls=document.getElementById('squid-controls');
+  controls.classList.toggle('hidden',!state.isHost||!safe);
+  controls.querySelector('summary').textContent=`经典鱿鱼 · ${s.enabled?'已开启':'默认关闭'}`;
+  document.getElementById('btn-squid-toggle').textContent=s.enabled?'关闭模式并解冻':'开启经典鱿鱼';
+  document.getElementById('btn-squid-cancel').classList.toggle('hidden',!s.current);
+  document.getElementById('squid-control-tip').textContent=s.enabled?'取消本轮后仍保留模式，下次发牌前会尝试开启新轮。':'';
+  const events=state.stage==='handover'?(state.results?.squidEvents||[]):[];
+  const payment=events.findLast(e=>e.type==='payment');
+  const last=(s.history||[]).at(-1);
+  const summary=document.getElementById('squid-summary');
+  summary.textContent=s.waitingReason||(payment?`鱿鱼：${payment.from} 付${payment.total} · 其余${payment.to.length}人各收${payment.bb}`:(safe&&last?.type==='cancel'?squidEventText(last):''));
+  summary.classList.toggle('hidden',!summary.textContent);
+  const r=state.stage==='handover'?state.results:state.lastResult;
+  const detail=document.getElementById('squid-result'),detailEvents=r?.squidEvents||[];
+  detail.classList.toggle('hidden',!detailEvents.length);
+  detail.innerHTML=detailEvents.length?`<h3>鱿鱼记录</h3>${detailEvents.map(e=>`<p>${escapeHtml(squidEventText(e))}</p>`).join('')}<p>本局净盈亏已含鱿鱼收付；底池分得金额仅为德州结算。冻结、解冻不计盈亏。</p>`:'';
+}
+document.getElementById('btn-squid-toggle').onclick=()=>socket.emit('set_squid',{enabled:!state.squid?.enabled},r=>{if(!r?.ok)flashTip(r?.err||'操作失败');});
+document.getElementById('btn-squid-cancel').onclick=()=>socket.emit('cancel_squid_round',null,r=>{if(!r?.ok)flashTip(r?.err||'操作失败');});

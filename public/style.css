@@ -1239,3 +1239,16 @@ body.modal-open { overflow: hidden; }
 }
 @media(prefers-reduced-motion:reduce) { .reveal-flip { animation:none!important; } }
 .forfeit-intermission .seat.folded-seat,.forfeit-summary .seat-card.folded-seat { opacity:1; }
+
+#squid-progress { align-self:flex-end; color:var(--a1-text-soft); font-size:11px; line-height:18px; padding:0 4px; }
+.squid-mark { position:absolute; left:3px; bottom:1px; font-size:12px; color:#80e6c1; text-shadow:0 1px 3px #102a24; }
+.frozen-chips { font-size:9px; color:var(--a1-text-soft); font-weight:normal; white-space:nowrap; }
+#squid-controls { max-width:520px; width:100%; font-size:12px; color:var(--a1-text-soft); }
+#squid-controls summary { text-align:center; cursor:pointer; }
+#squid-controls p { margin:8px 0; line-height:1.5; }
+#squid-controls[open] { padding:8px; background:var(--a1-surface); border-radius:8px; }
+#squid-summary { max-width:520px; text-align:center; font-size:11px; color:var(--a1-text-soft); line-height:1.5; }
+#squid-result { font-size:12px; line-height:1.5; border-bottom:1px solid var(--a1-line-soft); }
+.squid-glow { animation:squidMarkGlow .65s ease-out; }
+@keyframes squidMarkGlow { from { filter:drop-shadow(0 0 8px #80e6c1); transform:scale(1.5); } to { filter:none; transform:none; } }
+@media(prefers-reduced-motion:reduce) { .squid-glow { animation:none; } }
