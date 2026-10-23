@@ -118,4 +118,34 @@ async function next(host,r){await ok(host,'set_next_hand_paused',{paused:false})
     assert.strictEqual(p.chips,0);assert.strictEqual(p.totalBet,1960);assert.strictEqual(p.squidFrozen,40,'全押不能动用冻结资产');
     assert.strictEqual(assets(r),r.economyTotal);
   }
+  // 不调用 next 辅助函数：条件恢复后必须靠原自动续局流程发第二手。
+  for(const restore of ['reconnect','sit_back']) for(const paused of [false,true]){
+    const {ss,r,joins}=await table(3);r.settings.nextHandDelay=1;
+    await ok(ss[0],'set_squid',{enabled:true});
+    assert.strictEqual(r.handNumber,0);assert.strictEqual(r.nextHandTimer,null,'初始等待不能自动开第一手');
+    await ok(ss[0],'start_game');await foldTo(r,'甲');
+    const round=r.squid.current,frozen=r.players.map(squid.frozen),marked=round.members.map(m=>m.marked);
+    if(restore==='reconnect'){ss[2].disconnect();await wait(()=>!r.players[2].connected);}
+    else await ok(ss[2],'sit_out');
+    await wait(()=>!r.nextHandTimer&&!r.nextHandDeadline);
+    assert.strictEqual(r.handNumber,1);assert.strictEqual(r.stage,'handover');assert.ok(r.squid.waitingReason);
+    if(paused)await ok(ss[0],'set_next_hand_paused',{paused:true});
+    if(restore==='reconnect'){ss[2]=await open();await ok(ss[2],'join_room',{code:r.code,name:'丙',token:joins[2].token});}
+    else await ok(ss[2],'sit_back');
+    assert.strictEqual(r.squid.waitingReason,null);
+    if(paused){await new Promise(resolve=>setTimeout(resolve,1250));assert.strictEqual(r.handNumber,1);assert.strictEqual(r.nextHandTimer,null);assert.strictEqual(r.nextHandDeadline,0);}
+    else{assert.ok(r.nextHandTimer,'恢复人数后应重建已耗尽的自动续局排期');await wait(()=>r.handNumber===2);await ok(ss[0],'set_next_hand_paused',{paused:true});}
+    assert.strictEqual(r.squid.current,round);assert.deepStrictEqual(r.players.map(squid.frozen),frozen);assert.deepStrictEqual(round.members.map(m=>m.marked),marked);assert.strictEqual(assets(r),r.economyTotal);
+    console.log(`✓ 自动续局：${restore}恢复已耗尽的倒计时，${paused?'显式暂停保持不发牌':'无需手动next即发第二手'}，轮次/标记/冻结不变`);
+  }
+  {
+    const {ss,r,joins}=await table(3);r.settings.nextHandDelay=5;
+    await ok(ss[0],'set_squid',{enabled:true});await ok(ss[0],'start_game');await foldTo(r,'甲');
+    const timer=r.nextHandTimer,deadline=r.nextHandDeadline;
+    ss[2].disconnect();await wait(()=>!r.players[2].connected);ss[2]=await open();await ok(ss[2],'join_room',{code:r.code,name:'丙',token:joins[2].token});
+    assert.strictEqual(r.nextHandTimer,timer);assert.strictEqual(r.nextHandDeadline,deadline,'有效原截止时间不被重连延长');
+    await ok(ss[2],'sit_out');await ok(ss[2],'sit_back');assert.strictEqual(r.nextHandTimer,timer);assert.strictEqual(r.nextHandDeadline,deadline);
+    await ok(ss[0],'set_next_hand_paused',{paused:true});
+    console.log('✓ 正常未到期：重连/坐回均保持原计时器与截止时间，初始waiting不自动开局');
+  }
 }finally{sockets.forEach(s=>s.disconnect());await new Promise(r=>io.close(r));for(const r of rooms.values()){clearTimeout(r.timer);clearTimeout(r.nextHandTimer);clearTimeout(r.waitingCleanupTimer);}}})().catch(e=>{console.error(e);process.exitCode=1;});

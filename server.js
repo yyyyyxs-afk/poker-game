@@ -826,6 +826,12 @@ function endHand(room) {
  * 0 筹码玩家不阻塞——他们可以选择重买或暂离，定时器照常倒计时。
  * 如果实在凑不齐 2 人可参与（都走了或都 0 筹码），进入 gameOver。
  */
+// 资格恢复只补缺失的局间排期，不能延长仍有效的倒计时或绕过显式暂停。
+function resumeNextHandIfReady(room) {
+  if (room.stage !== 'handover' || room.gameOver || room.nextHandPaused || room.nextHandTimer) return;
+  scheduleNextHandIfReady(room);
+}
+
 function scheduleNextHandIfReady(room) {
   clearTimeout(room.nextHandTimer);
   room.nextHandTimer = null;
@@ -1450,6 +1456,7 @@ io.on('connection', (socket) => {
     if (!p) return reply({ ok: false, err: '不在房间中' });
     p.sittingOut = false;
     addLog(room, `${p.name} 坐回`);
+    resumeNextHandIfReady(room);
     broadcast(room);
     reply({ ok: true });
   });
@@ -1545,6 +1552,7 @@ function joinPlayer(room, socket, name, token) {
       room.preGrace = null;
     }
     resumeStuckTurn(room);
+    resumeNextHandIfReady(room);
     broadcast(room);
     return { token: existing.token };
   }
@@ -1577,6 +1585,7 @@ function joinPlayer(room, socket, name, token) {
   }
   ensureConnectedHost(room);
   addLog(room, `${name} 加入房间`);
+  resumeNextHandIfReady(room);
   broadcast(room);
   return { token: t };
 }
