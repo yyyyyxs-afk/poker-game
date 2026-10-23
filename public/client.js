@@ -605,6 +605,7 @@ socket.on('disconnect', () => {
 function render() {
   if (!state) return;
   try {
+    renderForfeitShowcase();
     updateWinnerSeats();
     renderTableInfo();
     renderSeats();
@@ -798,7 +799,7 @@ function seatCardHtml(p, isMe) {
     <div class="seat-copy">
       <strong>${escapeHtml(p.name)}</strong>
       <span class="seat-chips">${p.chips}</span>
-      ${p.shownCards && p.shownCards.length ? `<span class="voluntary-label">已亮 ${p.shownCards.map(e => `${e.index === 0 ? '左' : '右'}${RANK_LABEL[e.card.r] || e.card.r}${SUIT_CHAR[e.card.s]}`).join(' \u00b7 ')}</span>` : ''}
+
     </div>
     ${stateBadge ? `<span class="state-badge">${stateBadge}</span>` : ''}
     ${isTurn ? '<span class="turn-dot" aria-label="正在行动"></span>' : ''}
@@ -1765,9 +1766,7 @@ function renderNextHandStatus() {
   btn.classList.toggle('hidden', !state.isHost);
   btn.textContent = paused ? '恢复下一局' : '暂停下一局';
   btn.setAttribute('aria-pressed', String(paused));
-  document.getElementById('next-hand-status').textContent = paused
-    ? '下一局已暂停，当前手照常进行'
-    : '';
+  document.getElementById('next-hand-status').textContent = isForfeitIntermission() ? forfeitStatus() : (paused ? '下一局已暂停，当前手照常进行' : '');
   const settled = ['waiting', 'handover'].includes(state.stage);
   document.getElementById('btn-export-session').disabled = !settled;
   document.getElementById('export-session-tip').textContent = settled
@@ -1830,3 +1829,48 @@ document.getElementById('winner-show-controls').onclick = e => {
   const i = Number(b.dataset.showIndex);
   socket.emit('show_winner_cards', {handNumber:Number(b.dataset.showHand), indices:i === 2 ? [0,1] : [i]}, r => { if (!r.ok) flashTip(r.err); });
 };
+
+function isForfeitIntermission() { return state && state.stage === 'handover' && state.results && state.results.forfeit; }
+function forfeitStatus() {
+  if (state.nextHandPaused) return '下一局已暂停';
+  if (state.nextHandDeadline) return `下一局 ${Math.max(0, Math.ceil((state.nextHandDeadline-Date.now())/1000))} 秒`;
+  return '等待玩家就绪';
+}
+// 动画去重只用内存；首次当前手快照作为基线，刷新/重连不重播已亮牌。
+const revealSeen = new Set();
+const revealHands = new Set();
+function renderForfeitShowcase() {
+  const active = isForfeitIntermission();
+  document.getElementById('table').classList.toggle('forfeit-intermission', !!active);
+  document.getElementById('play-stage').classList.toggle('forfeit-summary', !!active);
+  const panel = document.getElementById('forfeit-showcase');
+  panel.classList.toggle('hidden', !active);
+  if (!active) { panel.innerHTML=''; delete panel.dataset.key; return; }
+  const winner = state.results.pots[0].winners[0];
+  const shown = winner.voluntaryCards || [];
+  const handKey = `${state.code}:${state.handNumber}`;
+  const firstSnapshot = !revealHands.has(handKey);
+  revealHands.add(handKey);
+  const key = handKey + JSON.stringify(shown);
+  if (panel.dataset.key === key) return;
+  panel.dataset.key=key;
+  const amount = Number.isFinite(winner.amountWon) ? winner.amountWon : state.results.pots[0].amount;
+  panel.innerHTML=`<div class="showcase-owner"><img src="${avatarPng(winner.seat)}" alt="" /><b>${escapeHtml(winner.name)}</b><span>分得 ${amount}</span></div><div class="showcase-cards"></div>`;
+  const slots=panel.querySelector('.showcase-cards');
+  for (let index=0;index<2;index++) {
+    const entry=shown.find(e=>e.index===index);
+    const slot=document.createElement('div');slot.className='showcase-slot';slot.setAttribute('aria-label',`${index===0?'左':'右'}张${entry?'已公开':'未公开'}`);
+    if(entry) {
+      slot.appendChild(cardEl(entry.card,false));
+      const seenKey=handKey+':'+index;
+      if(!firstSnapshot && !revealSeen.has(seenKey)) slot.classList.add('reveal-flip');
+      revealSeen.add(seenKey);
+    } else {
+      const back=document.createElement('img');back.src='assets/a1/card-back.png';back.alt='未公开';back.className='showcase-back';slot.appendChild(back);
+    }
+    slots.appendChild(slot);
+  }
+
+}
+setInterval(()=>{if(isForfeitIntermission()) document.getElementById('next-hand-status').textContent=forfeitStatus();},1000);
+window.addEventListener('resize', () => { if (isForfeitIntermission()) { renderSeats(); renderBets(); } });
