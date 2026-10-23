@@ -7,6 +7,7 @@
     "start": "node server.js",
     "test": "node test/run-all.js",
     "test:rules": "node test/rules.test.js",
+    "test:ui": "node test/ui-content.test.js",
     "test:geometry": "node test/geometry-check.js",
     "test:smoke": "node test/smoke.test.js"
   },
@@ -15,6 +16,8 @@
   },
   "dependencies": {
     "express": "^5.2.1",
+    "ipaddr.js": "1.9.1",
+    "proxy-addr": "2.0.7",
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3"
   }

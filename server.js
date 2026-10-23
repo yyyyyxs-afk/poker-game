@@ -9,18 +9,36 @@ const http = require('http');
 const path = require('path');
 const crypto = require('crypto');
 const { Server } = require('socket.io');
+const { createNetworkPolicy, createGuards } = require('./network-guard');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' } });
-
-// 防御性日志（经总负责人授权的最小改动）：只记录未捕获异常/拒绝，防止
-// 进程无堆栈静默退出、便于事后定位；不改变任何牌局逻辑与错误处理路径。
-process.on('uncaughtException', (err) => {
-  console.error('[uncaughtException]', err && err.stack ? err.stack : err);
+const networkPolicy = createNetworkPolicy();
+const guards = createGuards();
+const io = new Server(server, {
+  cors: { origin: (origin, callback) => callback(null, networkPolicy.allowsOrigin(origin)) },
+  // CORS 只限制浏览器长轮询，WebSocket 也必须检查初始请求来源。
+  allowRequest: (request, callback) => callback(null, networkPolicy.allowsOrigin(request.headers.origin)),
 });
-process.on('unhandledRejection', (reason) => {
-  console.error('[unhandledRejection]', reason && reason.stack ? reason.stack : reason);
+
+// 严重异常必须记录并退出，避免在未知状态下继续裁决牌局。
+// 仅直接运行时安装进程处理器；测试夹具负责自己的退出路径。
+if (require.main === module) {
+  const fatal = (kind, reason) => {
+    // 同步写入，确保退出前保留诊断；不记录房间状态或身份 token。
+    require('fs').writeSync(2, JSON.stringify({
+      time: new Date().toISOString(), level: 'fatal', event: kind,
+      error: reason instanceof Error ? reason.stack : String(reason),
+    }) + '\n');
+    process.exit(1);
+  };
+  process.on('uncaughtException', (err) => fatal('uncaughtException', err));
+  process.on('unhandledRejection', (err) => fatal('unhandledRejection', err));
+}
+
+app.get('/healthz', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ status: 'ok' });
 });
 
 // 静态资源禁用强缓存：客户端 js/css/index 更新后，浏览器刷新即可拿到最新版，
@@ -176,6 +194,10 @@ function createRoom(hostName) {
     queue: [],             // 本轮待行动座位队列
     logs: [],
     results: null,         // 摊牌结果
+    lastResult: null,      // 最近一局完整复盘；开下一局后仍可回看
+    handActions: [],       // 当前一手的结构化行动时间线
+    chatMessages: [],      // 最近 50 条好友聊天
+    nextChatId: 1,
     revealed: false,
     timer: null,
     turnDeadline: 0,       // 当前行动定时器的绝对截止时间（断线保护窗口用于恢复剩余时间）
@@ -237,6 +259,32 @@ function addLog(room, msg) {
 
 function canAct(p) {
   return p && !p.folded && !p.allIn && p.connected && p.chips > 0 && p.inHand && !p.sittingOut;
+}
+
+/**
+ * 玩家是否拥有加注权。
+ * - 尚未在本轮行动：可以加注；
+ * - 已行动后遇到不足额全押：仍需跟注/弃牌，但不自动恢复加注权；
+ * - 多个不足额全押累计达到其上次面对的完整最小加注幅度：恢复加注权。
+ */
+function canRaise(room, p) {
+  if (!canAct(p)) return false;
+  if (!Number.isFinite(p.actedBet) || !Number.isFinite(p.actedMinRaise)) return true;
+  return room.currentBet - p.actedBet >= p.actedMinRaise;
+}
+
+function markBettingAction(room, p) {
+  p.actedBet = room.currentBet;
+  p.actedMinRaise = room.minRaise;
+}
+
+function reopenRaiseRights(room, raiser) {
+  room.players.forEach((p) => {
+    if (!p) return;
+    p.actedBet = null;
+    p.actedMinRaise = null;
+  });
+  markBettingAction(room, raiser);
 }
 
 function nextSeat(room, from, filterFn) {
@@ -306,12 +354,16 @@ function startHand(room) {
   room.currentBet = bbAmt;
   room.minRaise = bbAmt;
   room.results = null;
+  room.handActions = [{ type: 'street', street: 'preflop', cards: [] }];
   room.revealed = false;
   room.queue = [];
   room.preGrace = null; // 新一手开始，旧的断线保护恢复记录作废
 
   room.players.forEach((p) => {
     if (!p) return;
+    // 记录本手开局时的筹码，结算后用于生成“本局筹码变化”。
+    // 必须在扣除盲注前记录，才能反映这一整手的真实盈亏。
+    p.handStartChips = p.chips;
     // 暂离或 0 筹码玩家不参与本局
     if (p.sittingOut || p.chips <= 0 || !p.connected) {
       p.inHand = false;
@@ -326,6 +378,8 @@ function startHand(room) {
     p.hole = [];
     p.isSB = false;
     p.isBB = false;
+    p.actedBet = null;
+    p.actedMinRaise = null;
   });
 
   // 本场战绩：参与本手的玩家计一手
@@ -369,6 +423,10 @@ function startHand(room) {
   const sbPaid = pay(sbP, sbAmt);
   const bbPaid = pay(bbP, bbAmt);
   addLog(room, `${sbP.name} 小盲 ${sbPaid}，${bbP.name} 大盲 ${bbPaid}`);
+  room.handActions.push(
+    { type: 'action', street: 'preflop', seat: sbSeat, name: sbP.name, label: `小盲 ${sbPaid}`, amount: sbPaid },
+    { type: 'action', street: 'preflop', seat: bbSeat, name: bbP.name, label: `大盲 ${bbPaid}`, amount: bbPaid },
+  );
   sbP.isSB = true; bbP.isBB = true;
 
   buildQueueFrom(room, nextSeat(room, bbSeat, canAct));
@@ -402,7 +460,12 @@ function streetBetsToPot(room) {
 }
 
 function nextStreet(room) {
-  room.players.forEach((p) => { if (p) p.roundBet = 0; });
+  room.players.forEach((p) => {
+    if (!p) return;
+    p.roundBet = 0;
+    p.actedBet = null;
+    p.actedMinRaise = null;
+  });
   room.currentBet = 0;
   room.minRaise = room.settings.bigBlind;
   streetBetsToPot(room);
@@ -414,12 +477,15 @@ function nextStreet(room) {
     room.stage = 'flop';
     room.community.push(newDeckPop3(room));
     room.community = room.community.flat();
+    room.handActions.push({ type: 'street', street: 'flop', cards: room.community.slice(-3) });
   } else if (room.stage === 'flop') {
     room.stage = 'turn';
     room.community.push(room.deck.pop());
+    room.handActions.push({ type: 'street', street: 'turn', cards: room.community.slice(-1) });
   } else if (room.stage === 'turn') {
     room.stage = 'river';
     room.community.push(room.deck.pop());
+    room.handActions.push({ type: 'street', street: 'river', cards: room.community.slice(-1) });
   } else if (room.stage === 'river') {
     showdown(room);
     return;
@@ -460,18 +526,24 @@ function applyAction(room, seat, action, amount, opts = {}) {
   switch (action) {
     case 'fold':
       p.folded = true;
+      markBettingAction(room, p);
       addLog(room, `${p.name} 弃牌`);
+      room.handActions.push({ type: 'action', street: room.stage, seat, name: p.name, label: opts.auto ? '自动弃牌' : '弃牌' });
       break;
     case 'check': {
       if (p.roundBet !== room.currentBet) return { ok: false, err: '当前有人加注，不能过牌' };
+      markBettingAction(room, p);
       addLog(room, `${p.name} 过牌`);
+      room.handActions.push({ type: 'action', street: room.stage, seat, name: p.name, label: opts.auto ? '自动过牌' : '过牌' });
       break;
     }
     case 'call': {
       const need = room.currentBet - p.roundBet;
       if (need <= 0) return { ok: false, err: '无需跟注，可以过牌' };
       const paid = pay(p, need);
+      markBettingAction(room, p);
       addLog(room, `${p.name} 跟注 ${paid}${p.allIn ? '（全押）' : ''}`);
+      room.handActions.push({ type: 'action', street: room.stage, seat, name: p.name, label: `跟注 ${paid}${p.allIn ? '（全押）' : ''}`, amount: paid });
       break;
     }
     case 'raise':
@@ -487,13 +559,24 @@ function applyAction(room, seat, action, amount, opts = {}) {
       const isAllIn = need >= p.chips;
       if (target > room.currentBet) {
         const raiseSize = target - room.currentBet;
+        const fullRaise = raiseSize >= room.minRaise;
+        if (!canRaise(room, p)) {
+          return { ok: false, err: '不足额全押未重新开放加注权，只能跟注或弃牌' };
+        }
         if (!isAllIn && raiseSize < room.minRaise) {
           return { ok: false, err: `最小加注到 ${room.currentBet + room.minRaise}` };
         }
         pay(p, need);
-        room.minRaise = Math.max(room.minRaise, raiseSize);
         room.currentBet = target;
+        if (fullRaise) {
+          room.minRaise = raiseSize;
+          reopenRaiseRights(room, p);
+        } else {
+          // 不足额全押只提高跟注金额，不改变完整最小加注幅度和已行动玩家的加注权。
+          markBettingAction(room, p);
+        }
         addLog(room, `${p.name} 加注到 ${target}${isAllIn ? '（全押）' : ''}`);
+        room.handActions.push({ type: 'action', street: room.stage, seat, name: p.name, label: `${isAllIn ? '全押到' : '加注到'} ${target}`, amount: target });
         // 有新加注：其余未弃牌未全押玩家重新获得行动权
         const n = room.players.length;
         room.queue = [];
@@ -508,7 +591,9 @@ function applyAction(room, seat, action, amount, opts = {}) {
           return { ok: false, err: `加注至少到 ${room.currentBet}` };
         }
         pay(p, need);
+        markBettingAction(room, p);
         addLog(room, `${p.name} 全押跟注 ${need}`);
+        room.handActions.push({ type: 'action', street: room.stage, seat, name: p.name, label: `全押跟注 ${need}`, amount: need });
       }
       break;
     }
@@ -529,12 +614,16 @@ function consumeQueueAndAdvance(room, actedSeat) {
     // 其余全部弃牌，直接赢池
     streetBetsToPot(room);
     const winner = alive[0];
-    winner.chips += room.pot;
+    const winnerSeat = room.players.indexOf(winner);
+    const awards = awardPot(room, room.pot, [winnerSeat]);
     const wst = room.session.get(winner.name);
     if (wst && room.winMarkedHand !== room.handNumber) { wst.wins++; room.winMarkedHand = room.handNumber; }
     addLog(room, `${winner.name} 赢得底池 ${room.pot}（其余玩家均弃牌）`);
     room.results = {
-      pots: [{ amount: room.pot, winners: [{ seat: room.players.indexOf(winner), name: winner.name, chips: winner.chips, handName: null }] }],
+      pots: [{ amount: room.pot, winners: [{
+        seat: winnerSeat, name: winner.name, chips: winner.chips,
+        amountWon: awards.get(winnerSeat), handName: null,
+      }] }],
       forfeit: true,
     };
     endHand(room);
@@ -575,6 +664,40 @@ function computePots(room) {
   return pots;
 }
 
+/**
+ * 平分底池时，零头筹码从庄家左侧起按顺时针发给最先遇到的赢家。
+ * 每个主池/边池都独立使用同一顺序。
+ */
+function oddChipWinnerOrder(room, winners) {
+  const n = room.players.length;
+  if (!n || !Number.isInteger(room.dealerSeat) || room.dealerSeat < 0) {
+    return [...winners].sort((a, b) => a - b);
+  }
+  const distance = (seat) => {
+    const d = (seat - room.dealerSeat + n) % n;
+    return d === 0 ? n : d;
+  };
+  return [...winners].sort((a, b) => distance(a) - distance(b));
+}
+
+function awardPot(room, amount, winners) {
+  const share = Math.floor(amount / winners.length);
+  let remainder = amount - share * winners.length;
+  const oddChipOrder = oddChipWinnerOrder(room, winners);
+  const awards = new Map();
+  for (const s of winners) {
+    room.players[s].chips += share;
+    awards.set(s, share);
+  }
+  for (const s of oddChipOrder) {
+    if (remainder <= 0) break;
+    room.players[s].chips++;
+    awards.set(s, awards.get(s) + 1);
+    remainder--;
+  }
+  return awards;
+}
+
 function showdown(room) {
   room.stage = 'showdown';
   room.revealed = true;
@@ -607,18 +730,14 @@ function showdown(room) {
       }
       winners = eligibleAlive.filter((s) => cmpScore(evals[s].score, bestScore) === 0);
     }
-    const share = Math.floor(pot.amount / winners.length);
-    let remainder = pot.amount - share * winners.length;
-    for (const s of winners) {
-      room.players[s].chips += share + (remainder > 0 ? 1 : 0);
-      if (remainder > 0) remainder--;
-    }
+    const awards = awardPot(room, pot.amount, winners);
     potResults.push({
       amount: pot.amount,
       winners: winners.map((s) => ({
         seat: s,
         name: room.players[s].name,
         chips: room.players[s].chips,
+        amountWon: awards.get(s),
         handName: evals[s] ? evals[s].name : null,
         bestCards: evals[s] ? evals[s].best5 : null,
         hole: room.players[s].hole,
@@ -641,13 +760,43 @@ function showdown(room) {
     room.winMarkedHand = room.handNumber;
   }
 
-  room.results = { pots: potResults, forfeit: false };
+  room.results = {
+    pots: potResults,
+    forfeit: false,
+    showdown: aliveSeats.map((seat) => ({
+      seat,
+      name: room.players[seat].name,
+      handName: evals[seat].name,
+      hole: [...room.players[seat].hole],
+      bestCards: [...evals[seat].best5],
+    })),
+  };
   endHand(room);
 }
 
 function endHand(room) {
   room.stage = 'handover';
   clearTurnTimer(room);
+  // 只统计实际参与本手的玩家；所有 delta 相加应为 0。
+  // 在离场玩家战绩入账前生成，保留完整的本手座位和结算快照。
+  if (room.results) {
+    room.results.handNumber = room.handNumber;
+    room.results.community = [...room.community];
+    room.results.actions = room.handActions.map((entry) => ({
+      ...entry,
+      cards: Array.isArray(entry.cards) ? [...entry.cards] : undefined,
+    }));
+    room.results.changes = room.players
+      .map((p, seat) => ({ p, seat }))
+      .filter(({ p }) => p && p.inHand)
+      .map(({ p, seat }) => ({
+        seat,
+        name: p.name,
+        delta: p.chips - (Number.isFinite(p.handStartChips) ? p.handStartChips : p.chips),
+        chips: p.chips,
+      }));
+    room.lastResult = room.results;
+  }
   // 对局中明确离开的玩家为维持座位索引暂留到本手结束；结算完成后再固化战绩。
   room.players.forEach((p) => { if (p && p.left) bankSession(room, p); });
   broadcast(room);
@@ -756,6 +905,8 @@ function sanitizeState(room, viewerSocketId) {
       ...room.sessionLeft.map((e) => ({ ...e, chips: null, left: true })),
     ],
     results: room.results,
+    lastResult: room.lastResult,
+    chatMessages: room.chatMessages.slice(-50),
     revealed: room.revealed,
     logs: room.logs.slice(-12),
     players: room.players.map((p, seat) => ({
@@ -771,6 +922,7 @@ function sanitizeState(room, viewerSocketId) {
       left: !!p.left,
       inHand: p.inHand,
       sittingOut: !!p.sittingOut,
+      raiseAllowed: canRaise(room, p),
       isDealer: seat === room.dealerSeat,
       // 摊牌只公开仍在本手且未弃牌者；已弃牌者的底牌始终仅本人可见。
       hole: p.hole && (seat === viewerIdx || (room.revealed && p.inHand && !p.folded)) ? p.hole : null,
@@ -883,13 +1035,23 @@ function rejectExistingRoom(socket, reply) {
   return true;
 }
 
+function allowRequestRate(limiter, key, reply, message) {
+  const result = limiter.take(key);
+  if (result.ok) return true;
+  reply({ ok: false, err: message, retryAfterMs: result.retryAfterMs });
+  return false;
+}
+
 io.on('connection', (socket) => {
+  const clientKey = networkPolicy.clientKey(socket.request);
   onSocketRequest(socket, 'create_room', (payload, reply) => {
     const data = requireObjectPayload(payload, reply, ['name']);
     if (!data) return;
     const nick = normalizeNickname(data.name);
     if (nick.err) return reply({ ok: false, err: nick.err });
     if (rejectExistingRoom(socket, reply)) return;
+
+    if (!allowRequestRate(guards.create, clientKey, reply, '创建房间过于频繁，请稍后再试')) return;
 
     const room = createRoom(nick.name);
     const res = joinPlayer(room, socket, nick.name);
@@ -899,16 +1061,6 @@ io.on('connection', (socket) => {
     }
     reply({ ok: true, code: room.code, token: res.token });
   });
-
-  // 加入限频：同一 socket 短时间内大量尝试不存在的房间视为扫房，拒绝
-  const joinAttempts = new Map(); // socketId -> { count, resetAt }
-  function registerFailedJoin(sid) {
-    const now = Date.now();
-    let rec = joinAttempts.get(sid);
-    if (!rec || now > rec.resetAt) { rec = { count: 0, resetAt: now + 60000 }; joinAttempts.set(sid, rec); }
-    rec.count++;
-    return rec.count <= 15;
-  }
 
   onSocketRequest(socket, 'join_room', (payload, reply) => {
     const data = requireObjectPayload(payload, reply, ['code', 'name']);
@@ -926,13 +1078,20 @@ io.on('connection', (socket) => {
     // 统一大写、去空格：邀请码不区分大小写输入
     const normalized = data.code.trim().toUpperCase();
     const room = rooms.get(normalized);
+    const returning = room && room.players.find((p) => p && !p.left && p.name === nick.name
+      && p.token && p.token === data.token
+      && !(p.socketId && io.sockets.sockets.has(p.socketId)));
+    // 正确 token 只能恢复自己的原座位，不因同网络有人刷房而失去断线保护。
+    if (returning) {
+      const res = joinPlayer(room, socket, nick.name, data.token);
+      if (res.err) return reply({ ok: false, err: res.err });
+      return reply({ ok: true, code: room.code, token: res.token });
+    }
+    if (!allowRequestRate(guards.join, clientKey, reply, '加入房间过于频繁，请稍后再试')) return;
     if (!room) {
-      if (!registerFailedJoin(socket.id)) {
-        return reply({ ok: false, err: '尝试过于频繁，请稍后再试' });
-      }
+      if (!allowRequestRate(guards.missingRoom, clientKey, reply, '尝试过于频繁，请稍后再试')) return;
       return reply({ ok: false, err: '房间不存在，请核对邀请码' });
     }
-    joinAttempts.delete(socket.id);
     // 断线重连：同名匹配到离线玩家时，任何阶段都允许恢复座位
     const offlineSameName = room.players.find((p) => p && !p.left && p.name === nick.name && !p.connected);
     // 满员判断按有效座位算（排除已离开的占位）；同名断线座位即将被 token 恢复，
@@ -956,6 +1115,8 @@ io.on('connection', (socket) => {
     if (!requireEmptyPayload(payload, reply)) return;
     const room = findRoomBySocket(socket.id);
     if (!room) return reply({ ok: false, err: '不在房间中' });
+    const p = room.players.find((x) => x && x.socketId === socket.id);
+    if (!p || p.name !== room.hostName) return reply({ ok: false, err: '只有房主可以开始游戏' });
     // 只能在等待/局间开局，防止对局中重复开局重扣盲注
     if (!['waiting', 'handover'].includes(room.stage)) {
       return reply({ ok: false, err: '本局正在进行中' });
@@ -973,6 +1134,8 @@ io.on('connection', (socket) => {
     if (!requireEmptyPayload(payload, reply)) return;
     const room = findRoomBySocket(socket.id);
     if (!room || room.stage !== 'handover') return reply({ ok: false, err: '当前不能开局' });
+    const p = room.players.find((x) => x && x.socketId === socket.id);
+    if (!p || p.name !== room.hostName) return reply({ ok: false, err: '只有房主可以立即开始下一局' });
     clearTimeout(room.nextHandTimer);
     room.nextHandTimer = null;
     startHand(room);
@@ -1071,6 +1234,33 @@ io.on('connection', (socket) => {
     const seat = room.players.findIndex((p) => p && p.socketId === socket.id);
     const res = applyAction(room, seat, data.type, data.amount);
     reply(res);
+  });
+
+  // 原 token 重连保留个人配额；换身份/换房仍共用网络配额。
+  onSocketRequest(socket, 'chat_message', (payload, reply) => {
+    const data = requireObjectPayload(payload, reply, ['text']);
+    if (!data) return;
+    if (typeof data.text !== 'string' || data.text.length > 500) {
+      return reply({ ok: false, err: '消息格式错误' });
+    }
+    const room = findRoomBySocket(socket.id);
+    const seat = room && room.players.findIndex((p) => p && p.socketId === socket.id);
+    const player = room && seat >= 0 ? room.players[seat] : null;
+    if (!room || !player) return reply({ ok: false, err: '不在房间中' });
+
+    const text = data.text.normalize('NFKC').trim().replace(/\s+/gu, ' ');
+    if (!text) return reply({ ok: false, err: '消息不能为空' });
+    if (/[\p{Cc}\p{Cf}\p{Cs}]/u.test(text)) return reply({ ok: false, err: '消息包含不可见字符' });
+    if (Array.from(text).length > 80) return reply({ ok: false, err: '消息最多 80 个字符' });
+
+    const now = Date.now();
+    if (!allowRequestRate(guards.chatPlayer, player.token, reply, '消息发得太快了')) return;
+    if (!allowRequestRate(guards.chatAddress, clientKey, reply, '当前网络消息过于频繁，请稍后再试')) return;
+
+    room.chatMessages.push({ id: room.nextChatId++, seat, name: player.name, text, at: now });
+    if (room.chatMessages.length > 50) room.chatMessages.shift();
+    reply({ ok: true });
+    broadcast(room);
   });
 
   // 表情快捷互动：转发给全房间，在自己头像上冒泡展示
@@ -1177,7 +1367,6 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    joinAttempts.delete(socket.id);
     handleLeave(socket, true);
   });
 });
@@ -1364,4 +1553,6 @@ if (require.main === module) {
 module.exports = {
   server, io, rooms,
   evaluate7, computePots, score5, newDeck, normalizeNickname, newToken,
+  applyAction, canRaise, oddChipWinnerOrder, awardPot,
+  __test: { showdown, consumeQueueAndAdvance },
 };

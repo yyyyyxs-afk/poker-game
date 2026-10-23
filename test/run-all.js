@@ -198,7 +198,11 @@ installSignalHandler('SIGTERM', 143);
 
 (async () => {
   try {
+    await runNode('test/ui-content.test.js', {}, { timeoutMs: 60000 });
     await runNode('test/rules.test.js', {}, { timeoutMs: 60000 });
+    await runNode('test/runtime.test.js', {}, { timeoutMs: 60000 });
+    await runNode('test/network-guard.test.js', {}, { timeoutMs: 60000 });
+    await runNode('test/network.test.js', {}, { timeoutMs: 60000 });
     await runNode('test/geometry-check.js', {}, { timeoutMs: 60000 });
 
     const port = await startServer();

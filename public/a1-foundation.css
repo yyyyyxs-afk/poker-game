@@ -13,7 +13,7 @@
   --a1-text: #edf0ee;
   --a1-text-soft: #cbd1cf;
   --a1-muted: #9fa8aa;
-  --a1-faint: #717b7e;
+  --a1-faint: #8b979a;
   --a1-line: #344044;
   --a1-line-soft: #293236;
   --a1-action: #6f9e91;
@@ -47,12 +47,12 @@
 
   --a1-radius-xs: 4px;
   --a1-radius-sm: 8px;
-  --a1-radius-md: 12px;
-  --a1-radius-lg: 16px;
+  --a1-radius-md: 16px;
+  --a1-radius-lg: 20px;
   --a1-radius-round: 999px;
 
-  --a1-shadow-panel: 0 18px 44px rgba(0, 0, 0, 0.24);
-  --a1-shadow-control: 0 4px 12px rgba(0, 0, 0, 0.2);
+  --a1-shadow-panel: 0 24px 64px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  --a1-shadow-control: 0 6px 16px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.035);
   --a1-shadow-card: 0 8px 14px rgba(32, 30, 26, 0.25);
   --a1-focus: 0 0 0 3px rgba(130, 178, 165, 0.24);
 }

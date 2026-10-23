@@ -88,13 +88,167 @@ logToggleBtn.addEventListener('click', () => {
   setLogCollapsed(!logPanel.classList.contains('collapsed'));
 });
 logPanel.querySelector('.log-head').addEventListener('click', (e) => {
-  if (e.target.closest('#btn-log-collapse')) return;
+  if (e.target.closest('button')) return;
   setLogCollapsed(!logPanel.classList.contains('collapsed'));
 });
 document.getElementById('btn-log-collapse').addEventListener('click', () => setLogCollapsed(true));
 if (window.matchMedia('(max-width: 900px)').matches) {
   setLogCollapsed(true);
 }
+
+// 牌局记录 / 好友聊天共用右侧面板，手机端也沿用同一底部抽屉。
+const panelLogTab = document.getElementById('panel-tab-log');
+const panelChatTab = document.getElementById('panel-tab-chat');
+const chatUnread = document.getElementById('chat-unread');
+let panelMode = 'log';
+let seenChatId = 0;
+function setPanelMode(mode) {
+  panelMode = mode === 'chat' ? 'chat' : 'log';
+  document.getElementById('log-view').classList.toggle('hidden', panelMode !== 'log');
+  document.getElementById('chat-view').classList.toggle('hidden', panelMode !== 'chat');
+  panelLogTab.classList.toggle('active', panelMode === 'log');
+  panelChatTab.classList.toggle('active', panelMode === 'chat');
+  panelLogTab.setAttribute('aria-selected', String(panelMode === 'log'));
+  panelChatTab.setAttribute('aria-selected', String(panelMode === 'chat'));
+  if (panelMode === 'chat') {
+    const chats = (state && state.chatMessages) || [];
+    seenChatId = chats.length ? chats[chats.length - 1].id : seenChatId;
+    chatUnread.classList.add('hidden');
+    logToggleBtn.classList.remove('has-unread');
+    renderChats();
+  }
+}
+panelLogTab.addEventListener('click', () => setPanelMode('log'));
+panelChatTab.addEventListener('click', () => setPanelMode('chat'));
+
+// ---------------- 新手玩法与牌型速查 ----------------
+const rulesOverlay = document.getElementById('rules-overlay');
+const rulesCloseBtn = document.getElementById('btn-rules-close');
+const rulesTabs = [...document.querySelectorAll('[data-rules-tab]')];
+const rulesPanels = [...document.querySelectorAll('[data-rules-panel]')];
+let rulesReturnFocus = null;
+
+const MODAL_FOCUSABLE_SELECTOR = [
+  'a[href]', 'button:not([disabled])', 'input:not([disabled]):not([type="hidden"])',
+  'select:not([disabled])', 'textarea:not([disabled])', '[contenteditable="true"]',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',');
+
+function isVisibleAndEnabled(element) {
+  if (!element || !element.isConnected || element.disabled || element.closest('.hidden')) return false;
+  const style = getComputedStyle(element);
+  return style.display !== 'none' && style.visibility !== 'hidden' && element.getClientRects().length > 0;
+}
+
+function getModalFocusableElements(overlay) {
+  return [...overlay.querySelectorAll(MODAL_FOCUSABLE_SELECTOR)].filter(isVisibleAndEnabled);
+}
+
+function getTopOpenModal() {
+  const overlays = [settingsOverlay, resultOverlay, rulesOverlay]
+    .filter((overlay) => overlay && isVisibleAndEnabled(overlay));
+  return overlays.reduce((top, candidate) => {
+    if (!top) return candidate;
+    const topZ = Number.parseInt(getComputedStyle(top).zIndex, 10) || 0;
+    const candidateZ = Number.parseInt(getComputedStyle(candidate).zIndex, 10) || 0;
+    if (candidateZ !== topZ) return candidateZ > topZ ? candidate : top;
+    return top.compareDocumentPosition(candidate) & Node.DOCUMENT_POSITION_FOLLOWING
+      ? candidate : top;
+  }, null);
+}
+
+function focusFirstModalControl(overlay) {
+  const first = getModalFocusableElements(overlay)[0];
+  const fallback = overlay.querySelector('[tabindex="-1"]');
+  (first || fallback)?.focus();
+}
+
+function restoreModalFocus(preferred, fallbacks = []) {
+  const activeModal = getTopOpenModal();
+  if (activeModal) {
+    if (activeModal.contains(preferred) && isVisibleAndEnabled(preferred)) preferred.focus();
+    else focusFirstModalControl(activeModal);
+    return;
+  }
+  const candidates = [
+    preferred, ...fallbacks,
+    document.getElementById('btn-menu'), document.getElementById('btn-rules-lobby'),
+    document.getElementById('btn-create'),
+  ];
+  candidates.find(isVisibleAndEnabled)?.focus();
+}
+
+function handleModalKeyboard(event) {
+  const activeModal = getTopOpenModal();
+  if (!activeModal) return;
+
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (activeModal === rulesOverlay) closeRules();
+    else if (activeModal === resultOverlay) closeResultDetail();
+    else if (activeModal === settingsOverlay) closeSettings();
+    return;
+  }
+
+  if (event.key !== 'Tab') return;
+  const focusable = getModalFocusableElements(activeModal);
+  if (!focusable.length) {
+    event.preventDefault();
+    focusFirstModalControl(activeModal);
+    return;
+  }
+
+  const currentIndex = focusable.indexOf(document.activeElement);
+  if (event.shiftKey && currentIndex <= 0) {
+    event.preventDefault();
+    focusable[focusable.length - 1].focus();
+  } else if (!event.shiftKey && (currentIndex < 0 || currentIndex === focusable.length - 1)) {
+    event.preventDefault();
+    focusable[0].focus();
+  }
+}
+
+// 只在当前最上层对话框打开时接管 Tab 与 Esc，其余按键继续交给原有交互。
+document.addEventListener('keydown', handleModalKeyboard, true);
+
+function selectRulesTab(name) {
+  rulesTabs.forEach((tab) => {
+    const active = tab.dataset.rulesTab === name;
+    tab.classList.toggle('active', active);
+    tab.setAttribute('aria-selected', String(active));
+  });
+  rulesPanels.forEach((panel) => panel.classList.toggle('hidden', panel.dataset.rulesPanel !== name));
+}
+
+function openRules(tab = 'quick', trigger = document.activeElement) {
+  const activeModal = getTopOpenModal();
+  rulesReturnFocus = activeModal && activeModal.contains(document.activeElement)
+    ? document.activeElement : trigger;
+  selectRulesTab(tab);
+  rulesOverlay.classList.remove('hidden');
+  document.body.classList.add('modal-open');
+  rulesCloseBtn.focus();
+}
+
+function closeRules() {
+  if (rulesOverlay.classList.contains('hidden')) return;
+  rulesOverlay.classList.add('hidden');
+  document.body.classList.remove('modal-open');
+  const returnFocus = rulesReturnFocus;
+  rulesReturnFocus = null;
+  restoreModalFocus(returnFocus, [document.getElementById('btn-rules-lobby'), menuBtn]);
+}
+
+document.getElementById('btn-rules-lobby').addEventListener('click', (event) => openRules('quick', event.currentTarget));
+document.getElementById('btn-rules-game').addEventListener('click', () => {
+  closeMenu();
+  openRules('quick', menuBtn);
+});
+rulesTabs.forEach((tab) => tab.addEventListener('click', () => selectRulesTab(tab.dataset.rulesTab)));
+rulesCloseBtn.addEventListener('click', closeRules);
+rulesOverlay.addEventListener('click', (event) => { if (event.target === rulesOverlay) closeRules(); });
+document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeRules(); });
 
 // ---------------- 大厅 ----------------
 // 记住昵称：进页自动预填；URL 带 ?room=XXXXXX 时自动填邀请码（邀请链接直达）
@@ -318,7 +472,7 @@ leaveBtn.onclick = () => {
   setTimeout(() => location.replace(location.pathname), 300);
 };
 
-// 开始游戏（等待阶段且人数 >= 2 时显示）
+// 开始游戏（仅房主在等待阶段且人数 >= 2 时显示）
 document.getElementById('btn-start').onclick = () => {
   socket.emit('start_game', null, (res) => {
     if (!res.ok) flashTip(res.err);
@@ -353,7 +507,14 @@ socket.on('kicked', ({ reason }) => {
 
 // ---------------- 房管设置 ----------------
 const settingsOverlay = document.getElementById('settings-overlay');
-document.getElementById('btn-settings').onclick = () => {
+const settingsBtn = document.getElementById('btn-settings');
+const settingsFirstControl = document.getElementById('set-start-chips');
+let settingsReturnFocus = null;
+
+settingsBtn.onclick = () => {
+  const activeModal = getTopOpenModal();
+  settingsReturnFocus = activeModal && activeModal.contains(document.activeElement)
+    ? document.activeElement : settingsBtn;
   document.getElementById('set-start-chips').value = state.settings.startChips;
   document.getElementById('set-sb').value = state.settings.smallBlind;
   document.getElementById('set-bb').value = state.settings.bigBlind;
@@ -364,8 +525,16 @@ document.getElementById('btn-settings').onclick = () => {
   document.getElementById('set-locked').value = String(!!state.settings.locked);
   document.getElementById('settings-error').textContent = '';
   settingsOverlay.classList.remove('hidden');
+  settingsFirstControl.focus();
 };
-document.getElementById('btn-settings-close').onclick = () => settingsOverlay.classList.add('hidden');
+function closeSettings() {
+  if (settingsOverlay.classList.contains('hidden')) return;
+  settingsOverlay.classList.add('hidden');
+  const returnFocus = settingsReturnFocus;
+  settingsReturnFocus = null;
+  restoreModalFocus(returnFocus, [settingsBtn, menuBtn]);
+}
+document.getElementById('btn-settings-close').onclick = closeSettings;
 document.getElementById('btn-settings-save').onclick = saveSettings;
 function saveSettings() {
   const payload = {
@@ -379,7 +548,7 @@ function saveSettings() {
   };
   socket.emit('update_settings', payload, (res) => {
     if (res.ok) {
-      settingsOverlay.classList.add('hidden');
+      closeSettings();
     } else {
       document.getElementById('settings-error').textContent = res.err;
     }
@@ -392,10 +561,18 @@ socket.on('state', (s) => {
   // 一个 socket 若因历史重复请求残留在多个房间，只接收当前明确进入的房间状态。
   if (activeRoomCode && incomingCode && incomingCode !== activeRoomCode) return;
   if (!activeRoomCode && lobbyExpectedRoom && incomingCode && incomingCode !== lobbyExpectedRoom) return;
+  // 自动开出下一手时收起上一局弹窗，避免遮挡当前行动；之后仍可主动回看。
+  const autoClosedResult = !!(state && state.stage === 'handover' && s.stage !== 'handover' && resultDetailOpen);
+  if (state && state.stage === 'handover' && s.stage !== 'handover') resultDetailOpen = false;
   state = s;
   mySeat = s.youSeat;
   document.getElementById('conn-overlay').classList.add('hidden');
   render();
+  if (autoClosedResult) {
+    const returnFocus = resultReturnFocus;
+    resultReturnFocus = null;
+    restoreModalFocus(returnFocus, [resultDetailBtn, menuBtn]);
+  }
 });
 
 // 断线感知：掉线全屏提示；socket 自动重连成功后用 token 恢复座位
@@ -435,6 +612,7 @@ function render() {
     renderCommunity();
     renderMyArea();
     renderLogs();
+    renderChats();
     renderResults();
   } catch (e) {
     // 渲染异常不应白屏：把错误显示在提示区，座位区保留上次内容
@@ -793,6 +971,19 @@ function renderBets() {
       chip.style.visibility = '';
     };
 
+    // 自己的席位在牌桌外的 Hero Dock。不能从 Hero 卡中心做有限距离搜索，
+    // 否则在手机竖屏的大间距布局中搜索不到桌内点，最终会回退到手牌附近。
+    // 固定优先放在桌面下沿内侧，既表达“来自自己”，也与底牌保持明显间隔。
+    if (p.seat === mySeat) {
+      const heroX = tableRect.left + tableRect.width / 2;
+      for (const ratio of [0.82, 0.78, 0.86, 0.74]) {
+        const heroY = tableRect.top + tableRect.height * ratio;
+        if (!blocked(heroX, heroY)) { place(heroX, heroY); return; }
+      }
+      place(heroX, tableRect.top + tableRect.height * 0.82);
+      return;
+    }
+
     // 1) 沿"席位→桌心"轴：从贴卡缘向外找第一个可行点（最贴近自家席位）。
     //    起始距离用卡矩形在轴上的投影半径（正上/正下席位远小于对角半径）。
     const dMin = Math.abs(vx) * (selfRect.width / 2) + Math.abs(vy) * (selfRect.height / 2) + 2;
@@ -917,7 +1108,8 @@ function renderMyArea() {
   const rebuyBtn = document.getElementById('btn-rebuy');
   const sitOutBtn = document.getElementById('btn-sit-out');
   const sitBackBtn = document.getElementById('btn-sit-back');
-  const showStart = state.stage === 'waiting' && !state.gameOver && state.players.length >= 2;
+  const showStart = state.stage === 'waiting' && state.isHost
+    && !state.gameOver && state.players.length >= 2;
   startBtn.classList.toggle('hidden', !showStart);
   const showRebuy = !state.gameOver && ['waiting', 'handover'].includes(state.stage)
     && me && me.chips === 0;
@@ -975,11 +1167,13 @@ function waitingTipText() {
   if (state.gameOver) return '游戏已结束';
   const count = state.players.length;
   if (count < 2) return `把房号 ${state.code} 发给朋友，凑齐 2 人即可开局`;
-  return `${count} 名玩家已就绪`;
+  return state.isHost ? `${count} 名玩家已就绪，可以开始游戏`
+    : `${count} 名玩家已就绪，等待房主开始`;
 }
 
 function updateActionBar(me) {
   const toCall = state.currentBet - me.roundBet;
+  const raiseAllowed = me.raiseAllowed !== false; // 兼容旧服务端：字段缺失时仍按可加注处理
   // "轮到你 · 跟注 335"式提示：金额数据全部来自服务端状态
   const hint = document.getElementById('action-hint');
   hint.innerHTML = toCall <= 0 ? '轮到你 · <b>过牌</b>'
@@ -990,12 +1184,14 @@ function updateActionBar(me) {
     : toCall >= me.chips ? `跟注全押 (${me.chips})` : `跟注 ${toCall}`;
   callBtn.onclick = () => sendAction(toCall <= 0 ? 'check' : 'call');
 
-  document.getElementById('btn-allin').onclick = () => sendAction('allin');
+  const allInBtn = document.getElementById('btn-allin');
+  allInBtn.onclick = () => sendAction('allin');
 
   // 加注面板范围：最小加注到 ~ 全部筹码。
   // 筹码不足以最小加注时（rawMin > max）合法动作只剩全押：把下限钳到全部筹码，
   // 避免 slider 出现 min>max 的非法区间、确认金额超过"最大"标签。
   const maxRaiseTo = me.roundBet + me.chips;
+  allInBtn.disabled = !raiseAllowed && maxRaiseTo > state.currentBet;
   const rawMinRaiseTo = Math.max(state.currentBet + state.minRaise,
     Math.min(state.currentBet + 1, maxRaiseTo));
   const minRaiseTo = Math.min(rawMinRaiseTo, maxRaiseTo);
@@ -1023,9 +1219,10 @@ function updateActionBar(me) {
   if (confirmBtn.firstChild && confirmBtn.firstChild.nodeType === Node.TEXT_NODE) {
     confirmBtn.firstChild.textContent = allInOnly ? '全押 ' : '确认加注 ';
   }
-  document.getElementById('raise-min-label').textContent = allInOnly
-    ? '筹码不足以最小加注，仅全押'
-    : `最小 ${minRaiseTo.toLocaleString('zh-CN')}`;
+  document.getElementById('raise-min-label').textContent = !raiseAllowed
+    ? '不足额全押未重新开放加注权'
+    : allInOnly ? '筹码不足以最小加注，仅全押'
+      : `最小 ${minRaiseTo.toLocaleString('zh-CN')}`;
   document.getElementById('raise-max-label').textContent = `最大 ${maxRaiseTo.toLocaleString('zh-CN')}`;
   const isBet = state.currentBet === 0 || state.currentBet <= me.roundBet;
   document.getElementById('raise-label').textContent = isBet ? '下注到' : '加注到';
@@ -1084,7 +1281,7 @@ function updateActionBar(me) {
 
   const raiseBtn = document.getElementById('btn-toggle-raise');
   raiseBtn.textContent = isBet ? '下注' : '加注';
-  raiseBtn.disabled = maxRaiseTo <= state.currentBet;
+  raiseBtn.disabled = maxRaiseTo <= state.currentBet || !raiseAllowed;
   raiseBtn.onclick = onRaiseToggleClick;
   document.getElementById('btn-raise-confirm').onclick = confirmRaise;
   document.getElementById('btn-raise-cancel').onclick = hideRaisePanel;
@@ -1208,6 +1405,48 @@ function renderLogs() {
   ul.scrollTop = ul.scrollHeight;
 }
 
+function renderChats() {
+  const chats = (state && Array.isArray(state.chatMessages)) ? state.chatMessages : [];
+  const ul = document.getElementById('chat-list');
+  ul.innerHTML = chats.length ? chats.map((message) => `
+    <li class="${message.seat === mySeat ? 'mine' : ''}">
+      <span>${escapeHtml(message.name)}</span>
+      <p>${escapeHtml(message.text)}</p>
+    </li>`).join('') : '<li class="chat-empty">还没有消息，先打个招呼吧</li>';
+  ul.scrollTop = ul.scrollHeight;
+
+  const latestId = chats.length ? chats[chats.length - 1].id : 0;
+  if (panelMode === 'chat' && !logPanel.classList.contains('collapsed')) {
+    seenChatId = latestId;
+    chatUnread.classList.add('hidden');
+    logToggleBtn.classList.remove('has-unread');
+  } else if (latestId > seenChatId) {
+    chatUnread.classList.remove('hidden');
+    logToggleBtn.classList.add('has-unread');
+  }
+}
+
+const chatForm = document.getElementById('chat-form');
+const chatInput = document.getElementById('chat-input');
+const chatSendBtn = document.getElementById('btn-chat-send');
+const chatError = document.getElementById('chat-error');
+chatForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const text = chatInput.value.trim();
+  if (!text || chatSendBtn.disabled) return;
+  chatSendBtn.disabled = true;
+  chatError.textContent = '';
+  socket.emit('chat_message', { text }, (res) => {
+    chatSendBtn.disabled = false;
+    if (res && res.ok) {
+      chatInput.value = '';
+      chatInput.focus();
+    } else {
+      chatError.textContent = (res && res.err) || '发送失败，请重试';
+    }
+  });
+});
+
 // ---------------- 结算（两层，§17） ----------------
 // 第一层：牌桌直显——winner 横幅 + 席位高亮 + 摊牌亮牌（renderSeats 的 revealed 逻辑）；
 // 第二层：查看本局详情——主池边池/每人结果/最佳五张/战绩（result-overlay，手动打开）。
@@ -1216,37 +1455,87 @@ let resultDetailOpen = false;
 const resultOverlay = document.getElementById('result-overlay');
 const winnerBanner = document.getElementById('winner-banner');
 const resultDetailBtn = document.getElementById('btn-result-detail');
-resultDetailBtn.addEventListener('click', () => {
+const resultCloseTopBtn = document.getElementById('btn-result-close-top');
+let resultReturnFocus = null;
+resultDetailBtn.addEventListener('click', (event) => {
+  resultReturnFocus = event.currentTarget;
   resultDetailOpen = true;
   renderResults();
+  if (!resultOverlay.classList.contains('hidden')) resultCloseTopBtn.focus();
+  else restoreModalFocus(resultReturnFocus, [menuBtn]);
 });
-document.getElementById('btn-result-close').addEventListener('click', () => {
+function closeResultDetail() {
+  if (!resultDetailOpen) return;
   resultDetailOpen = false;
   renderResults();
-});
+  const returnFocus = resultReturnFocus;
+  resultReturnFocus = null;
+  restoreModalFocus(returnFocus, [resultDetailBtn, menuBtn]);
+}
+resultCloseTopBtn.addEventListener('click', closeResultDetail);
+document.getElementById('btn-result-close').addEventListener('click', closeResultDetail);
 
 function renderResults() {
-  if (state.stage !== 'handover' || !state.results) {
+  const isCurrentResult = state.stage === 'handover' && !!state.results;
+  const r = isCurrentResult ? state.results : state.lastResult;
+  if (!r) {
+    const wasOpen = resultDetailOpen;
+    resultDetailOpen = false;
     resultOverlay.classList.add('hidden');
     resultDetailBtn.classList.add('hidden');
     winnerBanner.classList.add('hidden');
-    if (state.stage !== 'handover') resultDetailOpen = false;
+    if (wasOpen) {
+      const returnFocus = resultReturnFocus;
+      resultReturnFocus = null;
+      restoreModalFocus(returnFocus, [resultDetailBtn, menuBtn]);
+    }
     return;
   }
-  const r = state.results;
   document.getElementById('result-title').textContent =
-    r.forfeit ? '其余玩家全部弃牌' : '摊牌结算';
+    `${isCurrentResult ? '' : `第 ${r.handNumber} 局 · `}${r.forfeit ? '其余玩家全部弃牌' : '摊牌结算'}`;
 
   // 第一层：牌桌直显横幅（主池赢家 + 赢取金额 + 牌型）
   const mainPot = r.pots[0];
   const winnerNames = mainPot.winners.map((w) => escapeHtml(w.name)).join('、');
   const winnerHand = mainPot.winners[0].handName
     ? escapeHtml(mainPot.winners[0].handName) : '对手全部弃牌';
-  winnerBanner.innerHTML = `<b>${winnerNames}</b><span class="winner-amount">获胜 <em>+${mainPot.amount}</em></span>` +
-    `<span class="winner-hand">${winnerHand}${r.pots.length > 1 ? ` · 含边池 ${r.pots.length - 1} 个` : ''}</span>`;
-  winnerBanner.classList.remove('hidden');
+  const mainPotWinnerAmount = Number.isFinite(mainPot.winners[0].amountWon)
+    ? mainPot.winners[0].amountWon : mainPot.amount;
+  const mainPotAmountLabel = mainPot.winners.length > 1 ? '赢家合计分得' : '分得底池';
+  if (isCurrentResult) {
+    winnerBanner.innerHTML = `<b>${winnerNames}</b><span class="winner-amount">${mainPotAmountLabel} <em>+${mainPot.winners.length > 1 ? mainPot.amount : mainPotWinnerAmount}</em></span>` +
+      `<span class="winner-hand">${winnerHand}${r.pots.length > 1 ? ` · 含边池 ${r.pots.length - 1} 个` : ''}</span>`;
+    winnerBanner.classList.remove('hidden');
+  } else {
+    winnerBanner.classList.add('hidden');
+  }
+  resultDetailBtn.textContent = isCurrentResult ? '查看本局详情' : `回看第 ${r.handNumber} 局`;
   resultDetailBtn.classList.remove('hidden');
   resultOverlay.classList.toggle('hidden', !resultDetailOpen); // 第二层仅在主动查看时显示
+
+  const changesDiv = document.getElementById('hand-changes');
+  const changes = Array.isArray(r.changes)
+    ? [...r.changes].sort((a, b) => b.delta - a.delta)
+    : [];
+  if (changes.length) {
+    changesDiv.innerHTML = `
+      <div class="hand-change-title">本局净盈亏</div>
+      <div class="hand-change-list">
+        ${changes.map((entry) => {
+          const delta = Number(entry.delta) || 0;
+          const tone = delta > 0 ? 'gain' : (delta < 0 ? 'loss' : 'flat');
+          const label = delta > 0 ? `+${delta}` : `${delta}`;
+          return `<div class="hand-change ${tone}">
+            <span>${escapeHtml(entry.name)}</span>
+            <b>${label}</b>
+          </div>`;
+        }).join('')}
+      </div>`;
+    changesDiv.classList.remove('hidden');
+  } else {
+    changesDiv.innerHTML = '';
+    changesDiv.classList.add('hidden');
+  }
 
   const potsDiv = document.getElementById('result-pots');
   potsDiv.innerHTML = '';
@@ -1254,27 +1543,35 @@ function renderResults() {
     const row = document.createElement('div');
     row.className = 'result-pot-row';
     const label = r.pots.length > 1 ? (i === 0 ? '主池' : `边池 ${i}`) : '底池';
+    const winnerAmountLabel = (winner) => {
+      if (Number.isFinite(winner.amountWon)) return `分得 ${winner.amountWon} 筹码`;
+      if (pot.winners.length === 1) return `分得底池 ${pot.amount} 筹码`;
+      return `与 ${pot.winners.length - 1} 位赢家共享底池（个人分配未记录）`;
+    };
     row.innerHTML = `
       <div class="pot-label">${label} · ${pot.amount} 筹码</div>
       ${pot.winners.map((w) => `
         <div class="winners">
           <img class="winner-avatar" src="${avatarPng(w.seat)}" alt="" />
           <div class="winner-info">
-            <div class="winner-name"><b>${escapeHtml(w.name)}</b> 赢得 ${pot.amount} 筹码</div>
+            <div class="winner-name"><b>${escapeHtml(w.name)}</b> ${winnerAmountLabel(w)}</div>
             ${w.handName ? `<div class="hand-name">牌型: ${w.handName}</div>` : '<div class="hand-name">对手全部弃牌</div>'}
-            ${winnerCardsHtml(w)}
+            ${winnerCardsHtml(w, r.community)}
           </div>
         </div>`).join('')}
     `;
     potsDiv.appendChild(row);
   });
 
+  renderShowdownReview(r);
+  renderActionTimeline(r);
+
   renderSession();
 
   // 我赢钱了：播放胜利音效 + 倒计时只在结算变化时启动一次
   // （否则 handover 阶段每次状态推送都会重置倒计时）
-  const resultKey = `${state.handNumber}_${r.pots.map((p) => p.winners.map((w) => w.seat).join(',')).join('|')}`;
-  if (lastResultKey !== resultKey) {
+  const resultKey = `${r.handNumber}_${r.pots.map((p) => p.winners.map((w) => w.seat).join(',')).join('|')}`;
+  if (isCurrentResult && lastResultKey !== resultKey) {
     lastResultKey = resultKey;
     clearInterval(countdownTimer);
     countdown = cfg().nextHandDelay || 20;
@@ -1289,12 +1586,15 @@ function renderResults() {
 
   const nextTip = document.getElementById('next-tip');
   const nextBtn = document.getElementById('btn-next-hand');
-  if (state.gameOver) {
+  nextTip.classList.toggle('hidden', !isCurrentResult);
+  if (!isCurrentResult) {
+    nextBtn.classList.add('hidden');
+  } else if (state.gameOver) {
     nextTip.textContent = '游戏结束！刷新页面可开新房间。';
     nextBtn.classList.add('hidden');
   } else {
     nextTip.textContent = `${countdown} 秒后自动开始下一局…`;
-    nextBtn.classList.remove('hidden');
+    nextBtn.classList.toggle('hidden', !state.isHost);
   }
 }
 
@@ -1322,16 +1622,62 @@ function renderSession() {
 }
 
 /** 赢家的 7 张牌（底牌+公共牌），高亮实际获胜的 5 张 */
-function winnerCardsHtml(w) {
-  if (!w.hole || !w.hole.length || !state.community || !state.community.length || !w.bestCards) return '';
+function winnerCardsHtml(w, community = state.community) {
+  if (!w.hole || !w.hole.length || !community || !community.length || !w.bestCards) return '';
   const bestKeys = new Set(w.bestCards.map((c) => c.r + '_' + c.s));
-  const all = [...w.hole, ...state.community];
+  const all = [...w.hole, ...community];
   return '<div class="win-cards">' + all.map((c) => {
     const el = cardEl(c, false);
     if (bestKeys.has(c.r + '_' + c.s)) el.classList.add('hl');
     el.classList.add('mini');
     return el.outerHTML;
   }).join('') + '</div>';
+}
+
+function miniCardsHtml(cards, highlighted = cards) {
+  if (!Array.isArray(cards) || !cards.length) return '';
+  const keys = new Set((highlighted || []).map((c) => c.r + '_' + c.s));
+  return cards.map((c) => {
+    const el = cardEl(c, false);
+    el.classList.add('mini');
+    if (keys.has(c.r + '_' + c.s)) el.classList.add('hl');
+    return el.outerHTML;
+  }).join('');
+}
+
+function renderShowdownReview(r) {
+  const box = document.getElementById('result-showdown');
+  const players = Array.isArray(r.showdown) ? r.showdown : [];
+  if (!players.length) {
+    box.innerHTML = '';
+    box.classList.add('hidden');
+    return;
+  }
+  box.innerHTML = `<h3>摊牌结果</h3>${players.map((p) => `
+    <div class="showdown-row">
+      <div class="showdown-player"><b>${escapeHtml(p.name)}</b><span>${escapeHtml(p.handName)}</span></div>
+      <div class="showdown-best" aria-label="最佳五张">${miniCardsHtml(p.bestCards)}</div>
+    </div>`).join('')}`;
+  box.classList.remove('hidden');
+}
+
+function renderActionTimeline(r) {
+  const box = document.getElementById('result-timeline');
+  const actions = Array.isArray(r.actions) ? r.actions : [];
+  if (!actions.length) {
+    box.innerHTML = '';
+    box.classList.add('hidden');
+    return;
+  }
+  const streetNames = { preflop: '翻牌前', flop: '翻牌', turn: '转牌', river: '河牌' };
+  box.innerHTML = `<h3>本局过程</h3><div class="timeline-list">${actions.map((entry) => {
+    if (entry.type === 'street') {
+      const cards = miniCardsHtml(entry.cards || []);
+      return `<div class="timeline-street"><b>${streetNames[entry.street] || escapeHtml(entry.street)}</b>${cards ? `<span class="timeline-cards">${cards}</span>` : ''}</div>`;
+    }
+    return `<div class="timeline-action"><span>${escapeHtml(entry.name)}</span><b>${escapeHtml(entry.label)}</b></div>`;
+  }).join('')}</div>`;
+  box.classList.remove('hidden');
 }
 let countdown = 8;
 let countdownTimer = null;

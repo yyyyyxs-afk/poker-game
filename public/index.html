@@ -12,20 +12,27 @@
   <!-- 大厅（A1：私人好友局入口，§19） -->
   <div id="lobby" class="screen">
     <div class="lobby-card">
-      <h1>Poker Game</h1>
-      <p class="lobby-tag">好友局的线上牌桌 · 无限注德州扑克</p>
-      <p class="subtitle">盲注 10/20 · 起始筹码 2000 · 2-6 人</p>
+      <div class="lobby-brand"><img src="assets/a1/card-back.png" alt="" /><span>POKER GAME<span>私人好友局</span></span></div>
+      <h1>和朋友，开一局。</h1>
+      <p class="lobby-tag">不必坐在一起，也能同桌尽兴。</p>
+      <div class="lobby-facts" aria-label="默认牌局设置">
+        <div><b>2–6</b><span>同桌人数</span></div>
+        <div><b>2,000</b><span>起始筹码</span></div>
+        <div><b>10 / 20</b><span>默认盲注</span></div>
+      </div>
       <label>你的昵称
         <input id="nickname" type="text" maxlength="8" placeholder="昵称（每人不同）" />
       </label>
       <button id="btn-create" class="btn btn-primary">创建房间</button>
       <div class="divider">或加入好友房间</div>
       <div class="join-row">
-        <input id="room-code" type="text" maxlength="6" placeholder="6 位邀请码"
+        <input id="room-code" type="text" maxlength="6" placeholder="6 位邀请码" aria-label="好友房间邀请码"
                autocapitalize="characters" autocomplete="off" spellcheck="false" />
         <button id="btn-join" class="btn btn-secondary">加入</button>
       </div>
-      <div id="lobby-error" class="error"></div>
+      <div id="lobby-error" class="error" role="status"></div>
+      <button id="btn-rules-lobby" class="lobby-help-btn" type="button">第一次玩？查看 2 分钟说明</button>
+      <p class="lobby-footnote">无限注德州扑克 · 仅供虚拟筹码娱乐</p>
     </div>
   </div>
 
@@ -40,6 +47,7 @@
           <div id="menu-dropdown" class="hidden" role="menu">
             <button id="btn-copy-code" role="menuitem">复制房号</button>
             <button id="btn-copy-link" role="menuitem">复制邀请链接</button>
+            <button id="btn-rules-game" role="menuitem">玩法说明与牌型</button>
             <button id="btn-sit-out" role="menuitem">暂离（不参与下局）</button>
             <button id="btn-leave" class="menu-danger" role="menuitem">退出房间</button>
           </div>
@@ -139,19 +147,30 @@
 
       <aside id="log-panel">
         <div class="log-head">
-          <h3>牌局记录</h3>
+          <div class="panel-tabs" role="tablist" aria-label="牌桌消息">
+            <button id="panel-tab-log" class="active" role="tab" aria-selected="true">牌局</button>
+            <button id="panel-tab-chat" role="tab" aria-selected="false">聊天 <i id="chat-unread" class="hidden" aria-label="有新消息"></i></button>
+          </div>
           <button id="btn-log-collapse" class="icon-btn small" aria-label="收起牌局记录">
             <img src="assets/a1/icons/chevron-right.svg" alt="" />
           </button>
         </div>
-        <ul id="log-list"></ul>
+        <div id="log-view" class="panel-view"><ul id="log-list"></ul></div>
+        <div id="chat-view" class="panel-view hidden">
+          <ul id="chat-list" aria-live="polite"></ul>
+          <form id="chat-form">
+            <input id="chat-input" type="text" maxlength="80" autocomplete="off" placeholder="和朋友说点什么…" aria-label="聊天消息" />
+            <button id="btn-chat-send" type="submit">发送</button>
+          </form>
+          <div id="chat-error" aria-live="polite"></div>
+        </div>
       </aside>
     </main>
 
     <!-- 房管设置弹窗 -->
-    <div id="settings-overlay" class="overlay hidden">
-      <div id="settings-card">
-        <h2>房管设置</h2>
+    <div id="settings-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div id="settings-card" tabindex="-1">
+        <h2 id="settings-title">房管设置</h2>
         <label>每人起始筹码
           <input id="set-start-chips" type="number" min="100" max="1000000" step="100" />
         </label>
@@ -202,10 +221,16 @@
     </div>
 
     <!-- 结果弹窗（Phase 6 改牌桌直显，本轮保持可用） -->
-    <div id="result-overlay" class="overlay hidden">
-      <div id="result-card">
-        <h2 id="result-title"></h2>
+    <div id="result-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="result-title">
+      <div id="result-card" tabindex="-1">
+        <div class="result-sticky-head">
+          <h2 id="result-title"></h2>
+          <button id="btn-result-close-top" type="button" class="result-close-top" aria-label="关闭复盘并返回牌桌" title="关闭复盘">×</button>
+        </div>
+        <div id="hand-changes" class="hidden"></div>
         <div id="result-pots"></div>
+        <div id="result-showdown" class="hidden"></div>
+        <div id="result-timeline" class="hidden"></div>
         <div id="session-box" class="hidden">
           <h3>本场战绩</h3>
           <table id="session-table">
@@ -221,6 +246,57 @@
           <button id="btn-next-hand" class="btn btn-primary hidden">立即开始下一局</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- 新手玩法与牌型速查：大厅和牌桌内均可打开 -->
+  <div id="rules-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="rules-title">
+    <div id="rules-card" tabindex="-1">
+      <div class="rules-head">
+        <div>
+          <span class="rules-kicker">好友局速查</span>
+          <h2 id="rules-title">两分钟看懂德州扑克</h2>
+        </div>
+        <button id="btn-rules-close" class="rules-close" type="button" aria-label="关闭玩法说明">×</button>
+      </div>
+      <div class="rules-tabs" role="tablist" aria-label="玩法说明分类">
+        <button class="rules-tab active" type="button" role="tab" aria-selected="true" data-rules-tab="quick">快速上手</button>
+        <button class="rules-tab" type="button" role="tab" aria-selected="false" data-rules-tab="hands">牌型大小</button>
+      </div>
+
+      <section class="rules-panel" data-rules-panel="quick">
+        <ol class="rules-steps">
+          <li><b>每人两张底牌</b><span>只有自己能看见。</span></li>
+          <li><b>桌面依次发五张公共牌</b><span>翻牌 3 张、转牌 1 张、河牌 1 张。</span></li>
+          <li><b>选出最强五张牌</b><span>可组合底牌和公共牌，也可以只用公共牌。</span></li>
+        </ol>
+        <div class="rules-action-grid">
+          <div><b>过牌</b><span>没人下注时不加筹码，继续看牌。</span></div>
+          <div><b>跟注</b><span>补到当前最高下注额。</span></div>
+          <div><b>加注</b><span>跟上后再提高下注额。</span></div>
+          <div><b>弃牌</b><span>放弃本局，已投入筹码不退回。</span></div>
+          <div><b>全押</b><span>押上自己剩余的全部筹码。</span></div>
+          <div><b>盲注</b><span>开局前两位玩家自动投入的小额强制下注。</span></div>
+        </div>
+        <div class="rules-note"><b>最容易忽略：</b>不是必须使用两张底牌；同样牌型先比较关键点数，再比较剩余大牌。多人全押时系统会自动计算边池。</div>
+      </section>
+
+      <section class="rules-panel hidden" data-rules-panel="hands">
+        <p class="rank-tip">从强到弱排列；牌型相同时比较组成牌型的点数，再依次比较踢脚牌。</p>
+        <ol class="hand-ranks">
+          <li><span class="rank-no">1</span><b>皇家同花顺</b><span>同花色的 10、J、Q、K、A</span></li>
+          <li><span class="rank-no">2</span><b>同花顺</b><span>同花色的五张连续点数</span></li>
+          <li><span class="rank-no">3</span><b>四条</b><span>四张相同点数</span></li>
+          <li><span class="rank-no">4</span><b>葫芦</b><span>三条加一对</span></li>
+          <li><span class="rank-no">5</span><b>同花</b><span>五张同花色，不连续</span></li>
+          <li><span class="rank-no">6</span><b>顺子</b><span>五张连续点数，花色不限</span></li>
+          <li><span class="rank-no">7</span><b>三条</b><span>三张相同点数</span></li>
+          <li><span class="rank-no">8</span><b>两对</b><span>两个不同点数的对子</span></li>
+          <li><span class="rank-no">9</span><b>一对</b><span>两张相同点数</span></li>
+          <li><span class="rank-no">10</span><b>高牌</b><span>以上都没有时比较最大单牌</span></li>
+        </ol>
+      </section>
+      <p class="rules-footer">本游戏仅供好友娱乐，不涉及真钱交易。</p>
     </div>
   </div>
 
