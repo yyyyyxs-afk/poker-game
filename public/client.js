@@ -605,6 +605,7 @@ socket.on('disconnect', () => {
 function render() {
   if (!state) return;
   try {
+    renderForfeitShowcase();
     updateWinnerSeats();
     renderTableInfo();
     renderSeats();
@@ -613,6 +614,9 @@ function render() {
     renderMyArea();
     renderLogs();
     renderChats();
+    renderWinnerShowControls();
+    renderIdentityControls();
+    renderNextHandStatus();
     renderResults();
   } catch (e) {
     // 渲染异常不应白屏：把错误显示在提示区，座位区保留上次内容
@@ -721,7 +725,7 @@ function escapeHtml(v) {
   }[ch]));
 }
 
-/** 六款真实透明 PNG 按座位号稳定映射：六人桌一席一款。 */
+/** 默认仍映射原六款；用户选择的头像编号绑定玩家身份。 */
 const AVATAR_PNGS = [
   'assets/a1/avatars/avatar-blue-headphones.png',
   'assets/a1/avatars/avatar-magenta-asym.png',
@@ -729,10 +733,18 @@ const AVATAR_PNGS = [
   'assets/a1/avatars/avatar-teal-ponytail.png',
   'assets/a1/avatars/avatar-amber-beanie.png',
   'assets/a1/avatars/avatar-violet-bangs.png',
+  'assets/a1/avatars/hk/gao-jin.png',
+  'assets/a1/avatars/hk/chan-siuto.png',
+  'assets/a1/avatars/hk/sing.png',
+  'assets/a1/avatars/hk/lung-five.png',
+  'assets/a1/avatars/hk/lung-nine.png',
+  'assets/a1/avatars/hk/hoi-tong.png',
 ];
+const AVATAR_NAMES = ['像素头像1','像素头像2','像素头像3','像素头像4','像素头像5','像素头像6','高进','陈小刀','阿星','龙五','龙九','海棠'];
 function avatarPng(seat) {
-  const count = AVATAR_PNGS.length;
-  return AVATAR_PNGS[((seat % count) + count) % count];
+  const player = state && state.players.find(p => p.seat === seat);
+  const id = player && Number.isInteger(player.avatarId) && AVATAR_PNGS[player.avatarId] ? player.avatarId : ((seat % 6) + 6) % 6;
+  return AVATAR_PNGS[id];
 }
 
 /** 座位围绕椭圆分布，自己固定在底部（Hero Dock），其余席位在桌沿顺时针排布：
@@ -783,10 +795,11 @@ function seatCardHtml(p, isMe) {
     ? '<span class="dealer-badge" title="庄家">D</span>' : '';
   return `
     ${dealer}
-    <img class="avatar-img" src="${avatarPng(p.seat)}" alt="${escapeHtml(p.name)} 的像素头像" />
+    <img class="avatar-img" src="${avatarPng(p.seat)}" alt="${escapeHtml(p.name)} 的头像" />
     <div class="seat-copy">
       <strong>${escapeHtml(p.name)}</strong>
       <span class="seat-chips">${p.chips}</span>
+
     </div>
     ${stateBadge ? `<span class="state-badge">${stateBadge}</span>` : ''}
     ${isTurn ? '<span class="turn-dot" aria-label="正在行动"></span>' : ''}
@@ -808,8 +821,11 @@ function renderSeats() {
   const players = state.players;
   players.forEach((p) => {
     if (p.seat === mySeat) return; // 自己固定渲染在 Hero Dock
-    const relIdx = (p.seat - (mySeat >= 0 ? mySeat : 0) + players.length) % players.length;
-    const pos = seatPosition(relIdx, players.length);
+    const choosing = state.stage === 'waiting' && state.handNumber === 0;
+    const total = choosing ? 6 : players.length;
+    const mine = players.find(x => x.seat === mySeat);
+    const relIdx = choosing ? (p.lobbySeat - (mine ? mine.lobbySeat : 0) + 6) % 6 : (p.seat - (mySeat >= 0 ? mySeat : 0) + total) % total;
+    const pos = seatPosition(relIdx, total);
 
     const div = document.createElement('div');
     div.className = 'seat' + (p.folded ? ' folded-seat' : '') +
@@ -825,7 +841,9 @@ function renderSeats() {
 
     // 仅用服务端公开的 holeCount 画牌背；牌面仍只在 revealed 后读取 p.hole，绝不推测底牌。
     const holeDiv = div.querySelector('.hole-cards');
-    if (p.hole && p.hole.length && state.revealed) {
+    if (p.shownCards && p.shownCards.length) {
+      // 自愿公开在席位文字与复盘显示，避免顶部牌面覆盖手机页头。
+    } else if (p.hole && p.hole.length && state.revealed) {
       p.hole.forEach((c) => holeDiv.appendChild(cardEl(c, false)));
     } else if (!state.revealed && p.inHand && !p.folded && p.holeCount > 0 &&
         ['preflop', 'flop', 'turn', 'river', 'showdown'].includes(state.stage)) {
@@ -885,7 +903,7 @@ function renderHeroSeat(me) {
   box.innerHTML = `
     <div class="seat-card me-seat${isTurn ? ' is-current' : ''}${me.folded ? ' folded-seat' : ''}${winnerSeats.has(me.seat) ? ' winner-seat' : ''}">
       ${me.isDealer && state.stage !== 'waiting' ? '<span class="dealer-badge" title="庄家">D</span>' : ''}
-      <img class="avatar-img" src="${avatarPng(me.seat)}" alt="我的像素头像" />
+      <img class="avatar-img" src="${avatarPng(me.seat)}" alt="我的头像" />
       <div class="seat-copy">
         <strong>${escapeHtml(me.name)}</strong>
         <span class="seat-chips">${me.chips}</span>
@@ -1576,8 +1594,9 @@ function renderResults() {
     clearInterval(countdownTimer);
     countdown = cfg().nextHandDelay || 20;
     countdownTimer = setInterval(() => {
-      countdown--;
-      if (countdown <= 0) { clearInterval(countdownTimer); nextTip.textContent = '正在开始下一局…'; }
+      if (state.nextHandPaused) { nextTip.textContent = '下一局已暂停，等待房主恢复'; return; }
+      countdown = state.nextHandDeadline ? Math.max(0, Math.ceil((state.nextHandDeadline - Date.now()) / 1000)) : 0;
+      if (countdown <= 0) { nextTip.textContent = state.nextHandDeadline ? '正在开始下一局…' : '等待可参与玩家或重买后继续'; }
       else nextTip.textContent = `${countdown} 秒后自动开始下一局…`;
     }, 1000);
     const meWon = r.pots.some((p) => p.winners.some((w) => w.seat === mySeat));
@@ -1589,11 +1608,14 @@ function renderResults() {
   nextTip.classList.toggle('hidden', !isCurrentResult);
   if (!isCurrentResult) {
     nextBtn.classList.add('hidden');
+  } else if (state.nextHandPaused) {
+    nextTip.textContent = '下一局已暂停，等待房主恢复';
+    nextBtn.classList.add('hidden');
   } else if (state.gameOver) {
     nextTip.textContent = '游戏结束！刷新页面可开新房间。';
     nextBtn.classList.add('hidden');
   } else {
-    nextTip.textContent = `${countdown} 秒后自动开始下一局…`;
+    nextTip.textContent = state.nextHandDeadline ? `${Math.max(0, Math.ceil((state.nextHandDeadline - Date.now()) / 1000))} 秒后自动开始下一局…` : '等待可参与玩家或重买后继续';
     nextBtn.classList.toggle('hidden', !state.isHost);
   }
 }
@@ -1623,6 +1645,7 @@ function renderSession() {
 
 /** 赢家的 7 张牌（底牌+公共牌），高亮实际获胜的 5 张 */
 function winnerCardsHtml(w, community = state.community) {
+  if (w.voluntaryCards && w.voluntaryCards.length) return '<div class="hand-name">自愿亮牌</div><div class="win-cards">' + w.voluntaryCards.map(e => `<span>${e.index === 0 ? '左' : '右'}张${miniCardsHtml([e.card], [])}</span>`).join('') + '</div>';
   if (!w.hole || !w.hole.length || !community || !community.length || !w.bestCards) return '';
   const bestKeys = new Set(w.bestCards.map((c) => c.r + '_' + c.s));
   const all = [...w.hole, ...community];
@@ -1736,3 +1759,118 @@ function showEmojiBubble(seat, emoji) {
   setTimeout(() => b.remove(), 1600);
   tone(880, 0.08, 0, 'sine', 0.05);
 }
+
+function renderNextHandStatus() {
+  const paused = !!state.nextHandPaused;
+  const btn = document.getElementById('btn-pause-next');
+  btn.classList.toggle('hidden', !state.isHost);
+  btn.textContent = paused ? '恢复下一局' : '暂停下一局';
+  btn.setAttribute('aria-pressed', String(paused));
+  document.getElementById('next-hand-status').textContent = isForfeitIntermission() ? forfeitStatus() : (paused ? '下一局已暂停，当前手照常进行' : '');
+  const settled = ['waiting', 'handover'].includes(state.stage);
+  document.getElementById('btn-export-session').disabled = !settled;
+  document.getElementById('export-session-tip').textContent = settled
+    ? '导出已结算战绩，包含已离场记录；离场筹码按离场时记录。'
+    : '本手尚未结算，请在局间下载战绩。';
+}
+document.getElementById('btn-pause-next').onclick = () => {
+  socket.emit('set_next_hand_paused', { paused: !state.nextHandPaused }, res => {
+    if (!res || !res.ok) alert((res && res.err) || '操作失败');
+  });
+};
+document.getElementById('btn-export-session').onclick = () => {
+  socket.emit('export_session', null, res => {
+    if (!res || !res.ok) return alert((res && res.err) || '导出失败');
+    const url = URL.createObjectURL(new Blob([res.csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url; link.download = res.filename; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+};
+
+function renderIdentityControls() {
+  const me = state.players.find(p => p.seat === mySeat);
+  const panel = document.getElementById('identity-controls');
+  panel.classList.toggle('hidden', !me || state.stage !== 'waiting' || state.handNumber !== 0);
+  if (!me) return;
+  const canMove = state.stage === 'waiting' && state.handNumber === 0;
+  const select = document.getElementById('identity-seat');
+  select.disabled = !canMove;
+  select.innerHTML = Array.from({length:6}, (_,i) => {
+    const occupant = state.players.find(p => !p.left && p.lobbySeat === i);
+    return `<option value="${i}" ${i === me.lobbySeat ? 'selected' : ''} ${occupant && occupant !== me ? 'disabled' : ''}>${i+1}号座位${occupant ? (occupant === me ? '（我）' : '（有人）') : '（空位）'}</option>`;
+  }).join('');
+  document.getElementById('identity-seat-tip').textContent = canMove ? '座号按顺时针排列，首次开局后固定。' : '已开局，座位固定。';
+  document.querySelectorAll('[data-avatar-id]').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.avatarId) === me.avatarId)));
+}
+const avatarChoices = document.getElementById('identity-avatars');
+avatarChoices.innerHTML = [{label:'原像素头像',start:0,end:6},{label:'港片人物',start:6,end:12}].map(group => `<fieldset class="avatar-group"><legend>${group.label}</legend><div class="avatar-options ${group.start ? 'hk-options' : ''}">${AVATAR_PNGS.slice(group.start,group.end).map((src,idx) => {
+  const i = idx + group.start;
+  return `<button type="button" data-avatar-id="${i}" aria-label="${AVATAR_NAMES[i]}" title="${AVATAR_NAMES[i]}"><img loading="lazy" decoding="async" src="${src}" width="38" height="38" alt="" />${group.start ? `<span>${AVATAR_NAMES[i]}</span>` : ''}</button>`;
+}).join('')}</div></fieldset>`).join('');
+avatarChoices.onclick = e => {
+  const b = e.target.closest('[data-avatar-id]');
+  if (b) socket.emit('choose_avatar', {avatarId:Number(b.dataset.avatarId)}, r => { if (!r.ok) alert(r.err); });
+};
+document.getElementById('identity-seat').onchange = e => socket.emit('choose_seat', {seat:Number(e.target.value)}, r => { if (!r.ok) { alert(r.err); renderIdentityControls(); } });
+
+function renderWinnerShowControls() {
+  const box = document.getElementById('winner-show-controls');
+  const winner = state.results && state.results.forfeit && state.results.pots[0].winners[0];
+  const allowed = state.stage === 'handover' && winner && winner.seat === mySeat;
+  box.classList.toggle('hidden', !allowed);
+  if (!allowed) { box.innerHTML = ''; return; }
+  const shown = (winner.voluntaryCards || []).map(e => e.index);
+  box.innerHTML = '<span>自愿亮牌</span>' + [[0,'左张'],[1,'右张'],[2,'两张']].map(([i,label]) => `<button type="button" class="btn btn-ghost btn-small" data-show-index="${i}" data-show-hand="${state.handNumber}" ${i === 2 ? (shown.length === 2 ? 'disabled' : '') : (shown.includes(i) ? 'disabled' : '')}>${label}${shown.includes(i) ? '已亮' : ''}</button>`).join('');
+}
+document.getElementById('winner-show-controls').onclick = e => {
+  const b = e.target.closest('[data-show-index]');
+  if (!b) return;
+  const i = Number(b.dataset.showIndex);
+  socket.emit('show_winner_cards', {handNumber:Number(b.dataset.showHand), indices:i === 2 ? [0,1] : [i]}, r => { if (!r.ok) flashTip(r.err); });
+};
+
+function isForfeitIntermission() { return state && state.stage === 'handover' && state.results && state.results.forfeit; }
+function forfeitStatus() {
+  if (state.nextHandPaused) return '下一局已暂停';
+  if (state.nextHandDeadline) return `下一局 ${Math.max(0, Math.ceil((state.nextHandDeadline-Date.now())/1000))} 秒`;
+  return '等待玩家就绪';
+}
+// 动画去重只用内存；首次当前手快照作为基线，刷新/重连不重播已亮牌。
+const revealSeen = new Set();
+const revealHands = new Set();
+function renderForfeitShowcase() {
+  const active = isForfeitIntermission();
+  document.getElementById('table').classList.toggle('forfeit-intermission', !!active);
+  document.getElementById('play-stage').classList.toggle('forfeit-summary', !!active);
+  const panel = document.getElementById('forfeit-showcase');
+  panel.classList.toggle('hidden', !active);
+  if (!active) { panel.innerHTML=''; delete panel.dataset.key; return; }
+  const winner = state.results.pots[0].winners[0];
+  const shown = winner.voluntaryCards || [];
+  const handKey = `${state.code}:${state.handNumber}`;
+  const firstSnapshot = !revealHands.has(handKey);
+  revealHands.add(handKey);
+  const key = handKey + JSON.stringify(shown);
+  if (panel.dataset.key === key) return;
+  panel.dataset.key=key;
+  const amount = Number.isFinite(winner.amountWon) ? winner.amountWon : state.results.pots[0].amount;
+  panel.innerHTML=`<div class="showcase-owner"><img src="${avatarPng(winner.seat)}" alt="" /><b>${escapeHtml(winner.name)}</b><span>分得 ${amount}</span></div><div class="showcase-cards"></div>`;
+  const slots=panel.querySelector('.showcase-cards');
+  for (let index=0;index<2;index++) {
+    const entry=shown.find(e=>e.index===index);
+    const slot=document.createElement('div');slot.className='showcase-slot';slot.setAttribute('aria-label',`${index===0?'左':'右'}张${entry?'已公开':'未公开'}`);
+    if(entry) {
+      slot.appendChild(cardEl(entry.card,false));
+      const seenKey=handKey+':'+index;
+      if(!firstSnapshot && !revealSeen.has(seenKey)) slot.classList.add('reveal-flip');
+      revealSeen.add(seenKey);
+    } else {
+      const back=document.createElement('img');back.src='assets/a1/card-back.png';back.alt='未公开';back.className='showcase-back';slot.appendChild(back);
+    }
+    slots.appendChild(slot);
+  }
+
+}
+setInterval(()=>{if(isForfeitIntermission()) document.getElementById('next-hand-status').textContent=forfeitStatus();},1000);
+window.addEventListener('resize', () => { if (isForfeitIntermission()) { renderSeats(); renderBets(); } });

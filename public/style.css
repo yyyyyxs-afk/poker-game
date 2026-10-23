@@ -1096,6 +1096,7 @@ body.modal-open { overflow: hidden; }
    牌面与席位保持真机已验证的压缩档；手牌微压保 568 高一屏；
    下侧翼席位对与社区牌带的纵向避让由 seatPosition 的 veryNarrow 档负责 */
 @media (max-width: 420px) {
+  #next-hand-status { max-width: 100%; padding: 0 4px; text-align: center; font-size: 12px; line-height: 1.3; }
   #lobby { padding: 16px 0; }
   .lobby-card { padding: 26px 22px 20px; border-radius: 20px; }
   .lobby-brand { margin-bottom: 20px; }
@@ -1180,3 +1181,61 @@ body.modal-open { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+#identity-controls { width: min(100%, 310px); font-size: 12px; text-align: center; }
+#identity-controls summary { cursor: pointer; color: var(--a1-text-soft); padding: 4px; }
+#identity-controls[open] { padding: 8px; border: 1px solid var(--a1-line); border-radius: 10px; background: var(--a1-surface-raised); }
+#identity-avatars { margin:6px 0; }
+.avatar-group { border:0; margin:8px 0; padding:0; min-width:0; }
+.avatar-group legend { color:var(--a1-text-soft); margin-bottom:5px; }
+.avatar-options { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:3px; }
+.avatar-options.hk-options { grid-template-columns:repeat(3,minmax(0,1fr)); }
+#identity-avatars button span { display:block; font-size:11px; color:var(--a1-text-soft); }
+#identity-avatars .hk-options img { width:38px; height:38px; object-fit:contain; image-rendering:auto; }
+#identity-avatars button { border:1px solid transparent; background:transparent; border-radius:6px; padding:3px; cursor:pointer; }
+#identity-avatars button[aria-pressed="true"] { border-color: var(--a1-action); }
+#identity-avatars img { width:30px; height:30px; image-rendering:pixelated; }
+#identity-seat { max-width: 180px; padding:4px; background:var(--a1-canvas-soft); color:var(--a1-text-soft); }
+#identity-seat-tip { margin:5px 0 0; }
+
+#winner-show-controls { display:flex; align-items:center; justify-content:center; gap:5px; font-size:12px; flex-wrap:wrap; }
+#winner-show-controls .btn { padding:4px 8px; min-height:30px; font-size:12px; }
+
+.voluntary-label { font-size:10px; color:var(--a1-text-soft); white-space:nowrap; }
+
+/* 只调整弃牌单赢的桌心信息，不移动桌形/环桌席位。 */
+.forfeit-intermission #bets,.forfeit-summary #toast,.forfeit-intermission #stage-label,
+.forfeit-intermission #pot-display,.forfeit-intermission #winner-banner { display:none!important; }
+.forfeit-intermission #table-inner { gap:8px; }
+.forfeit-intermission .winner-seat .seat-card { box-shadow:0 0 12px rgba(184,165,114,.25); }
+#forfeit-showcase { display:flex; flex-direction:column; align-items:center; gap:8px; }
+.showcase-owner { display:flex; gap:8px; align-items:center; color:var(--a1-felt-ink); font-size:13px; }
+.showcase-owner img { width:28px; height:28px; object-fit:contain; }
+.showcase-owner b { max-width:100px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.showcase-cards { display:flex; gap:10px; }
+.showcase-slot { width:54px; height:76px; }
+.showcase-slot .card,.showcase-back { width:100%; height:100%; object-fit:contain; }
+.reveal-flip { animation:voluntaryFlip .32s ease-out; }
+@keyframes voluntaryFlip { from { transform:perspective(300px) rotateY(85deg) scale(.96); } 65% { transform:perspective(300px) rotateY(-5deg) scale(1.04); } to { transform:none; } }
+@media(max-width:900px) {
+ .forfeit-intermission #table-inner { gap:6px; padding-top:20px; }
+ #forfeit-showcase { gap:4px; }
+ .showcase-owner { font-size:11px; gap:5px; line-height:22px; }
+ .showcase-owner img { width:22px; height:22px; }
+ .showcase-slot { width:38px; height:54px; }
+ .forfeit-intermission #community { gap:4px; }
+ .forfeit-intermission #community .card-slot { width:30px; height:42px; }
+}
+@media(max-width:340px) {
+ .forfeit-intermission #table-inner { padding-top:28px; }
+ .showcase-owner { line-height:18px; }
+ .showcase-owner img { width:18px; height:18px; }
+ .showcase-slot { width:32px; height:45px; }
+ .showcase-slot .card .idx b { font-size:11px; }
+ .showcase-slot .card .pip { font-size:17px; }
+ .forfeit-intermission #community .card-slot { width:26px; height:36px; }
+ .forfeit-intermission #community .card .idx b { font-size:10px; }
+ .forfeit-intermission #community .card .pip { font-size:16px; }
+}
+@media(prefers-reduced-motion:reduce) { .reveal-flip { animation:none!important; } }
+.forfeit-intermission .seat.folded-seat,.forfeit-summary .seat-card.folded-seat { opacity:1; }
