@@ -5,17 +5,34 @@ const {server,io,rooms,applyAction}=require('../server');
 const clients=[];
 let room,busy=false;
 server.listen(0,'127.0.0.1',()=>console.log(`UI_PORT=${server.address().port}`));
-const poll=setInterval(async()=>{
-  if(busy||room||!rooms.size)return;busy=true;room=[...rooms.values()][0];
-  for(const name of ['高进','陈小刀','阿星','龙五','海棠']){
-    const s=connect(`http://127.0.0.1:${server.address().port}`,{transports:['websocket']});clients.push(s);
-    await new Promise(r=>s.once('connect',r));await new Promise(r=>s.emit('join_room',{code:room.code,name},r));
-  }
-  room.settings.actionTime=600;room.nextHandPaused=true;
-  console.log(`UI_ROOM=${room.code}，6人就绪；输入 win 昵称 可确定性结束本手`);
+const poll=setInterval(()=>{
+  const latest=[...rooms.values()].at(-1);
+  if(!latest||latest===room)return;
+  room=latest;room.settings.actionTime=600;room.nextHandPaused=true;
+  console.log(`UI_ROOM=${room.code}，输入 bots 3/5 加好友，turn 昵称/flop 昵称准备行动，win 昵称结算，next续局`);
 },100);
-readline.createInterface({input:process.stdin}).on('line',line=>{
+readline.createInterface({input:process.stdin}).on('line',async line=>{
   if(!room)return;
+  if(line.startsWith('bots ')){
+    const count=Math.min(Number(line.slice(5)),6-room.players.filter(p=>!p.left).length);
+    const current=room;
+    for(let i=0;i<count;i++){
+      const name=['高进','陈小刀','阿星','龙五','海棠'][current.players.length-1];
+      const s=connect(`http://127.0.0.1:${server.address().port}`,{transports:['websocket']});clients.push(s);
+      await new Promise(r=>s.once('connect',r));await new Promise(r=>s.emit('join_room',{code:current.code,name},r));
+    }
+    return console.log(`UI_PLAYERS=${current.players.length}`);
+  }
+  if(line.startsWith('turn ')||line.startsWith('flop ')){
+    const flop=line.startsWith('flop '),name=line.slice(5).trim();
+    for(let i=0;i<35&&room.stage!=='handover';i++){
+      const p=room.players[room.turnSeat];
+      if(p?.name===name&&(!flop||room.stage==='flop'))break;
+      if(!p)break;
+      applyAction(room,room.turnSeat,p.roundBet===room.currentBet?'check':'call');
+    }
+    return console.log(`UI_TURN=${room.players[room.turnSeat]?.name} stage=${room.stage}`);
+  }
   if(line==='next'){
     const host=room.players.find(p=>p.name===room.hostName);
     const s=io.sockets.sockets.get(host?.socketId);

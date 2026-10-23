@@ -55,16 +55,15 @@ console.log('✓ 确定性：3–6人冻结/解冻/逐轮固定1BB支付守恒�
   assert.strictEqual(r.results.changes.reduce((s,p)=>s+p.delta,0),0);assert.strictEqual(assets(r),8000);
 }
 async function open(){const s=connect(`http://127.0.0.1:${server.address().port}`,{transports:['websocket']});sockets.push(s);s.on('state',v=>s.latest=v);await new Promise(r=>s.once('connect',r));return s;}
-async function table(n){const ss=[];for(let i=0;i<n;i++)ss.push(await open());const cr=await ok(ss[0],'create_room',{name:'甲'});const names=['甲','乙','丙','丁','戊','己'];const joins=[cr];for(let i=1;i<n;i++)joins.push(await ok(ss[i],'join_room',{code:cr.code,name:names[i]}));return {ss,r:rooms.get(cr.code),joins};}
+async function table(n,config={mode:'squid'}){const ss=[];for(let i=0;i<n;i++)ss.push(await open());const cr=await ok(ss[0],'create_room',{name:'甲',...config});const names=['甲','乙','丙','丁','戊','己'];const joins=[cr];for(let i=1;i<n;i++)joins.push(await ok(ss[i],'join_room',{code:cr.code,name:names[i]}));return {ss,r:rooms.get(cr.code),joins};}
 async function foldTo(r,name){let turns=0;while(r.stage!=='handover'){assert.ok(turns++<25);const p=r.players[r.turnSeat],s=sockets.find(s=>s.id===p.socketId);await ok(s,'action',{type:p.name===name?(p.roundBet===r.currentBet?'check':'call'):'fold'});}}
 async function next(host,r){await ok(host,'set_next_hand_paused',{paused:false});await ok(host,'next_hand');await ok(host,'set_next_hand_paused',{paused:true});}
 (async()=>{await new Promise(r=>server.listen(0,'127.0.0.1',r));try{
-  const {ss,r,joins}=await table(2);assert.strictEqual(ss[0].latest.squid.enabled,false);
-  assert.strictEqual((await req(ss[0],'set_squid',{enabled:true})).ok,false);
-  const third=await open();ss.push(third);joins.push(await ok(third,'join_room',{code:r.code,name:'丙'}));
+  {const {ss,r}=await table(2,{});assert.strictEqual(ss[0].latest.squid.enabled,false);assert.strictEqual((await req(ss[0],'set_squid',{enabled:true})).ok,false);assert.strictEqual(r.mode,'classic');}
+  const {ss,r,joins}=await table(3);assert.strictEqual(ss[0].latest.squid.enabled,true);
   for(const data of [null,{enabled:'true'},{enabled:true,amount:999}])assert.strictEqual((await req(ss[0],'set_squid',data)).ok,false);
   assert.strictEqual((await req(ss[1],'set_squid',{enabled:true})).ok,false);
-  await ok(ss[0],'set_squid',{enabled:true});assert.ok(r.players.every(p=>!p.squidFrozen),'显式开启后仍要到开轮才冻结');
+  assert.ok(r.players.every(p=>!p.squidFrozen),'创建鱿鱼房后仍要到开轮才冻结');
   await ok(ss[0],'start_game');await ok(ss[0],'set_next_hand_paused',{paused:true});
   assert.strictEqual(assets(r),r.economyTotal);assert.ok(r.players.every(p=>p.handStartChips===2000));
   assert.strictEqual((await req(ss[0],'set_squid',{enabled:false})).ok,false);assert.strictEqual((await req(ss[0],'cancel_squid_round')).ok,false);
@@ -91,10 +90,10 @@ async function next(host,r){await ok(host,'set_next_hand_paused',{paused:false})
   const snapshot=r.players.map(squid.estate);squid.finishHand(r);assert.deepStrictEqual(r.players.map(squid.estate),snapshot);
   await next(ss[0],r);assert.strictEqual(r.squid.current.round,2);assert.ok(r.players.every(p=>p.squidFrozen===40));
   await foldTo(r,'甲');assert.strictEqual((await req(ss[1],'cancel_squid_round')).ok,false);await ok(ss[0],'cancel_squid_round');assert.strictEqual(r.squid.current,null);assert.strictEqual(r.squid.enabled,true);assert.ok(r.players.every(p=>!p.squidFrozen));
-  await ok(ss[0],'set_squid',{enabled:false});assert.strictEqual(r.squid.enabled,false);
-  console.log('✓ Socket：权限/参数/默认关闭，固定开轮，弃牌单赢隐私，断线重连保留，重复获胜，支付一次，跨轮，局间取消及CSV/盈亏');
+  assert.strictEqual((await req(ss[0],'set_squid',{enabled:false})).ok,false);assert.strictEqual(r.squid.enabled,true);
+  console.log('✓ Socket：权限/参数/默认关闭，固定开轮，弃牌单赢隐私，断线重连保留，重复获胜，支付一次，跨轮，局间取消、固定模式及CSV/盈亏');
   for(const operation of ['leave_room','kick_player']){
-    const {ss,r}=await table(4);await ok(ss[0],'set_squid',{enabled:true});await ok(ss[0],'start_game');await ok(ss[0],'set_next_hand_paused',{paused:true});
+    const {ss,r}=await table(4);await ok(ss[0],'start_game');await ok(ss[0],'set_next_hand_paused',{paused:true});
     const identities=[...r.players],before=assets(r);await ok(operation==='leave_room'?ss[2]:ss[0],operation,operation==='kick_player'?{seat:2}:null);
     assert.strictEqual(r.squid.current,null);assert.strictEqual(r.squid.enabled,true);assert.ok(r.players.every(p=>!p.squidFrozen));
     assert.strictEqual(r.stage,'preflop');assert.deepStrictEqual(r.players,identities);assert.strictEqual(assets(r),before);
@@ -103,7 +102,7 @@ async function next(host,r){await ok(host,'set_next_hand_paused',{paused:false})
     assert.ok(r.results.squidEvents.some(e=>e.type==='cancel'));
   }
   {
-    const {ss,r}=await table(3);await ok(ss[0],'set_squid',{enabled:true});r.players[2].chips=40;r.economyTotal-=1960;
+    const {ss,r}=await table(3);r.players[2].chips=40;r.economyTotal-=1960;
     assert.strictEqual((await req(ss[0],'start_game')).ok,false);assert.ok(r.players.every(p=>!p.squidFrozen));
     const buyIn=r.session.get('丙').buyIn;await ok(ss[2],'rebuy');assert.strictEqual(r.players[2].chips,2040);assert.strictEqual(r.session.get('丙').buyIn,buyIn+2000);
     await ok(ss[0],'start_game');assert.strictEqual(assets(r),r.economyTotal);
@@ -113,7 +112,7 @@ async function next(host,r){await ok(host,'set_next_hand_paused',{paused:false})
   }
   console.log('✓ Socket：局中主动退出/移除立即解冻且保留主局座序，离场存档守恒，资金不足原子拒绝与正筹码重买，新人下轮参加');
   {
-    const {ss,r}=await table(3);await ok(ss[0],'set_squid',{enabled:true});await ok(ss[0],'start_game');await ok(ss[0],'set_next_hand_paused',{paused:true});
+    const {ss,r}=await table(3);await ok(ss[0],'start_game');await ok(ss[0],'set_next_hand_paused',{paused:true});
     const p=r.players[r.turnSeat],seat=r.turnSeat;await ok(ss[seat],'action',{type:'allin'});
     assert.strictEqual(p.chips,0);assert.strictEqual(p.totalBet,1960);assert.strictEqual(p.squidFrozen,40,'全押不能动用冻结资产');
     assert.strictEqual(assets(r),r.economyTotal);
@@ -121,7 +120,7 @@ async function next(host,r){await ok(host,'set_next_hand_paused',{paused:false})
   // 不调用 next 辅助函数：条件恢复后必须靠原自动续局流程发第二手。
   for(const restore of ['reconnect','sit_back']) for(const paused of [false,true]){
     const {ss,r,joins}=await table(3);r.settings.nextHandDelay=1;
-    await ok(ss[0],'set_squid',{enabled:true});
+
     assert.strictEqual(r.handNumber,0);assert.strictEqual(r.nextHandTimer,null,'初始等待不能自动开第一手');
     await ok(ss[0],'start_game');await foldTo(r,'甲');
     const round=r.squid.current,frozen=r.players.map(squid.frozen),marked=round.members.map(m=>m.marked);
@@ -140,7 +139,7 @@ async function next(host,r){await ok(host,'set_next_hand_paused',{paused:false})
   }
   {
     const {ss,r,joins}=await table(3);r.settings.nextHandDelay=5;
-    await ok(ss[0],'set_squid',{enabled:true});await ok(ss[0],'start_game');await foldTo(r,'甲');
+    await ok(ss[0],'start_game');await foldTo(r,'甲');
     const timer=r.nextHandTimer,deadline=r.nextHandDeadline;
     ss[2].disconnect();await wait(()=>!r.players[2].connected);ss[2]=await open();await ok(ss[2],'join_room',{code:r.code,name:'丙',token:joins[2].token});
     assert.strictEqual(r.nextHandTimer,timer);assert.strictEqual(r.nextHandDeadline,deadline,'有效原截止时间不被重连延长');

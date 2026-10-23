@@ -208,6 +208,7 @@ installSignalHandler('SIGTERM', 143);
     await runNode('test/identity.test.js', {}, { timeoutMs: 60000 });
     await runNode('test/friends.test.js', {}, { timeoutMs: 60000 });
     await runNode('test/squid.test.js', {}, { timeoutMs: 60000 });
+    await runNode('test/mode-config.test.js', {}, { timeoutMs: 60000 });
 
     const port = await startServer();
     await waitForServer(port);

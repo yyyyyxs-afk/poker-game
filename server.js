@@ -5,6 +5,7 @@
  * 流程：发牌 -> 翻牌前 -> 翻牌 -> 转牌 -> 河牌 -> 摊牌（含边池分配）
  */
 const squid = require('./squid');
+const {parseCreate,paymentError}=require('./room-config');
 const express = require('express');
 const http = require('http');
 const path = require('path');
@@ -908,6 +909,7 @@ function sanitizeState(room, viewerSocketId) {
     bigBlind: room.settings.bigBlind,
     startChips: room.settings.startChips,
     settings: room.settings,
+    mode: room.mode || 'classic',
     squid: squid.snapshot(room),
     isHost: !!viewer && viewer.name === room.hostName,
     hostName: room.hostName,
@@ -1090,13 +1092,35 @@ io.on('connection', (socket) => {
 
     if (!allowRequestRate(guards.create, clientKey, reply, '创建房间过于频繁，请稍后再试')) return;
 
+    const config=parseCreate(data);
+    if(config.err)return reply({ok:false,err:config.err});
     const room = createRoom(nick.name);
+    room.mode=config.mode;
+    room.settings=config.settings;
+    room.squid={enabled:config.mode==='squid',payment:config.payment,round:0,current:null,waitingReason:null};
     const res = joinPlayer(room, socket, nick.name);
     if (res.err) {
       rooms.delete(room.code);
       return reply({ ok: false, err: res.err });
     }
     reply({ ok: true, code: room.code, token: res.token });
+  });
+
+  onSocketRequest(socket, 'room_info', (payload, reply) => {
+    const data=requireObjectPayload(payload,reply,['code']);if(!data)return;
+    if(typeof data.code!=='string'||!data.code.trim()||data.code.length>64||Object.keys(data).some(k=>k!=='code'))return reply({ok:false,err:'邀请码格式错误'});
+    if(!allowRequestRate(guards.join,clientKey,reply,'查询/加入房间过于频繁，请稍后再试'))return;
+    const room=rooms.get(data.code.trim().toUpperCase());
+    if(!room){
+      if(!allowRequestRate(guards.missingRoom,clientKey,reply,'尝试过于频繁，请稍后再试'))return;
+      return reply({ok:false,err:'房间不存在，请核对邀请码'});
+    }
+    if(room.settings.locked)return reply({ok:false,err:'房主已锁定房间，暂不接受新玩家'});
+    if(!['waiting','handover'].includes(room.stage))return reply({ok:false,err:'本局进行中，请稍等局结束后加入'});
+    const count=room.players.filter(p=>p&&!p.left).length;
+    if(count>=MAX_PLAYERS)return reply({ok:false,err:'房间已满（最多6人）'});
+    const s=room.settings;
+    reply({ok:true,info:{code:room.code,mode:room.mode||'classic',settings:{startChips:s.startChips,smallBlind:s.smallBlind,bigBlind:s.bigBlind,actionTime:s.actionTime,nextHandDelay:s.nextHandDelay,rebuyAllowed:s.rebuyAllowed},squidPayment:room.mode==='squid'?squid.snapshot(room).payment:null}});
   });
 
   onSocketRequest(socket, 'join_room', (payload, reply) => {
@@ -1199,20 +1223,23 @@ io.on('connection', (socket) => {
     reply({ ok: true });
   });
 
-  // 鱿鱼模式只能由在线房主在安全局间显式开启或取消。
+  // 创建后玩法固定，旧客户端也不能通过原切换接口改变玩法。
   onSocketRequest(socket, 'set_squid', (payload, reply) => {
-    const data=requireObjectPayload(payload,reply,['enabled']);if(!data)return;
-    if(typeof data.enabled!=='boolean'||Object.keys(data).some(k=>k!=='enabled'))return reply({ok:false,err:'模式参数无效'});
-    const room=findRoomBySocket(socket.id),p=room&&room.players.find(p=>p&&p.socketId===socket.id);
-    if(!p||p.name!==room.hostName)return reply({ok:false,err:'只有房主可以设置鱿鱼模式'});
-    if(!['waiting','handover'].includes(room.stage))return reply({ok:false,err:'请在局间设置鱿鱼模式'});
-    const current=squid.init(room);
-    if(current.enabled===data.enabled)return reply({ok:true});
-    if(data.enabled&&room.players.filter(p=>p&&!p.left).length<3)return reply({ok:false,err:'经典鱿鱼至少需要3人'});
-    if(!data.enabled)squid.cancel(room,'房主取消模式');
-    current.enabled=data.enabled;current.waitingReason=null;
-    squid.check(room);
-    scheduleNextHandIfReady(room);
+    reply({ok:false,err:'玩法在创建时固定，请退出后重新创建房间'});
+  });
+
+  onSocketRequest(socket, 'set_squid_payment', (payload, reply) => {
+    const data=requireObjectPayload(payload,reply,['payment']);if(!data)return;
+    const err=paymentError(data.payment);
+    if(err||Object.keys(data).some(k=>k!=='payment'))return reply({ok:false,err:err||'支付参数无效'});
+    const room=findRoomBySocket(socket.id),p=room&&room.players.find(p=>p&&!p.left&&p.socketId===socket.id);
+    if(!p||p.name!==room.hostName)return reply({ok:false,err:'只有房主可以修改支付额'});
+    if(room.mode!=='squid')return reply({ok:false,err:'经典德州没有鱿鱼支付设置'});
+    if(!['waiting','handover'].includes(room.stage))return reply({ok:false,err:'只能在等待或局间修改下轮支付额'});
+    const s=squid.init(room);
+    if(s.payment===data.payment)return reply({ok:true});
+    s.payment=data.payment;
+    resumeNextHandIfReady(room);
     broadcast(room);reply({ok:true});
   });
 
@@ -1220,6 +1247,7 @@ io.on('connection', (socket) => {
     if(!requireEmptyPayload(payload,reply))return;
     const room=findRoomBySocket(socket.id),p=room&&room.players.find(p=>p&&!p.left&&p.socketId===socket.id);
     if(!p||p.name!==room.hostName)return reply({ok:false,err:'只有房主可以取消本轮'});
+    if(room.mode!=='squid')return reply({ok:false,err:'经典德州没有鱿鱼轮次'});
     if(!['waiting','handover'].includes(room.stage))return reply({ok:false,err:'请在局间取消本轮'});
     squid.cancel(room,'房主取消本轮');
     squid.check(room);
@@ -1316,6 +1344,7 @@ io.on('connection', (socket) => {
       'startChips', 'smallBlind', 'bigBlind', 'actionTime', 'nextHandDelay', 'rebuyAllowed',
     ]);
     if (!data) return;
+    if(Object.keys(data).some(k=>!['startChips','smallBlind','bigBlind','actionTime','nextHandDelay','rebuyAllowed','locked'].includes(k)))return reply({ok:false,err:'设置字段无效，玩法在创建时固定'});
     const { startChips, smallBlind, bigBlind, actionTime, nextHandDelay, rebuyAllowed } = data;
     if (typeof rebuyAllowed !== 'boolean') return reply({ ok: false, err: '重买设置格式错误' });
     if (data.locked !== undefined && typeof data.locked !== 'boolean') {

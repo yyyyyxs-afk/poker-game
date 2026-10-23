@@ -282,10 +282,9 @@ function beginLobbySubmission(kind, expectedRoom = '') {
   if (lobbySubmission) return false;
   lobbySubmission = kind;
   lobbyExpectedRoom = expectedRoom;
-  createRoomBtn.disabled = true;
-  joinRoomBtn.disabled = true;
+  for(const id of ['btn-create','btn-join','btn-create-confirm','btn-create-back','btn-join-confirm'])document.getElementById(id).disabled=true;
   createRoomBtn.textContent = kind === 'create' ? '创建中…' : '创建房间';
-  joinRoomBtn.textContent = kind === 'join' ? '加入中…' : '加入';
+  joinRoomBtn.textContent = kind === 'join' ? '加入中…' : kind==='preview'?'查询中…':'加入';
   const busyBtn = kind === 'create' ? createRoomBtn : joinRoomBtn;
   busyBtn.setAttribute('aria-busy', 'true');
   showLobbyError('');
@@ -295,19 +294,20 @@ function endLobbySubmission(kind = lobbySubmission) {
   if (!lobbySubmission || kind !== lobbySubmission) return;
   lobbySubmission = '';
   lobbyExpectedRoom = '';
-  createRoomBtn.disabled = false;
-  joinRoomBtn.disabled = false;
+  for(const id of ['btn-create','btn-join','btn-create-confirm','btn-create-back','btn-join-confirm'])document.getElementById(id).disabled=false;
   createRoomBtn.textContent = '创建房间';
   joinRoomBtn.textContent = '加入';
   createRoomBtn.removeAttribute('aria-busy');
   joinRoomBtn.removeAttribute('aria-busy');
 }
 
-createRoomBtn.onclick = () => {
+document.getElementById('btn-create-confirm').onclick = () => {
   const name = getName();
   if (!name) return;
   if (!beginLobbySubmission('create')) return;
-  socket.emit('create_room', { name }, (res) => {
+  const settings={startChips:Number(document.getElementById('create-chips').value),smallBlind:Number(document.getElementById('create-sb').value),bigBlind:Number(document.getElementById('create-bb').value),actionTime:Number(document.getElementById('create-action').value),nextHandDelay:Number(document.getElementById('create-delay').value),rebuyAllowed:document.getElementById('create-rebuy').value==='true'};
+  const mode=document.getElementById('create-mode').value;
+  socket.emit('create_room', { name,mode,settings,...(mode==='squid'?{squidPayment:Number(document.getElementById('create-payment').value)}:{}) }, (res) => {
     if (lobbySubmission !== 'create') return;
     if (res && res.ok) {
       saveAuth(res.code, name, res.token);
@@ -319,7 +319,7 @@ createRoomBtn.onclick = () => {
     }
   });
 };
-joinRoomBtn.onclick = () => {
+function submitJoin() {
   const name = getName();
   const code = document.getElementById('room-code').value.trim().toUpperCase();
   if (!name) return;
@@ -336,7 +336,54 @@ joinRoomBtn.onclick = () => {
       showLobbyError((res && res.err) || '加入失败，请稍后重试');
     }
   });
+ }
+let previewCode='';
+joinRoomBtn.onclick=()=>{
+  const name=getName(),code=document.getElementById('room-code').value.trim().toUpperCase();
+  if(!name)return;
+  if(!/^[A-Z0-9]{6}$/.test(code))return showLobbyError('请输入6位邀请码');
+  if(storedToken()[`${code}_${name}`])return submitJoin();
+  if(!beginLobbySubmission('preview',code))return;
+  document.getElementById('join-preview').classList.add('hidden');
+  socket.emit('room_info',{code},res=>{
+    if(lobbySubmission!=='preview')return;
+    endLobbySubmission('preview');
+    if(!res?.ok)return showLobbyError(res?.err||'查询失败');
+    if(document.getElementById('room-code').value.trim().toUpperCase()!==code)return;
+    previewCode=code;
+    const info=res.info,c=info.settings;
+    document.getElementById('join-preview-text').textContent=`${info.mode==='squid'?'鱿鱼德州 · 52张 · 3–6人':'经典德州 · 52张 · 2–6人'}。起始${c.startChips}，盲注${c.smallBlind}/${c.bigBlind}，行动${c.actionTime}秒，局间${c.nextHandDelay}秒，${c.rebuyAllowed?'允许':'禁止'}重买。${info.mode==='squid'?`下轮末位向每人支付${info.squidPayment}筹码，新加入者从下一轮参加；冻结按实际开轮人数计算。`:''}玩法固定，加入时以房主当前设置为准。`;
+    document.getElementById('join-preview').classList.remove('hidden');
+  });
 };
+document.getElementById('btn-join-confirm').onclick=()=>{
+  if(previewCode!==document.getElementById('room-code').value.trim().toUpperCase())return showLobbyError('邀请码已变化，请重新查询房间说明');
+  submitJoin();
+};
+document.getElementById('room-code').addEventListener('input',()=>document.getElementById('join-preview').classList.add('hidden'));
+function showCreateOptions(open){
+  document.getElementById('create-options').classList.toggle('hidden',!open);
+  for(const id of ['btn-create','join-divider','join-entry'])document.getElementById(id).classList.toggle('hidden',open);
+  document.querySelector('.lobby-facts').classList.toggle('hidden',open);
+  document.getElementById('join-preview').classList.add('hidden');
+  showLobbyError('');
+  if(open)document.getElementById('create-mode').focus();else createRoomBtn.focus();
+}
+createRoomBtn.onclick=()=>showCreateOptions(true);
+document.getElementById('btn-create-back').onclick=()=>showCreateOptions(false);
+let createPaymentTouched=false;
+function renderCreateOptions(){
+  const isSquid=document.getElementById('create-mode').value==='squid';
+  document.getElementById('create-squid-settings').classList.toggle('hidden',!isSquid);
+  document.getElementById('create-mode-tip').textContent=isSquid?'普通52张德州叠加经典鱿鱼；玩法创建后固定。':'普通52张无限注德州扑克；玩法创建后固定。';
+  const p=Number(document.getElementById('create-payment').value);
+  document.getElementById('create-payment-preview').textContent=Number.isSafeInteger(p)&&p>=1&&p<=1000000?`以4人为例，实际按开轮人数：末位总付${3*p}，每人开轮冻结${3*p}。金额为绝对筹码数，不是大盲倍数。`:'请输入1–1,000,000的整数筹码。';
+}
+document.getElementById('create-mode').onchange=renderCreateOptions;
+document.getElementById('create-bb').oninput=()=>{if(!createPaymentTouched)document.getElementById('create-payment').value=document.getElementById('create-bb').value;renderCreateOptions();};
+document.getElementById('create-payment').oninput=()=>{createPaymentTouched=true;renderCreateOptions();};
+document.querySelectorAll('[data-payment]').forEach(b=>b.onclick=()=>{createPaymentTouched=true;document.getElementById('create-payment').value=b.dataset.payment;renderCreateOptions();});
+renderCreateOptions();
 function getName() {
   const n = document.getElementById('nickname').value.trim();
   if (!n) { showLobbyError('请先填写昵称'); return null; }
@@ -1129,10 +1176,10 @@ function renderMyArea() {
   const sitOutBtn = document.getElementById('btn-sit-out');
   const sitBackBtn = document.getElementById('btn-sit-back');
   const showStart = state.stage === 'waiting' && state.isHost
-    && !state.gameOver && state.players.length >= 2;
+    && !state.gameOver && state.players.filter(p=>!p.left&&p.connected&&!p.sittingOut).length >= (state.mode==='squid'?3:2);
   startBtn.classList.toggle('hidden', !showStart);
   const showRebuy = !state.gameOver && ['waiting', 'handover'].includes(state.stage)
-    && me && cfg().rebuyAllowed !== false && (me.chips === 0 || (state.squid?.enabled && !state.squid.current && state.squid.waitingReason && me.chips <= (state.players.filter(p=>p.connected&&!p.sittingOut&&!p.left).length-1)*cfg().bigBlind));
+    && me && cfg().rebuyAllowed !== false && (me.chips === 0 || (state.squid?.enabled && !state.squid.current && state.squid.waitingReason && me.chips <= (state.players.filter(p=>p.connected&&!p.sittingOut&&!p.left).length-1)*state.squid.payment));
   rebuyBtn.classList.toggle('hidden', !showRebuy);
   rebuyBtn.textContent = `重新买入（补充 ${cfg().startChips} 筹码）`;
   // 暂离/坐回按钮：对局中或局间都可以暂离；暂离状态显示坐回按钮
@@ -1186,6 +1233,7 @@ function renderMyArea() {
 function waitingTipText() {
   if (state.gameOver) return '游戏已结束';
   const count = state.players.length;
+  if(state.mode==='squid')return state.squid?.waitingReason || (state.isHost?`${count}名玩家已就绪，可开始鱿鱼德州`:`${count}名玩家已就绪，等待房主开始鱿鱼德州`);
   if (count < 2) return `把房号 ${state.code} 发给朋友，凑齐 2 人即可开局`;
   return state.isHost ? `${count} 名玩家已就绪，可以开始游戏`
     : `${count} 名玩家已就绪，等待房主开始`;
@@ -1897,32 +1945,42 @@ function squidMarkHtml(p){
   return `<span class="squid-mark${glow?' squid-glow':''}" ${glow?`style="animation-delay:-${elapsed}ms"`:''} title="本轮已得鱿鱼标记" aria-label="本轮已得鱿鱼标记">◆</span>`;
 }
 function squidEventText(e){
-  if(e.type==='round')return `第${e.round}轮开始：${e.names.join('、')}；大盲${e.bb}，每人冻结${(e.names.length-1)*e.bb}`;
+  if(e.type==='round')return `第${e.round}轮开始：${e.names.join('、')}；大盲${e.bb}，向每人支付${e.payment??e.bb}，每人冻结${(e.names.length-1)*(e.payment??e.bb)}`;
   if(e.type==='mark')return `${e.name} 主池独赢，得到标记并解冻`;
-  if(e.type==='payment')return `${e.from} 支付${e.total}，${e.to.join('、')}各收${e.bb}（1大盲）`;
+  if(e.type==='payment')return `${e.from} 支付${e.total}，${e.to.join('、')}各收${e.payment??e.bb}筹码`;
   return `第${e.round}轮取消并解冻：${e.reason}`;
 }
 function renderSquid(){
   const s=state.squid||{enabled:false},safe=['waiting','handover'].includes(state.stage);
   const progress=document.getElementById('squid-progress');
   progress.classList.toggle('hidden',!s.enabled);
-  progress.textContent=s.current?`鱿鱼第${s.current.round}轮 · ${s.current.members.filter(m=>m.marked).length}/${s.current.members.length}`:`鱿鱼 · ${s.round?`第${s.round}轮已结束`:'等待开轮'}`;
+  progress.textContent=s.current?`鱿鱼第${s.current.round}轮 · 已发${s.current.members.filter(m=>m.marked).length}/${s.current.members.length-1}`:`鱿鱼 · ${s.round?`第${s.round}轮已结束`:'等待开轮'}`;
   const controls=document.getElementById('squid-controls');
-  controls.classList.toggle('hidden',!state.isHost||!safe);
-  controls.querySelector('summary').textContent=`经典鱿鱼 · ${s.enabled?'已开启':'默认关闭'}`;
-  document.getElementById('btn-squid-toggle').textContent=s.enabled?'关闭模式并解冻':'开启经典鱿鱼';
+  controls.classList.toggle('hidden',!s.enabled||!state.isHost||!safe);
   document.getElementById('btn-squid-cancel').classList.toggle('hidden',!s.current);
-  document.getElementById('squid-control-tip').textContent=s.enabled?'取消本轮后仍保留模式，下次发牌前会尝试开启新轮。':'';
+  const roomPayment=document.getElementById('room-payment');
+  if(roomPayment.dataset.saved!==String(s.payment)){
+    if(document.activeElement!==roomPayment)roomPayment.value=s.payment;
+    roomPayment.dataset.saved=String(s.payment);
+  }
+  document.getElementById('squid-current-setting').textContent=s.current?`本轮向每人支付${s.current.payment}；下轮向每人支付${s.payment}。保存只改变下轮，本轮冻结和标记不变。`:`下轮向每人支付${s.payment}筹码。`;
+  document.querySelector('#room-setup summary').textContent=state.mode==='squid'?'鱿鱼德州 · 房间设置':'经典德州 · 房间设置';
+  document.getElementById('room-mode-info').textContent=state.mode==='squid'?'普通52张德州＋经典鱿鱼，3–6人。主池独赢得标记；一轮最多发人数−1个，最后未得标记者支付。玩法固定。':'普通52张德州扑克，2–6人。玩法固定。';
+  const c=cfg();
+  document.getElementById('room-settings-info').textContent=`起始${c.startChips} · 盲注${c.smallBlind}/${c.bigBlind} · 行动${c.actionTime}秒 · 局间${c.nextHandDelay}秒 · ${c.rebuyAllowed===false?'禁止':'允许'}重买`;
+  const preview=document.getElementById('room-payment-preview'),n=state.players.filter(p=>p.connected&&!p.sittingOut&&!p.left).length;
+  preview.classList.toggle('hidden',!s.enabled);
+  preview.textContent=s.current?`本轮${s.current.members.length}人，向每人支付${s.current.payment}，每人初始冻结${(s.current.members.length-1)*s.current.payment}；下轮向每人支付${s.payment}。新玩家下轮参加。`:n<3?`当前有效${n}人，不足3人，等待开轮。向每人支付${s.payment}。`:`当前有效${n}人：下轮末位总付${(n-1)*s.payment}，每人开轮冻结${(n-1)*s.payment}。实际以开轮人数为准。`;
   const events=state.stage==='handover'?(state.results?.squidEvents||[]):[];
   const payment=events.findLast(e=>e.type==='payment');
   const last=(s.history||[]).at(-1);
   const summary=document.getElementById('squid-summary');
-  summary.textContent=s.waitingReason||(payment?`鱿鱼：${payment.from} 付${payment.total} · 其余${payment.to.length}人各收${payment.bb}`:(safe&&last?.type==='cancel'?squidEventText(last):''));
+  summary.textContent=s.waitingReason||(payment?`鱿鱼：${payment.from} 付${payment.total} · 其余${payment.to.length}人各收${payment.payment??payment.bb}`:(safe&&last?.type==='cancel'?squidEventText(last):''));
   summary.classList.toggle('hidden',!summary.textContent);
   const r=state.stage==='handover'?state.results:state.lastResult;
   const detail=document.getElementById('squid-result'),detailEvents=r?.squidEvents||[];
   detail.classList.toggle('hidden',!detailEvents.length);
   detail.innerHTML=detailEvents.length?`<h3>鱿鱼记录</h3>${detailEvents.map(e=>`<p>${escapeHtml(squidEventText(e))}</p>`).join('')}<p>本局净盈亏已含鱿鱼收付；底池分得金额仅为德州结算。冻结、解冻不计盈亏。</p>`:'';
 }
-document.getElementById('btn-squid-toggle').onclick=()=>socket.emit('set_squid',{enabled:!state.squid?.enabled},r=>{if(!r?.ok)flashTip(r?.err||'操作失败');});
+document.getElementById('btn-squid-payment-save').onclick=()=>socket.emit('set_squid_payment',{payment:Number(document.getElementById('room-payment').value)},r=>{if(!r?.ok)flashTip(r?.err||'保存失败');else flashTip('已保存，仅下一轮生效');});
 document.getElementById('btn-squid-cancel').onclick=()=>socket.emit('cancel_squid_round',null,r=>{if(!r?.ok)flashTip(r?.err||'操作失败');});

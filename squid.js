@@ -1,7 +1,9 @@
 // 经典鱿鱼：金额仅为虚拟筹码，冻结始终属于本人。
+const {paymentError}=require('./room-config');
 const frozen = p => p.squidFrozen || 0;
 const estate = p => p.chips + frozen(p);
 function init(room) { return room.squid ||= { enabled:false, round:0, current:null, waitingReason:null }; }
+function payment(room) { return init(room).payment ?? room.settings.bigBlind; }
 function event(room, entry) {
   const s=init(room);
   const value={...entry,handNumber:room.handNumber+(entry.type==='round'?1:0),seq:(s.seq||0)+1};s.seq=value.seq;
@@ -20,23 +22,24 @@ function check(room) {
   const s=init(room);if(!s.enabled)return null;
   if(s.current){
     const online=room.players.filter(p=>p&&!p.left&&p.connected&&!p.sittingOut&&p.chips>0&&s.current.members.some(m=>m.name===p.name));
-    s.waitingReason=online.length<3?'本轮可行动参与者不足3人，请重连、重买或由房主局间取消鱿鱼':null;
+    s.waitingReason=online.length<3?'本轮可行动参与者不足3人，请重连、重买或由房主局间取消本轮':null;
     return s.waitingReason;
   }
   const players=room.players.filter(p=>p&&!p.left&&p.connected&&!p.sittingOut);
   let reason=null;
-  const reserve=(players.length-1)*room.settings.bigBlind;
-  if(players.length<3)reason='经典鱿鱼需3–6人，请等待玩家或取消模式';
-  else if(players.some(p=>p.chips<=reserve))reason=`新轮需每人冻结${reserve}且保留可下注筹码；不足者可重买或房主取消模式`;
+  const reserve=(players.length-1)*payment(room);
+  if(players.length<3)reason='鱿鱼德州需3–6人，请等待玩家；也可退出后重建经典房';
+  else if(players.length>6||paymentError(payment(room))||!Number.isSafeInteger(reserve))reason='鱿鱼支付设置无效';
+  else if(players.some(p=>p.chips<=reserve))reason=`新轮需每人冻结${reserve}且保留可下注筹码；不足者可重买，或退出后重建经典房`;
   s.waitingReason=reason;return reason;
 }
 function prepare(room) {
   const s=init(room);const reason=check(room);if(reason||!s.enabled||s.current)return reason;
   const players=room.players.filter(p=>p&&!p.left&&p.connected&&!p.sittingOut);
-  const reserve=(players.length-1)*room.settings.bigBlind;
-  s.round++;s.current={round:s.round,bb:room.settings.bigBlind,members:players.map(p=>({name:p.name,marked:false})),lastHand:-1};
+  const reserve=(players.length-1)*payment(room);
+  s.round++;s.current={round:s.round,bb:room.settings.bigBlind,payment:payment(room),members:players.map(p=>({name:p.name,marked:false})),lastHand:-1};
   for(const p of players){p.chips-=reserve;p.squidFrozen=reserve;}
-  event(room,{type:'round',round:s.round,bb:s.current.bb,names:players.map(p=>p.name)});
+  event(room,{type:'round',round:s.round,bb:s.current.bb,payment:s.current.payment,names:players.map(p=>p.name)});
   return null;
 }
 function finishHand(room) {
@@ -50,17 +53,17 @@ function finishHand(room) {
   event(room,{type:'mark',round:r.round,name:p.name});
   const remaining=r.members.filter(m=>!m.marked);
   if(remaining.length!==1)return;
-  const loser=room.players.find(p=>p&&p.name===remaining[0].name),amount=(r.members.length-1)*r.bb;
+  const loser=room.players.find(p=>p&&p.name===remaining[0].name),amount=(r.members.length-1)*r.payment;
   if(!loser||frozen(loser)!==amount)throw Error('鱿鱼冻结资产不一致');
   loser.squidFrozen=0;
-  for(const m of r.members){if(m.name===loser.name)continue;room.players.find(p=>p&&p.name===m.name).chips+=r.bb;}
-  event(room,{type:'payment',round:r.round,from:loser.name,total:amount,bb:r.bb,to:r.members.filter(m=>m.name!==loser.name).map(m=>m.name)});
+  for(const m of r.members){if(m.name===loser.name)continue;room.players.find(p=>p&&p.name===m.name).chips+=r.payment;}
+  event(room,{type:'payment',round:r.round,from:loser.name,total:amount,bb:r.bb,payment:r.payment,to:r.members.filter(m=>m.name!==loser.name).map(m=>m.name)});
   s.current=null;s.waitingReason=null;
 }
 function canRebuy(room,p) {
   const s=init(room);if(!s.enabled||s.current||!s.waitingReason)return false;
   const n=room.players.filter(x=>x&&!x.left&&x.connected&&!x.sittingOut).length;
-  return n>=3&&p.chips<=(n-1)*room.settings.bigBlind;
+  return n>=3&&p.chips<=(n-1)*payment(room);
 }
-function snapshot(room){const s=init(room);return{enabled:s.enabled,round:s.round,waitingReason:s.waitingReason,history:s.history||[],current:s.current?{round:s.current.round,bb:s.current.bb,members:s.current.members.map(m=>({...m}))}:null};}
+function snapshot(room){const s=init(room);return{enabled:s.enabled,round:s.round,payment:payment(room),waitingReason:s.waitingReason,history:s.history||[],current:s.current?{round:s.current.round,bb:s.current.bb,payment:s.current.payment,members:s.current.members.map(m=>({...m}))}:null};}
 module.exports={frozen,estate,init,cancel,check,prepare,finishHand,canRebuy,snapshot};

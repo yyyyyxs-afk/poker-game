@@ -1252,3 +1252,22 @@ body.modal-open { overflow: hidden; }
 .squid-glow { animation:squidMarkGlow .65s ease-out; }
 @keyframes squidMarkGlow { from { filter:drop-shadow(0 0 8px #80e6c1); transform:scale(1.5); } to { filter:none; transform:none; } }
 @media(prefers-reduced-motion:reduce) { .squid-glow { animation:none; } }
+
+/* 创建时先选玩法，再按需展开设置；金额始终为绝对虚拟筹码。 */
+#create-options { margin-top:18px; text-align:left; }
+.lobby-card select { width:100%; margin-top:6px; padding:10px; font:inherit; font-size:14px; color:var(--a1-text); background:var(--a1-surface-quiet); border:1px solid var(--a1-line); border-radius:8px; }
+#create-options label { margin-bottom:12px; }
+#create-options input { padding:9px 10px; }
+#create-options .settings-row { gap:12px; }
+#create-options .settings-row label { min-width:0; flex:1; }
+#create-mode-tip,.mode-note,#create-payment-preview,#join-preview-text { font-size:12px; line-height:1.6; color:var(--a1-text-soft); }
+.payment-presets { display:flex; gap:8px; }
+.payment-presets button { flex:1; padding:7px; min-height:34px; color:var(--a1-text); background:var(--a1-surface); border:1px solid var(--a1-line); border-radius:6px; cursor:pointer; }
+.create-actions { display:flex; gap:8px; margin-top:16px; }
+.create-actions .btn-primary { flex:1; width:auto; }
+#join-preview { margin-top:16px; border-top:1px solid var(--a1-line); text-align:left; }
+#join-preview h2 { font-size:16px; }
+#room-setup { width:100%; max-width:520px; font-size:11px; color:var(--a1-text-soft); }
+#room-setup summary { cursor:pointer; text-align:center; }
+#room-setup p { margin:6px 0; line-height:1.5; }
+#squid-controls input { width:100%; margin:6px 0; padding:8px; font:inherit; color:var(--a1-text); background:var(--a1-surface-quiet); border:1px solid var(--a1-line); border-radius:6px; }

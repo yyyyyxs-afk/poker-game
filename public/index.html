@@ -24,12 +24,28 @@
         <input id="nickname" type="text" maxlength="8" placeholder="昵称（每人不同）" />
       </label>
       <button id="btn-create" class="btn btn-primary">创建房间</button>
-      <div class="divider">或加入好友房间</div>
-      <div class="join-row">
+      <section id="create-options" class="hidden" aria-label="创建房间设置">
+        <label>玩法<select id="create-mode"><option value="classic">经典德州 · 52张 · 2–6人</option><option value="squid">鱿鱼德州 · 52张 · 3–6人</option></select></label>
+        <p id="create-mode-tip">普通无限注德州扑克。</p>
+        <label>起始筹码<input id="create-chips" type="number" min="100" max="1000000" step="1" value="2000" inputmode="numeric" /></label>
+        <div class="settings-row"><label>小盲注<input id="create-sb" type="number" min="1" step="1" value="10" inputmode="numeric" /></label><label>大盲注<input id="create-bb" type="number" min="1" step="1" value="20" inputmode="numeric" /></label></div>
+        <div class="settings-row"><label>行动时长<select id="create-action"><option value="20">20秒</option><option value="30">30秒</option><option value="45" selected>45秒</option><option value="60">60秒</option></select></label><label>局间时长<select id="create-delay"><option value="5">5秒</option><option value="10">10秒</option><option value="20" selected>20秒</option></select></label></div>
+        <label>允许重买<select id="create-rebuy"><option value="true">允许</option><option value="false">禁止</option></select></label>
+        <div id="create-squid-settings" class="hidden">
+          <label>末位向每人支付多少筹码<input id="create-payment" type="number" min="1" max="1000000" step="1" value="20" inputmode="numeric" /></label>
+          <div class="payment-presets" role="group" aria-label="快捷支付额"><button type="button" data-payment="20">20</button><button type="button" data-payment="50">50</button><button type="button" data-payment="100">100</button></div>
+          <p id="create-payment-preview" aria-live="polite"></p>
+          <p class="mode-note">主池独赢得标记，无需亮牌；最多发人数−1个标记。最后未得标记者支付，冻结仍属本人但不可下注。</p>
+        </div>
+        <div class="create-actions"><button id="btn-create-back" class="btn btn-secondary" type="button">返回</button><button id="btn-create-confirm" class="btn btn-primary" type="button">确认创建</button></div>
+      </section>
+      <div id="join-divider" class="divider">或加入好友房间</div>
+      <div id="join-entry" class="join-row">
         <input id="room-code" type="text" maxlength="6" placeholder="6 位邀请码" aria-label="好友房间邀请码"
                autocapitalize="characters" autocomplete="off" spellcheck="false" />
         <button id="btn-join" class="btn btn-secondary">加入</button>
       </div>
+      <section id="join-preview" class="hidden" aria-label="加入前房间说明"><h2>房间说明</h2><p id="join-preview-text"></p><button id="btn-join-confirm" class="btn btn-primary" type="button">确认加入</button></section>
       <div id="lobby-error" class="error" role="status"></div>
       <button id="btn-rules-lobby" class="lobby-help-btn" type="button">第一次玩？查看 2 分钟说明</button>
       <p class="lobby-footnote">无限注德州扑克 · 仅供虚拟筹码娱乐</p>
@@ -133,13 +149,14 @@
           <details id="identity-controls" class="hidden"><summary>我的头像与座位</summary><div id="identity-avatars"></div><label>我的座位 <select id="identity-seat"></select></label><p id="identity-seat-tip"></p></details>
           <div id="next-hand-status" aria-live="polite"></div>
           <div id="squid-summary" class="hidden" aria-live="polite"></div>
+          <details id="room-setup"><summary>房间玩法与设置</summary><p id="room-mode-info"></p><p id="room-settings-info"></p><p id="room-payment-preview" class="hidden"></p></details>
           <details id="squid-controls" class="hidden">
-            <summary>经典鱿鱼 · 默认关闭</summary>
-            <p>3–6 人（建议 4–6 人）。每轮固定人员与大盲；主池独赢得标记，弃牌单赢也算，无需亮牌。平分、仅赢边池及退回未跟注额不算。</p>
-            <p>开轮每人冻结（人数−1）×大盲，得标记即解冻；最后未得标记者向其余每人支付 1 大盲。冻结仍属本人，不能下注。有人主动离场或被移出则取消本轮、解冻；断线保留资格。新加入者下轮参加。</p>
-            <button id="btn-squid-toggle" class="btn btn-secondary btn-small">开启经典鱿鱼</button>
+            <summary>下轮支付额与取消本轮</summary>
+            <p id="squid-current-setting"></p>
+            <label>下轮末位向每人支付<input id="room-payment" type="number" min="1" max="1000000" step="1" inputmode="numeric" /></label>
+            <button id="btn-squid-payment-save" class="btn btn-secondary btn-small">保存下轮支付额</button>
             <button id="btn-squid-cancel" class="btn btn-secondary btn-small hidden">取消本轮并解冻</button>
-            <p id="squid-control-tip"></p>
+            <p id="squid-control-tip">玩法固定；金额只对下一轮生效。取消本轮解冻后，下次发牌前尝试新轮。</p>
           </details>
           <div class="footer-buttons">
             <button id="btn-pause-next" class="btn btn-secondary hidden">暂停下一局</button>
