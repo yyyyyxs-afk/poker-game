@@ -1749,7 +1749,7 @@ function renderNextHandStatus() {
   btn.textContent = paused ? '恢复下一局' : '暂停下一局';
   btn.setAttribute('aria-pressed', String(paused));
   document.getElementById('next-hand-status').textContent = paused
-    ? '下一局已暂停 · 当前手照常进行，等待房主恢复'
+    ? '下一局已暂停，当前手照常进行'
     : '';
   const settled = ['waiting', 'handover'].includes(state.stage);
   document.getElementById('btn-export-session').disabled = !settled;

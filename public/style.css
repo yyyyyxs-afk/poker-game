@@ -1096,6 +1096,7 @@ body.modal-open { overflow: hidden; }
    牌面与席位保持真机已验证的压缩档；手牌微压保 568 高一屏；
    下侧翼席位对与社区牌带的纵向避让由 seatPosition 的 veryNarrow 档负责 */
 @media (max-width: 420px) {
+  #next-hand-status { max-width: 100%; padding: 0 4px; text-align: center; font-size: 12px; line-height: 1.3; }
   #lobby { padding: 16px 0; }
   .lobby-card { padding: 26px 22px 20px; border-radius: 20px; }
   .lobby-brand { margin-bottom: 20px; }
