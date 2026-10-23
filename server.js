@@ -1458,8 +1458,10 @@ function joinPlayer(room, socket, name, token) {
     }
     const wasOffline = !existing.connected;
     clearTimeout(room.waitingCleanupTimer);
+    room.waitingCleanupTimer = null;
     existing.socketId = socket.id;
     existing.connected = true;
+    ensureWaitingHost(room);
     if (!existing.token) existing.token = newToken();
     addLog(room, wasOffline ? `${name} 重新连接` : `${name} 重新进入（接管原座位）`);
     // 断线保护窗口：若该玩家断线时正在行动，恢复断线前的剩余行动时间
@@ -1476,6 +1478,7 @@ function joinPlayer(room, socket, name, token) {
     return { token: existing.token };
   }
   clearTimeout(room.waitingCleanupTimer);
+  room.waitingCleanupTimer = null;
   const avatar = AVATARS[room.players.filter(Boolean).length % AVATARS.length];
   const t = newToken();
   room.players.push({
@@ -1501,6 +1504,7 @@ function joinPlayer(room, socket, name, token) {
   if (!room.session.has(name)) {
     room.session.set(name, { buyIn: room.settings.startChips, hands: 0, wins: 0 });
   }
+  ensureWaitingHost(room);
   addLog(room, `${name} 加入房间`);
   broadcast(room);
   return { token: t };
@@ -1542,7 +1546,18 @@ function bankSession(room, p) {
   room.session.delete(p.name);
 }
 
+// 仅修复首次开局前的管理权；身份保留与房主管理权分开处理。
+function ensureWaitingHost(room) {
+  if (room.stage !== 'waiting' || room.handNumber !== 0) return;
+  const online = p => p && !p.left && p.connected;
+  if (room.players.some(p => online(p) && p.name === room.hostName)) return;
+  const nextHost = room.players.find(online);
+  room.hostName = nextHost ? nextHost.name : null;
+  if (nextHost) addLog(room, `${nextHost.name} 成为新房主`);
+}
+
 function transferHostAfterLeave(room, p) {
+  if (room.stage === 'waiting' && room.handNumber === 0) { ensureWaitingHost(room); return; }
   if (p.name !== room.hostName) return;
   const nextHost = room.players.find((x) => x && !x.left);
   room.hostName = nextHost ? nextHost.name : null;
@@ -1558,6 +1573,7 @@ function handleLeave(socket, isDisconnect = false) {
 
   if (isDisconnect && room.stage === 'waiting' && room.handNumber === 0) {
     p.connected = false; p.socketId = null;
+    ensureWaitingHost(room);
     addLog(room, `${p.name} 离线，保留座位`);
     if (!room.players.some(x => x && x.connected)) {
       clearTimeout(room.waitingCleanupTimer);
