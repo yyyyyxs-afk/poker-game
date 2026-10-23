@@ -723,7 +723,7 @@ function escapeHtml(v) {
   }[ch]));
 }
 
-/** 六款真实透明 PNG 按座位号稳定映射：六人桌一席一款。 */
+/** 默认仍映射原六款；用户选择的头像编号绑定玩家身份。 */
 const AVATAR_PNGS = [
   'assets/a1/avatars/avatar-blue-headphones.png',
   'assets/a1/avatars/avatar-magenta-asym.png',
@@ -731,12 +731,18 @@ const AVATAR_PNGS = [
   'assets/a1/avatars/avatar-teal-ponytail.png',
   'assets/a1/avatars/avatar-amber-beanie.png',
   'assets/a1/avatars/avatar-violet-bangs.png',
+  'assets/a1/avatars/hk/gao-jin.png',
+  'assets/a1/avatars/hk/chan-siuto.png',
+  'assets/a1/avatars/hk/sing.png',
+  'assets/a1/avatars/hk/lung-five.png',
+  'assets/a1/avatars/hk/lung-nine.png',
+  'assets/a1/avatars/hk/hoi-tong.png',
 ];
+const AVATAR_NAMES = ['像素头像1','像素头像2','像素头像3','像素头像4','像素头像5','像素头像6','高进','陈小刀','阿星','龙五','龙九','海棠'];
 function avatarPng(seat) {
-  const count = AVATAR_PNGS.length;
   const player = state && state.players.find(p => p.seat === seat);
-  const id = player && Number.isInteger(player.avatarId) ? player.avatarId : seat;
-  return AVATAR_PNGS[((id % count) + count) % count];
+  const id = player && Number.isInteger(player.avatarId) && AVATAR_PNGS[player.avatarId] ? player.avatarId : ((seat % 6) + 6) % 6;
+  return AVATAR_PNGS[id];
 }
 
 /** 座位围绕椭圆分布，自己固定在底部（Hero Dock），其余席位在桌沿顺时针排布：
@@ -787,7 +793,7 @@ function seatCardHtml(p, isMe) {
     ? '<span class="dealer-badge" title="庄家">D</span>' : '';
   return `
     ${dealer}
-    <img class="avatar-img" src="${avatarPng(p.seat)}" alt="${escapeHtml(p.name)} 的像素头像" />
+    <img class="avatar-img" src="${avatarPng(p.seat)}" alt="${escapeHtml(p.name)} 的头像" />
     <div class="seat-copy">
       <strong>${escapeHtml(p.name)}</strong>
       <span class="seat-chips">${p.chips}</span>
@@ -892,7 +898,7 @@ function renderHeroSeat(me) {
   box.innerHTML = `
     <div class="seat-card me-seat${isTurn ? ' is-current' : ''}${me.folded ? ' folded-seat' : ''}${winnerSeats.has(me.seat) ? ' winner-seat' : ''}">
       ${me.isDealer && state.stage !== 'waiting' ? '<span class="dealer-badge" title="庄家">D</span>' : ''}
-      <img class="avatar-img" src="${avatarPng(me.seat)}" alt="我的像素头像" />
+      <img class="avatar-img" src="${avatarPng(me.seat)}" alt="我的头像" />
       <div class="seat-copy">
         <strong>${escapeHtml(me.name)}</strong>
         <span class="seat-chips">${me.chips}</span>
@@ -1794,7 +1800,10 @@ function renderIdentityControls() {
   document.querySelectorAll('[data-avatar-id]').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.avatarId) === me.avatarId)));
 }
 const avatarChoices = document.getElementById('identity-avatars');
-avatarChoices.innerHTML = AVATAR_PNGS.map((src,i) => `<button type="button" data-avatar-id="${i}" aria-label="头像${i+1}"><img src="${src}" alt="" /></button>`).join('');
+avatarChoices.innerHTML = [{label:'原像素头像',start:0,end:6},{label:'港片人物',start:6,end:12}].map(group => `<fieldset class="avatar-group"><legend>${group.label}</legend><div class="avatar-options ${group.start ? 'hk-options' : ''}">${AVATAR_PNGS.slice(group.start,group.end).map((src,idx) => {
+  const i = idx + group.start;
+  return `<button type="button" data-avatar-id="${i}" aria-label="${AVATAR_NAMES[i]}" title="${AVATAR_NAMES[i]}"><img loading="lazy" decoding="async" src="${src}" width="38" height="38" alt="" />${group.start ? `<span>${AVATAR_NAMES[i]}</span>` : ''}</button>`;
+}).join('')}</div></fieldset>`).join('');
 avatarChoices.onclick = e => {
   const b = e.target.closest('[data-avatar-id]');
   if (b) socket.emit('choose_avatar', {avatarId:Number(b.dataset.avatarId)}, r => { if (!r.ok) alert(r.err); });

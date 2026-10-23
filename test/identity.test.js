@@ -5,18 +5,19 @@ const clients=[];
 const request=(s,e,p=null)=>new Promise((resolve,reject)=>s.timeout(3000).emit(e,p,(err,r)=>err?reject(err):resolve(r)));
 const ok=async(...a)=>{const r=await request(...a);assert.strictEqual(r.ok,true,r.err);return r};
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-async function open(){const s=connect(`http://127.0.0.1:${server.address().port}`,{transports:['websocket']});clients.push(s);await new Promise(r=>s.once('connect',r));return s}
+async function open(){const s=connect(`http://127.0.0.1:${server.address().port}`,{transports:['websocket']});clients.push(s);s.on('state',state=>{s.latest=state});await new Promise(r=>s.once('connect',r));return s}
 (async()=>{await new Promise(r=>server.listen(0,'127.0.0.1',r));try{
 const a=await open(),b=await open(),c=await open();
 const created=await ok(a,'create_room',{name:'甲'});
 const rb=await ok(b,'join_room',{name:'乙',code:created.code});
 await ok(c,'join_room',{name:'丙',code:created.code});
 const room=rooms.get(created.code), before=room.players.map(p=>({name:p.name,token:p.token,chips:p.chips,avatarId:p.avatarId}));
-for(const avatarId of [-1,6,0.5,'0','https://example.com/x'])assert.strictEqual((await request(a,'choose_avatar',{avatarId})).ok,false);
+for(const avatarId of [-1,12,99,0.5,'0','https://example.com/x'])assert.strictEqual((await request(a,'choose_avatar',{avatarId})).ok,false);
 await ok(a,'choose_avatar',{avatarId:5});assert.strictEqual(room.players.find(p=>p.name==='甲').avatarId,5);
 assert.strictEqual(room.players.find(p=>p.name==='乙').avatarId,before[1].avatarId);
-await ok(b,'choose_avatar',{avatarId:3});
-for(const seat of [-1,6,0.5,'0'])assert.strictEqual((await request(a,'choose_seat',{seat})).ok,false);
+for (let id=6;id<12;id++) await ok(b,'choose_avatar',{avatarId:id});
+await sleep(50);assert.strictEqual(a.latest.players.find(p=>p.name==='乙').avatarId,11);
+for(const seat of [-1,12,99,0.5,'0'])assert.strictEqual((await request(a,'choose_seat',{seat})).ok,false);
 assert.strictEqual((await request(a,'choose_seat',{seat:1})).ok,false);
 const race=await Promise.all([request(a,'choose_seat',{seat:5}),request(b,'choose_seat',{seat:5})]);
 assert.strictEqual(race.filter(r=>r.ok).length,1);
@@ -25,7 +26,7 @@ for(const old of before){const p=room.players.find(x=>x.name===old.name);assert.
 assert.strictEqual(room.economyTotal,6000);assert.ok(room.players.every(Boolean));
 assert.deepStrictEqual(room.players.map(p=>p.name),['乙','丙','甲']);
 b.disconnect();await sleep(100);const br=await open();await ok(br,'join_room',{name:'乙',code:created.code,token:rb.token});
-assert.strictEqual(room.players[0].avatarId,3);assert.strictEqual(room.players[0].lobbySeat,0);
+assert.strictEqual(room.players[0].avatarId,11);assert.strictEqual(room.players[0].lobbySeat,0);
 assert.strictEqual(room.hostName,'甲');await ok(a,'start_game');
 assert.strictEqual(room.dealerSeat,0);assert.strictEqual(room.players[1].isSB,true);assert.strictEqual(room.players[2].isBB,true);assert.strictEqual(room.turnSeat,0);
 assert.strictEqual((await request(a,'choose_seat',{seat:3})).ok,false);
@@ -33,6 +34,12 @@ await ok(a,'set_next_hand_paused',{paused:true});
 while(room.stage!=='handover'){const p=room.players[room.turnSeat];await ok(clients.find(x=>x.connected&&x.id===p.socketId),'action',{type:'fold'})}
 assert.strictEqual((await request(a,'choose_seat',{seat:3})).ok,false);
 assert.strictEqual(room.players.reduce((sum,p)=>sum+p.chips,0),6000);
+// 十二款头像与六个玩家席位独立：满员仍拒绝第七位。
+const six=await open();const full=await ok(six,'create_room',{name:'满桌0'});
+for(let n=1;n<6;n++)await ok(await open(),'join_room',{code:full.code,name:`满桌${n}`});
+assert.deepStrictEqual(rooms.get(full.code).players.map(p=>p.avatarId),[0,1,2,3,4,5]);
+assert.strictEqual((await request(await open(),'join_room',{code:full.code,name:'第七位'})).ok,false);
+assert.strictEqual(rooms.get(full.code).players.length,6);
 // 等待区房主断线：权限请求走真实Socket，身份与筹码直接核对服务端对象。
 const waitFor = async fn => { const until = Date.now()+3000; while(!fn()){assert.ok(Date.now()<until, '等待状态超时');await sleep(20)} };
 const settings={startChips:2000,smallBlind:10,bigBlind:20,actionTime:45,nextHandDelay:20,rebuyAllowed:true,locked:false};

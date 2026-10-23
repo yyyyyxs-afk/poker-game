@@ -176,6 +176,7 @@ function genRoomCode() {
   return code;
 }
 
+const SELECTABLE_AVATAR_IDS = new Set(Array.from({ length: 12 }, (_, i) => i));
 const AVATARS = ['🦊', '🐼', '🐯', '🦁', '🐸', '🐵', '🐨', '🦉'];
 
 function createRoom(hostName) {
@@ -1177,7 +1178,7 @@ io.on('connection', (socket) => {
   onSocketRequest(socket, 'choose_avatar', (payload, reply) => {
     const data = requireObjectPayload(payload, reply, ['avatarId']);
     if (!data) return;
-    if (!Number.isInteger(data.avatarId) || data.avatarId < 0 || data.avatarId >= 6) return reply({ ok: false, err: '请选择现有的六款头像' });
+    if (!Number.isInteger(data.avatarId) || !SELECTABLE_AVATAR_IDS.has(data.avatarId)) return reply({ ok: false, err: '请选择现有头像' });
     const room = findRoomBySocket(socket.id);
     const p = room && room.players.find(x => x && x.socketId === socket.id);
     if (!p) return reply({ ok: false, err: '不在房间中' });

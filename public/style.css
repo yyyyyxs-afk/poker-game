@@ -1185,7 +1185,13 @@ body.modal-open { overflow: hidden; }
 #identity-controls { width: min(100%, 310px); font-size: 12px; text-align: center; }
 #identity-controls summary { cursor: pointer; color: var(--a1-text-soft); padding: 4px; }
 #identity-controls[open] { padding: 8px; border: 1px solid var(--a1-line); border-radius: 10px; background: var(--a1-surface-raised); }
-#identity-avatars { display:flex; gap:4px; justify-content:center; margin:6px 0; }
+#identity-avatars { margin:6px 0; }
+.avatar-group { border:0; margin:8px 0; padding:0; min-width:0; }
+.avatar-group legend { color:var(--a1-text-soft); margin-bottom:5px; }
+.avatar-options { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:3px; }
+.avatar-options.hk-options { grid-template-columns:repeat(3,minmax(0,1fr)); }
+#identity-avatars button span { display:block; font-size:11px; color:var(--a1-text-soft); }
+#identity-avatars .hk-options img { width:38px; height:38px; object-fit:contain; image-rendering:auto; }
 #identity-avatars button { border:1px solid transparent; background:transparent; border-radius:6px; padding:3px; cursor:pointer; }
 #identity-avatars button[aria-pressed="true"] { border-color: var(--a1-action); }
 #identity-avatars img { width:30px; height:30px; image-rendering:pixelated; }

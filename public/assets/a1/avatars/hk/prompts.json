@@ -1,0 +1,37 @@
+{
+  "generation": "built-in image_gen",
+  "names": {
+    "gao-jin": "高进",
+    "chan-siuto": "陈小刀",
+    "sing": "阿星",
+    "lung-five": "龙五",
+    "lung-nine": "龙九",
+    "hoi-tong": "海棠"
+  },
+  "prompts": [
+    {
+      "id": "gao-jin",
+      "prompt": "Use case: stylized-concept. Asset type: one individual selectable poker-game avatar PNG, square, real transparent background. Premium 80x80-style pixel art displayed at 30-44 pixels, matching a polished anime pixel-avatar set: crisp square pixel clusters, restrained 24-color palette, dark outline, carefully shaded hair, expressive readable eyes, soft warm skin highlights, centered head-and-shoulders bust with large head, front or very slight three-quarter view. Subject fills 85% of square with 8% transparent safe margin, complete hairstyle and shoulders, no cropping, no text, no letters, no logos, no cards, no chips, no weapons, no frame, no background scenery, no watermark. Not a movie still or photograph; original stylized pixel portrait based on the famous Hong Kong film character and recognizable screen persona. 高进（Chow Yun-fat 周润发 in God of Gamblers 赌神）: mature confident Chinese man, broad forehead, iconic perfectly slicked-back black hair, strong eyebrows, composed faint smile, luxurious black tuxedo, white shirt and black bow tie; classic elegant gambler king. Cool blue-violet highlights on black hair."
+    },
+    {
+      "id": "chan-siuto",
+      "prompt": "Use case: stylized-concept. Asset type: one individual selectable poker-game avatar PNG, square, real transparent background. Premium 80x80-style pixel art displayed at 30-44 pixels, matching a polished anime pixel-avatar set: crisp square pixel clusters, restrained 24-color palette, dark outline, carefully shaded hair, expressive readable eyes, soft warm skin highlights, centered head-and-shoulders bust with large head, front or very slight three-quarter view. Subject fills 85% of square with 8% transparent safe margin, complete hairstyle and shoulders, no cropping, no text, no letters, no logos, no cards, no chips, no weapons, no frame, no background scenery, no watermark. Not a movie still or photograph; original stylized pixel portrait based on the famous Hong Kong film character and recognizable screen persona. 陈小刀（Andy Lau 刘德华 in God of Gamblers / God of Gamblers II 赌侠）: handsome youthful Chinese man, iconic voluminous short side-swept black hair, strong straight brows, alert confident dark eyes and slight cocky smile, black casual jacket over white open-collar shirt; energetic clever apprentice. Teal-blue jacket highlights."
+    },
+    {
+      "id": "sing",
+      "prompt": "Use case: stylized-concept. Asset type: one individual selectable poker-game avatar PNG, square, real transparent background. Premium 80x80-style pixel art displayed at 30-44 pixels, matching a polished anime pixel-avatar set: crisp square pixel clusters, restrained 24-color palette, dark outline, carefully shaded hair, expressive readable eyes, soft warm skin highlights, centered head-and-shoulders bust with large head, front or very slight three-quarter view. Subject fills 85% of square with 8% transparent safe margin, complete hairstyle and shoulders, no cropping, no text, no letters, no logos, no cards, no chips, no weapons, no frame, no background scenery, no watermark. Not a movie still or photograph; original stylized pixel portrait based on the famous Hong Kong film character and recognizable screen persona. 阿星/周星祖（Stephen Chow 周星驰 in God of Gamblers II 赌侠）: youthful Chinese man, distinctive expressive broad brows, slightly tousled short black hair, lively dark eyes, cheeky asymmetric grin, red casual jacket with cream shirt; comedic charismatic gambler. Rich brick red clothing accent, never clown makeup."
+    },
+    {
+      "id": "lung-five",
+      "prompt": "Use case: stylized-concept. Asset type: one individual selectable poker-game avatar PNG, square, real transparent background. Premium 80x80-style pixel art displayed at 30-44 pixels, matching a polished anime pixel-avatar set: crisp square pixel clusters, restrained 24-color palette, dark outline, carefully shaded hair, expressive readable eyes, soft warm skin highlights, centered head-and-shoulders bust with large head, front or very slight three-quarter view. Subject fills 85% of square with 8% transparent safe margin, complete hairstyle and shoulders, no cropping, no text, no letters, no logos, no cards, no chips, no weapons, no frame, no background scenery, no watermark. Not a movie still or photograph; original stylized pixel portrait based on the famous Hong Kong film character and recognizable screen persona. 龙五（Charles Heung 向华强 in God of Gamblers 赌神）: serious middle-aged Chinese man, broad square jaw, very neat close short black hair, straight intense eyes and strong eyebrows, clean-shaven expressionless protector, black high-neck sweater and dark charcoal jacket; understated formidable persona. Grey-slate clothing highlights."
+    },
+    {
+      "id": "lung-nine",
+      "prompt": "Use case: stylized-concept. Asset type: one individual selectable poker-game avatar PNG, square, real transparent background. Premium 80x80-style pixel art displayed at 30-44 pixels, matching a polished anime pixel-avatar set: crisp square pixel clusters, restrained 24-color palette, dark outline, carefully shaded hair, expressive readable eyes, soft warm skin highlights, centered head-and-shoulders bust with large head, front or very slight three-quarter view. Subject fills 85% of square with 8% transparent safe margin, complete hairstyle and shoulders, no cropping, no text, no letters, no logos, no cards, no chips, no weapons, no frame, no background scenery, no watermark. Not a movie still or photograph; original stylized pixel portrait based on the famous Hong Kong film character and recognizable screen persona. 龙九（Monica Chan 陈法蓉 in God of Gamblers II 赌侠）: cool capable Chinese woman, recognizable sharp short black bob with side fringe, sculpted elegant brows, calm confident dark eyes, restrained red lips, fitted dark navy blazer over white collar shirt. Steel-blue and muted plum highlights, sophisticated composed expression."
+    },
+    {
+      "id": "hoi-tong",
+      "prompt": "Use case: stylized-concept. Asset type: one individual selectable poker-game avatar PNG, square, real transparent background. Premium 80x80-style pixel art displayed at 30-44 pixels, matching a polished anime pixel-avatar set: crisp square pixel clusters, restrained 24-color palette, dark outline, carefully shaded hair, expressive readable eyes, soft warm skin highlights, centered head-and-shoulders bust with large head, front or very slight three-quarter view. Subject fills 85% of square with 8% transparent safe margin, complete hairstyle and shoulders, no cropping, no text, no letters, no logos, no cards, no chips, no weapons, no frame, no background scenery, no watermark. Not a movie still or photograph; original stylized pixel portrait based on the famous Hong Kong film character and recognizable screen persona. 海棠（Chingmy Yau 邱淑贞 in God of Gamblers Returns 赌神2）: striking Chinese woman with flowing voluminous side-parted dark hair, distinctive bright almond eyes, softly arched brows, confident alluring but dignified expression, red lipstick, deep crimson elegant jacket with black collar. Warm burgundy highlights, fully clothed head-and-shoulders only."
+    }
+  ]
+}
