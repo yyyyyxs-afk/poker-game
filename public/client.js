@@ -613,6 +613,7 @@ function render() {
     renderMyArea();
     renderLogs();
     renderChats();
+    renderIdentityControls();
     renderNextHandStatus();
     renderResults();
   } catch (e) {
@@ -733,7 +734,9 @@ const AVATAR_PNGS = [
 ];
 function avatarPng(seat) {
   const count = AVATAR_PNGS.length;
-  return AVATAR_PNGS[((seat % count) + count) % count];
+  const player = state && state.players.find(p => p.seat === seat);
+  const id = player && Number.isInteger(player.avatarId) ? player.avatarId : seat;
+  return AVATAR_PNGS[((id % count) + count) % count];
 }
 
 /** 座位围绕椭圆分布，自己固定在底部（Hero Dock），其余席位在桌沿顺时针排布：
@@ -809,8 +812,11 @@ function renderSeats() {
   const players = state.players;
   players.forEach((p) => {
     if (p.seat === mySeat) return; // 自己固定渲染在 Hero Dock
-    const relIdx = (p.seat - (mySeat >= 0 ? mySeat : 0) + players.length) % players.length;
-    const pos = seatPosition(relIdx, players.length);
+    const choosing = state.stage === 'waiting' && state.handNumber === 0;
+    const total = choosing ? 6 : players.length;
+    const mine = players.find(x => x.seat === mySeat);
+    const relIdx = choosing ? (p.lobbySeat - (mine ? mine.lobbySeat : 0) + 6) % 6 : (p.seat - (mySeat >= 0 ? mySeat : 0) + total) % total;
+    const pos = seatPosition(relIdx, total);
 
     const div = document.createElement('div');
     div.className = 'seat' + (p.folded ? ' folded-seat' : '') +
@@ -1771,3 +1777,26 @@ document.getElementById('btn-export-session').onclick = () => {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
 };
+
+function renderIdentityControls() {
+  const me = state.players.find(p => p.seat === mySeat);
+  const panel = document.getElementById('identity-controls');
+  panel.classList.toggle('hidden', !me || state.stage !== 'waiting' || state.handNumber !== 0);
+  if (!me) return;
+  const canMove = state.stage === 'waiting' && state.handNumber === 0;
+  const select = document.getElementById('identity-seat');
+  select.disabled = !canMove;
+  select.innerHTML = Array.from({length:6}, (_,i) => {
+    const occupant = state.players.find(p => !p.left && p.lobbySeat === i);
+    return `<option value="${i}" ${i === me.lobbySeat ? 'selected' : ''} ${occupant && occupant !== me ? 'disabled' : ''}>${i+1}号座位${occupant ? (occupant === me ? '（我）' : '（有人）') : '（空位）'}</option>`;
+  }).join('');
+  document.getElementById('identity-seat-tip').textContent = canMove ? '座号按顺时针排列，首次开局后固定。' : '已开局，座位固定。';
+  document.querySelectorAll('[data-avatar-id]').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.avatarId) === me.avatarId)));
+}
+const avatarChoices = document.getElementById('identity-avatars');
+avatarChoices.innerHTML = AVATAR_PNGS.map((src,i) => `<button type="button" data-avatar-id="${i}" aria-label="头像${i+1}"><img src="${src}" alt="" /></button>`).join('');
+avatarChoices.onclick = e => {
+  const b = e.target.closest('[data-avatar-id]');
+  if (b) socket.emit('choose_avatar', {avatarId:Number(b.dataset.avatarId)}, r => { if (!r.ok) alert(r.err); });
+};
+document.getElementById('identity-seat').onchange = e => socket.emit('choose_seat', {seat:Number(e.target.value)}, r => { if (!r.ok) { alert(r.err); renderIdentityControls(); } });

@@ -922,6 +922,8 @@ function sanitizeState(room, viewerSocketId) {
       seat,
       name: p.name,
       avatar: p.avatar,
+      avatarId: p.avatarId,
+      lobbySeat: p.lobbySeat,
       chips: p.chips,
       roundBet: p.roundBet,
       totalBet: p.totalBet,
@@ -1169,6 +1171,32 @@ io.on('connection', (socket) => {
       broadcast(room);
     }
     reply({ ok: true });
+  });
+
+  // 仅本人可改头像/开局前空位；身份始终由当前socket定位，不能提交目标玩家。
+  onSocketRequest(socket, 'choose_avatar', (payload, reply) => {
+    const data = requireObjectPayload(payload, reply, ['avatarId']);
+    if (!data) return;
+    if (!Number.isInteger(data.avatarId) || data.avatarId < 0 || data.avatarId >= 6) return reply({ ok: false, err: '请选择现有的六款头像' });
+    const room = findRoomBySocket(socket.id);
+    const p = room && room.players.find(x => x && x.socketId === socket.id);
+    if (!p) return reply({ ok: false, err: '不在房间中' });
+    p.avatarId = data.avatarId;
+    broadcast(room); reply({ ok: true });
+  });
+
+  onSocketRequest(socket, 'choose_seat', (payload, reply) => {
+    const data = requireObjectPayload(payload, reply, ['seat']);
+    if (!data) return;
+    const room = findRoomBySocket(socket.id);
+    const p = room && room.players.find(x => x && x.socketId === socket.id);
+    if (!p) return reply({ ok: false, err: '不在房间中' });
+    if (room.stage !== 'waiting' || room.handNumber !== 0) return reply({ ok: false, err: '只能在首次开局前选择座位' });
+    if (!Number.isInteger(data.seat) || data.seat < 0 || data.seat >= 6) return reply({ ok: false, err: '座位无效' });
+    if (room.players.some(x => x && !x.left && x !== p && x.lobbySeat === data.seat)) return reply({ ok: false, err: '该座位已有人，请选择空位' });
+    p.lobbySeat = data.seat;
+    room.players.sort((a, b) => a.lobbySeat - b.lobbySeat);
+    broadcast(room); reply({ ok: true });
   });
 
   onSocketRequest(socket, 'export_session', (payload, reply) => {
@@ -1429,6 +1457,7 @@ function joinPlayer(room, socket, name, token) {
       return { err: '该昵称已被其他玩家使用，请换一个昵称' };
     }
     const wasOffline = !existing.connected;
+    clearTimeout(room.waitingCleanupTimer);
     existing.socketId = socket.id;
     existing.connected = true;
     if (!existing.token) existing.token = newToken();
@@ -1446,6 +1475,7 @@ function joinPlayer(room, socket, name, token) {
     broadcast(room);
     return { token: existing.token };
   }
+  clearTimeout(room.waitingCleanupTimer);
   const avatar = AVATARS[room.players.filter(Boolean).length % AVATARS.length];
   const t = newToken();
   room.players.push({
@@ -1453,6 +1483,8 @@ function joinPlayer(room, socket, name, token) {
     name,
     token: t,
     avatar,
+    avatarId: room.players.filter(Boolean).length % 6,
+    lobbySeat: Array.from({ length: 6 }, (_, i) => i).find(i => !room.players.some(p => p && !p.left && p.lobbySeat === i)),
     chips: room.settings.startChips,
     hole: [],
     roundBet: 0,
@@ -1463,6 +1495,7 @@ function joinPlayer(room, socket, name, token) {
     connected: true,
     sittingOut: false,
   });
+  if (room.handNumber === 0) room.players.sort((a, b) => a.lobbySeat - b.lobbySeat);
   room.economyTotal += room.settings.startChips;
   // 本场战绩登记：买入从当前设置起始筹码算起
   if (!room.session.has(name)) {
@@ -1523,6 +1556,18 @@ function handleLeave(socket, isDisconnect = false) {
   if (idx < 0) return;
   const p = room.players[idx];
 
+  if (isDisconnect && room.stage === 'waiting' && room.handNumber === 0) {
+    p.connected = false; p.socketId = null;
+    addLog(room, `${p.name} 离线，保留座位`);
+    if (!room.players.some(x => x && x.connected)) {
+      clearTimeout(room.waitingCleanupTimer);
+      room.waitingCleanupTimer = setTimeout(() => {
+        if (room.stage === 'waiting' && room.handNumber === 0 && !room.players.some(x => x && x.connected)) rooms.delete(room.code);
+      }, 10 * 60 * 1000);
+      room.waitingCleanupTimer.unref();
+    }
+    broadcast(room); return;
+  }
   const midHand = !['waiting', 'handover'].includes(room.stage);
   if (midHand) {
     const wasInHand = p.inHand && !p.folded;

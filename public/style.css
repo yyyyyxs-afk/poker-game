@@ -1181,3 +1181,13 @@ body.modal-open { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+#identity-controls { width: min(100%, 310px); font-size: 12px; text-align: center; }
+#identity-controls summary { cursor: pointer; color: var(--a1-text-soft); padding: 4px; }
+#identity-controls[open] { padding: 8px; border: 1px solid var(--a1-line); border-radius: 10px; background: var(--a1-surface-raised); }
+#identity-avatars { display:flex; gap:4px; justify-content:center; margin:6px 0; }
+#identity-avatars button { border:1px solid transparent; background:transparent; border-radius:6px; padding:3px; cursor:pointer; }
+#identity-avatars button[aria-pressed="true"] { border-color: var(--a1-action); }
+#identity-avatars img { width:30px; height:30px; image-rendering:pixelated; }
+#identity-seat { max-width: 180px; padding:4px; background:var(--a1-canvas-soft); color:var(--a1-text-soft); }
+#identity-seat-tip { margin:5px 0 0; }

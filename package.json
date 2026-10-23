@@ -9,6 +9,7 @@
     "test:rules": "node test/rules.test.js",
     "test:ui": "node test/ui-content.test.js",
     "test:geometry": "node test/geometry-check.js",
+    "test:identity": "node test/identity.test.js",
     "test:friends": "node test/friends.test.js",
     "test:smoke": "node test/smoke.test.js"
   },
