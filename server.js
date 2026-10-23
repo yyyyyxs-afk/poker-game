@@ -203,6 +203,8 @@ function createRoom(hostName) {
     turnDeadline: 0,       // 当前行动定时器的绝对截止时间（断线保护窗口用于恢复剩余时间）
     preGrace: null,        // 行动者断线前保存的 { seat, deadline }，重连时恢复原剩余时间
     nextHandTimer: null,
+    nextHandPaused: false,
+    nextHandDeadline: 0,
     settings: {
       startChips: START_CHIPS,
       smallBlind: SMALL_BLIND,
@@ -308,6 +310,7 @@ function pay(p, amount) {
 
 // ---------------- 一局流程 ----------------
 function startHand(room) {
+  if (room.stage === 'handover' && room.nextHandPaused) return;
   const seated = room.players.filter((p) => p && !p.left);
   if (seated.length < MIN_PLAYERS) return;
 
@@ -799,8 +802,8 @@ function endHand(room) {
   }
   // 对局中明确离开的玩家为维持座位索引暂留到本手结束；结算完成后再固化战绩。
   room.players.forEach((p) => { if (p && p.left) bankSession(room, p); });
-  broadcast(room);
   scheduleNextHandIfReady(room);
+  broadcast(room);
 }
 
 /**
@@ -811,7 +814,8 @@ function endHand(room) {
 function scheduleNextHandIfReady(room) {
   clearTimeout(room.nextHandTimer);
   room.nextHandTimer = null;
-  if (room.stage !== 'handover') return;
+  room.nextHandDeadline = 0;
+  if (room.stage !== 'handover' || room.nextHandPaused) return;
   const playable = room.players.filter((p) => p && !p.left && !p.sittingOut && p.chips > 0 && p.connected);
   if (playable.length < MIN_PLAYERS) {
     // 看看有没有可能通过重买凑齐
@@ -831,8 +835,11 @@ function scheduleNextHandIfReady(room) {
     }
     return;
   }
+  room.nextHandDeadline = Date.now() + ((room.settings && room.settings.nextHandDelay) || 20) * 1000;
   room.nextHandTimer = setTimeout(() => {
     room.nextHandTimer = null;
+    room.nextHandDeadline = 0;
+    if (room.stage !== 'handover' || room.nextHandPaused) return;
     startHand(room);
   }, ((room.settings && room.settings.nextHandDelay) || 20) * 1000);
 }
@@ -881,6 +888,8 @@ function sanitizeState(room, viewerSocketId) {
     settings: room.settings,
     isHost: !!viewer && viewer.name === room.hostName,
     hostName: room.hostName,
+    nextHandPaused: !!room.nextHandPaused,
+    nextHandDeadline: room.nextHandDeadline || 0,
     dealerSeat: room.dealerSeat,
     community: room.community,
     // 结算阶段筹码已发放，底池归零以免与弹窗结果对不上
@@ -1123,8 +1132,10 @@ io.on('connection', (socket) => {
     }
     if (seatCount(room) < MIN_PLAYERS) return reply({ ok: false, err: '至少需要 2 名玩家' });
     // 清掉局间自动开局的定时器，避免手动开局后定时器再触发一次摧毁当前局
+    if (room.nextHandPaused && room.handNumber > 0) return reply({ ok: false, err: '下一局已暂停，请先恢复自动发牌' });
     clearTimeout(room.nextHandTimer);
     room.nextHandTimer = null;
+    room.nextHandDeadline = 0;
     room.gameOver = false;
     startHand(room);
     reply({ ok: true });
@@ -1136,10 +1147,37 @@ io.on('connection', (socket) => {
     if (!room || room.stage !== 'handover') return reply({ ok: false, err: '当前不能开局' });
     const p = room.players.find((x) => x && x.socketId === socket.id);
     if (!p || p.name !== room.hostName) return reply({ ok: false, err: '只有房主可以立即开始下一局' });
+    if (room.nextHandPaused) return reply({ ok: false, err: '下一局已暂停，请先恢复自动发牌' });
     clearTimeout(room.nextHandTimer);
     room.nextHandTimer = null;
+    room.nextHandDeadline = 0;
     startHand(room);
     reply({ ok: true });
+  });
+
+  onSocketRequest(socket, 'set_next_hand_paused', (payload, reply) => {
+    const data = requireObjectPayload(payload, reply, ['paused']);
+    if (!data) return;
+    if (typeof data.paused !== 'boolean') return reply({ ok: false, err: '暂停参数格式错误' });
+    const room = findRoomBySocket(socket.id);
+    const p = room && room.players.find((x) => x && x.socketId === socket.id);
+    if (!p || p.name !== room.hostName) return reply({ ok: false, err: '只有房主可以暂停或恢复下一局' });
+    if (room.nextHandPaused !== data.paused) {
+      room.nextHandPaused = data.paused;
+      addLog(room, data.paused ? '房主暂停下一局（当前手照常进行）' : '房主恢复下一局自动发牌');
+      scheduleNextHandIfReady(room);
+      broadcast(room);
+    }
+    reply({ ok: true });
+  });
+
+  onSocketRequest(socket, 'export_session', (payload, reply) => {
+    if (!requireEmptyPayload(payload, reply)) return;
+    const room = findRoomBySocket(socket.id);
+    if (!room) return reply({ ok: false, err: '不在房间中' });
+    if (!['waiting', 'handover'].includes(room.stage)) return reply({ ok: false, err: '本手尚未结算，请在局间导出战绩' });
+    const { buildSessionCsv } = require('./session-csv');
+    reply({ ok: true, csv: buildSessionCsv(room, sanitizeState(room, socket.id).session), filename: `好友局-${room.code}-战绩.csv` });
   });
 
   // 重买：筹码输光的玩家在两手之间补充筹码
@@ -1165,6 +1203,7 @@ io.on('connection', (socket) => {
     broadcast(room);
     // 重买后重新检查是否可以自动开局
     if (room.stage === 'handover') scheduleNextHandIfReady(room);
+    broadcast(room);
   });
 
   // 房管设置：房主在等待阶段修改起始筹码 / 盲注

@@ -127,7 +127,9 @@
               <button id="btn-allin" class="btn btn-allin">全押</button>
             </div>
           </div>
+          <div id="next-hand-status" aria-live="polite"></div>
           <div class="footer-buttons">
+            <button id="btn-pause-next" class="btn btn-secondary hidden">暂停下一局</button>
             <button id="btn-invite" class="btn btn-secondary hidden">邀请好友</button>
             <button id="btn-start" class="btn btn-primary hidden">开始游戏</button>
             <button id="btn-rebuy" class="btn btn-warning hidden">重新买入（补充 2000 筹码）</button>
@@ -233,6 +235,8 @@
         <div id="result-timeline" class="hidden"></div>
         <div id="session-box" class="hidden">
           <h3>本场战绩</h3>
+          <button id="btn-export-session" class="btn btn-secondary btn-small">下载本场战绩 CSV</button>
+          <p id="export-session-tip">仅在局间导出已结算战绩，包含已离场记录。</p>
           <table id="session-table">
             <thead>
               <tr><th>玩家</th><th>买入</th><th>筹码</th><th>盈亏</th><th>手数</th><th>胜场</th></tr>

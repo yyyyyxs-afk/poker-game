@@ -613,6 +613,7 @@ function render() {
     renderMyArea();
     renderLogs();
     renderChats();
+    renderNextHandStatus();
     renderResults();
   } catch (e) {
     // 渲染异常不应白屏：把错误显示在提示区，座位区保留上次内容
@@ -1576,8 +1577,9 @@ function renderResults() {
     clearInterval(countdownTimer);
     countdown = cfg().nextHandDelay || 20;
     countdownTimer = setInterval(() => {
-      countdown--;
-      if (countdown <= 0) { clearInterval(countdownTimer); nextTip.textContent = '正在开始下一局…'; }
+      if (state.nextHandPaused) { nextTip.textContent = '下一局已暂停，等待房主恢复'; return; }
+      countdown = state.nextHandDeadline ? Math.max(0, Math.ceil((state.nextHandDeadline - Date.now()) / 1000)) : 0;
+      if (countdown <= 0) { nextTip.textContent = state.nextHandDeadline ? '正在开始下一局…' : '等待可参与玩家或重买后继续'; }
       else nextTip.textContent = `${countdown} 秒后自动开始下一局…`;
     }, 1000);
     const meWon = r.pots.some((p) => p.winners.some((w) => w.seat === mySeat));
@@ -1589,11 +1591,14 @@ function renderResults() {
   nextTip.classList.toggle('hidden', !isCurrentResult);
   if (!isCurrentResult) {
     nextBtn.classList.add('hidden');
+  } else if (state.nextHandPaused) {
+    nextTip.textContent = '下一局已暂停，等待房主恢复';
+    nextBtn.classList.add('hidden');
   } else if (state.gameOver) {
     nextTip.textContent = '游戏结束！刷新页面可开新房间。';
     nextBtn.classList.add('hidden');
   } else {
-    nextTip.textContent = `${countdown} 秒后自动开始下一局…`;
+    nextTip.textContent = state.nextHandDeadline ? `${Math.max(0, Math.ceil((state.nextHandDeadline - Date.now()) / 1000))} 秒后自动开始下一局…` : '等待可参与玩家或重买后继续';
     nextBtn.classList.toggle('hidden', !state.isHost);
   }
 }
@@ -1736,3 +1741,33 @@ function showEmojiBubble(seat, emoji) {
   setTimeout(() => b.remove(), 1600);
   tone(880, 0.08, 0, 'sine', 0.05);
 }
+
+function renderNextHandStatus() {
+  const paused = !!state.nextHandPaused;
+  const btn = document.getElementById('btn-pause-next');
+  btn.classList.toggle('hidden', !state.isHost);
+  btn.textContent = paused ? '恢复下一局' : '暂停下一局';
+  btn.setAttribute('aria-pressed', String(paused));
+  document.getElementById('next-hand-status').textContent = paused
+    ? '下一局已暂停 · 当前手照常进行，等待房主恢复'
+    : '';
+  const settled = ['waiting', 'handover'].includes(state.stage);
+  document.getElementById('btn-export-session').disabled = !settled;
+  document.getElementById('export-session-tip').textContent = settled
+    ? '导出已结算战绩，包含已离场记录；离场筹码按离场时记录。'
+    : '本手尚未结算，请在局间下载战绩。';
+}
+document.getElementById('btn-pause-next').onclick = () => {
+  socket.emit('set_next_hand_paused', { paused: !state.nextHandPaused }, res => {
+    if (!res || !res.ok) alert((res && res.err) || '操作失败');
+  });
+};
+document.getElementById('btn-export-session').onclick = () => {
+  socket.emit('export_session', null, res => {
+    if (!res || !res.ok) return alert((res && res.err) || '导出失败');
+    const url = URL.createObjectURL(new Blob([res.csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url; link.download = res.filename; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+};
