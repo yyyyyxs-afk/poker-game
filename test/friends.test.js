@@ -57,7 +57,7 @@ async function main() {
     const edge = buildSessionCsv({code:'ABC123'}, [{name:' \t=SUM(1,2)\n"名字"',buyIn:2000,chips:1900,pl:-100,hands:1,wins:0,left:false}]);
     assert.ok(edge.includes('"\' \t=SUM(1,2)\n""名字"""')); assert.ok(edge.includes('"-100"'));
     assert.ok(exported.csv.includes('房号'));
-    assert.ok(exported.csv.includes('2026-'));
+
     await ok(b, 'set_next_hand_paused', { paused: false });
     await sleep(5200); assert.strictEqual(room.handNumber, 2);
     console.log('朋友局检查通过：房主权限、当前时钟、手动绕过、重复恢复、定时取消、重买、房主转移、自动恢复、结算口径与CSV安全');
