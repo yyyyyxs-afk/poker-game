@@ -613,6 +613,7 @@ function render() {
     renderMyArea();
     renderLogs();
     renderChats();
+    renderWinnerShowControls();
     renderIdentityControls();
     renderNextHandStatus();
     renderResults();
@@ -797,6 +798,7 @@ function seatCardHtml(p, isMe) {
     <div class="seat-copy">
       <strong>${escapeHtml(p.name)}</strong>
       <span class="seat-chips">${p.chips}</span>
+      ${p.shownCards && p.shownCards.length ? `<span class="voluntary-label">已亮 ${p.shownCards.map(e => `${e.index === 0 ? '左' : '右'}${RANK_LABEL[e.card.r] || e.card.r}${SUIT_CHAR[e.card.s]}`).join(' \u00b7 ')}</span>` : ''}
     </div>
     ${stateBadge ? `<span class="state-badge">${stateBadge}</span>` : ''}
     ${isTurn ? '<span class="turn-dot" aria-label="正在行动"></span>' : ''}
@@ -838,7 +840,9 @@ function renderSeats() {
 
     // 仅用服务端公开的 holeCount 画牌背；牌面仍只在 revealed 后读取 p.hole，绝不推测底牌。
     const holeDiv = div.querySelector('.hole-cards');
-    if (p.hole && p.hole.length && state.revealed) {
+    if (p.shownCards && p.shownCards.length) {
+      // 自愿公开在席位文字与复盘显示，避免顶部牌面覆盖手机页头。
+    } else if (p.hole && p.hole.length && state.revealed) {
       p.hole.forEach((c) => holeDiv.appendChild(cardEl(c, false)));
     } else if (!state.revealed && p.inHand && !p.folded && p.holeCount > 0 &&
         ['preflop', 'flop', 'turn', 'river', 'showdown'].includes(state.stage)) {
@@ -1640,6 +1644,7 @@ function renderSession() {
 
 /** 赢家的 7 张牌（底牌+公共牌），高亮实际获胜的 5 张 */
 function winnerCardsHtml(w, community = state.community) {
+  if (w.voluntaryCards && w.voluntaryCards.length) return '<div class="hand-name">自愿亮牌</div><div class="win-cards">' + w.voluntaryCards.map(e => `<span>${e.index === 0 ? '左' : '右'}张${miniCardsHtml([e.card], [])}</span>`).join('') + '</div>';
   if (!w.hole || !w.hole.length || !community || !community.length || !w.bestCards) return '';
   const bestKeys = new Set(w.bestCards.map((c) => c.r + '_' + c.s));
   const all = [...w.hole, ...community];
@@ -1809,3 +1814,19 @@ avatarChoices.onclick = e => {
   if (b) socket.emit('choose_avatar', {avatarId:Number(b.dataset.avatarId)}, r => { if (!r.ok) alert(r.err); });
 };
 document.getElementById('identity-seat').onchange = e => socket.emit('choose_seat', {seat:Number(e.target.value)}, r => { if (!r.ok) { alert(r.err); renderIdentityControls(); } });
+
+function renderWinnerShowControls() {
+  const box = document.getElementById('winner-show-controls');
+  const winner = state.results && state.results.forfeit && state.results.pots[0].winners[0];
+  const allowed = state.stage === 'handover' && winner && winner.seat === mySeat;
+  box.classList.toggle('hidden', !allowed);
+  if (!allowed) { box.innerHTML = ''; return; }
+  const shown = (winner.voluntaryCards || []).map(e => e.index);
+  box.innerHTML = '<span>自愿亮牌</span>' + [[0,'左张'],[1,'右张'],[2,'两张']].map(([i,label]) => `<button type="button" class="btn btn-ghost btn-small" data-show-index="${i}" data-show-hand="${state.handNumber}" ${i === 2 ? (shown.length === 2 ? 'disabled' : '') : (shown.includes(i) ? 'disabled' : '')}>${label}${shown.includes(i) ? '已亮' : ''}</button>`).join('');
+}
+document.getElementById('winner-show-controls').onclick = e => {
+  const b = e.target.closest('[data-show-index]');
+  if (!b) return;
+  const i = Number(b.dataset.showIndex);
+  socket.emit('show_winner_cards', {handNumber:Number(b.dataset.showHand), indices:i === 2 ? [0,1] : [i]}, r => { if (!r.ok) flashTip(r.err); });
+};

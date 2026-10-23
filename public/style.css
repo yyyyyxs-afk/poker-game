@@ -1197,3 +1197,8 @@ body.modal-open { overflow: hidden; }
 #identity-avatars img { width:30px; height:30px; image-rendering:pixelated; }
 #identity-seat { max-width: 180px; padding:4px; background:var(--a1-canvas-soft); color:var(--a1-text-soft); }
 #identity-seat-tip { margin:5px 0 0; }
+
+#winner-show-controls { display:flex; align-items:center; justify-content:center; gap:5px; font-size:12px; flex-wrap:wrap; }
+#winner-show-controls .btn { padding:4px 8px; min-height:30px; font-size:12px; }
+
+.voluntary-label { font-size:10px; color:var(--a1-text-soft); white-space:nowrap; }

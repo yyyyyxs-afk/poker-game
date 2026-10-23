@@ -938,6 +938,7 @@ function sanitizeState(room, viewerSocketId) {
       isDealer: seat === room.dealerSeat,
       // 摊牌只公开仍在本手且未弃牌者；已弃牌者的底牌始终仅本人可见。
       hole: p.hole && (seat === viewerIdx || (room.revealed && p.inHand && !p.folded)) ? p.hole : null,
+      shownCards: room.stage === 'handover' && room.results && room.results.forfeit && room.results.pots[0].winners[0].seat === seat ? (room.results.pots[0].winners[0].voluntaryCards || []) : [],
       holeCount: p.hole ? p.hole.length : 0,
     })),
   };
@@ -1174,7 +1175,29 @@ io.on('connection', (socket) => {
     reply({ ok: true });
   });
 
-  // 仅本人可改头像/开局前空位；身份始终由当前socket定位，不能提交目标玩家。
+  // 只公开服务器选定的真实赢家底牌子集，手数防止迟到请求跨局。
+  onSocketRequest(socket, 'show_winner_cards', (payload, reply) => {
+    const data = requireObjectPayload(payload, reply, ['handNumber', 'indices']);
+    if (!data) return;
+    if (!Number.isSafeInteger(data.handNumber) || !Array.isArray(data.indices) || data.indices.length < 1 || data.indices.length > 2 || data.indices.some(i => !Number.isInteger(i) || i < 0 || i > 1)) return reply({ ok: false, err: '亮牌参数无效' });
+    const room = findRoomBySocket(socket.id);
+    if (!room || room.stage !== 'handover' || room.handNumber !== data.handNumber || !room.results || !room.results.forfeit) return reply({ ok: false, err: '本手当前不能自愿亮牌' });
+    const p = room.players.find(x => x && !x.left && x.socketId === socket.id);
+    const winner = room.results.pots[0].winners[0];
+    if (!p || room.players[winner.seat] !== p || !p.inHand || p.folded || !p.hole || p.hole.length !== 2) return reply({ ok: false, err: '只有本手弃牌单赢者可以亮牌' });
+    const shown = winner.voluntaryCards || [];
+    let changed = false;
+    for (const index of data.indices) {
+      if (!shown.some(e => e.index === index)) { shown.push({ index, card: { ...p.hole[index] } }); changed = true; }
+    }
+    if (changed) {
+      winner.voluntaryCards = shown.sort((a, b) => a.index - b.index);
+      // lastResult与当前results共享已结算快照；仅把公开子集加入快照。
+      broadcast(room);
+    }
+    reply({ ok: true });
+  });
+
   onSocketRequest(socket, 'choose_avatar', (payload, reply) => {
     const data = requireObjectPayload(payload, reply, ['avatarId']);
     if (!data) return;
@@ -1462,7 +1485,7 @@ function joinPlayer(room, socket, name, token) {
     room.waitingCleanupTimer = null;
     existing.socketId = socket.id;
     existing.connected = true;
-    ensureWaitingHost(room);
+    ensureConnectedHost(room);
     if (!existing.token) existing.token = newToken();
     addLog(room, wasOffline ? `${name} 重新连接` : `${name} 重新进入（接管原座位）`);
     // 断线保护窗口：若该玩家断线时正在行动，恢复断线前的剩余行动时间
@@ -1505,7 +1528,7 @@ function joinPlayer(room, socket, name, token) {
   if (!room.session.has(name)) {
     room.session.set(name, { buyIn: room.settings.startChips, hands: 0, wins: 0 });
   }
-  ensureWaitingHost(room);
+  ensureConnectedHost(room);
   addLog(room, `${name} 加入房间`);
   broadcast(room);
   return { token: t };
@@ -1547,9 +1570,9 @@ function bankSession(room, p) {
   room.session.delete(p.name);
 }
 
-// 仅修复首次开局前的管理权；身份保留与房主管理权分开处理。
-function ensureWaitingHost(room) {
-  if (room.stage !== 'waiting' || room.handNumber !== 0) return;
+// 保留断线身份的阶段，管理权交给在线有效玩家。
+function ensureConnectedHost(room) {
+  if (!(room.stage === 'waiting' && room.handNumber === 0) && room.stage !== 'handover') return;
   const online = p => p && !p.left && p.connected;
   if (room.players.some(p => online(p) && p.name === room.hostName)) return;
   const nextHost = room.players.find(online);
@@ -1558,7 +1581,7 @@ function ensureWaitingHost(room) {
 }
 
 function transferHostAfterLeave(room, p) {
-  if (room.stage === 'waiting' && room.handNumber === 0) { ensureWaitingHost(room); return; }
+  if ((room.stage === 'waiting' && room.handNumber === 0) || room.stage === 'handover') { ensureConnectedHost(room); return; }
   if (p.name !== room.hostName) return;
   const nextHost = room.players.find((x) => x && !x.left);
   room.hostName = nextHost ? nextHost.name : null;
@@ -1572,11 +1595,11 @@ function handleLeave(socket, isDisconnect = false) {
   if (idx < 0) return;
   const p = room.players[idx];
 
-  if (isDisconnect && room.stage === 'waiting' && room.handNumber === 0) {
+  if (isDisconnect && ((room.stage === 'waiting' && room.handNumber === 0) || room.stage === 'handover')) {
     p.connected = false; p.socketId = null;
-    ensureWaitingHost(room);
+    ensureConnectedHost(room);
     addLog(room, `${p.name} 离线，保留座位`);
-    if (!room.players.some(x => x && x.connected)) {
+    if (room.stage === 'waiting' && !room.players.some(x => x && x.connected)) {
       clearTimeout(room.waitingCleanupTimer);
       room.waitingCleanupTimer = setTimeout(() => {
         if (room.stage === 'waiting' && room.handNumber === 0 && !room.players.some(x => x && x.connected)) rooms.delete(room.code);
