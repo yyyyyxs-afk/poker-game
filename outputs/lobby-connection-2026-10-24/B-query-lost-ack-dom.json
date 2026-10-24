@@ -1,0 +1,30 @@
+{
+  "createChips": "2000",
+  "createDisabled": true,
+  "createText": "创建房间",
+  "displayedRoom": "",
+  "errors": [
+    {
+      "id": "lobby-error",
+      "text": ""
+    },
+    {
+      "id": "create-form-error",
+      "text": ""
+    },
+    {
+      "id": "join-form-error",
+      "text": ""
+    }
+  ],
+  "gameVisible": false,
+  "joinDisabled": true,
+  "joinText": "查询中…",
+  "lobbyVisible": true,
+  "nickname": "查房诊断",
+  "roomCodeInput": "8TNRLD",
+  "viewport": {
+    "height": 320,
+    "width": 568
+  }
+}

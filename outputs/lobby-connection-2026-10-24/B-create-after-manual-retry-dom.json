@@ -1,0 +1,30 @@
+{
+  "createChips": "2460",
+  "createDisabled": false,
+  "createText": "创建房间",
+  "displayedRoom": "DUK3H8",
+  "errors": [
+    {
+      "id": "lobby-error",
+      "text": ""
+    },
+    {
+      "id": "create-form-error",
+      "text": ""
+    },
+    {
+      "id": "join-form-error",
+      "text": ""
+    }
+  ],
+  "gameVisible": true,
+  "joinDisabled": false,
+  "joinText": "加入",
+  "lobbyVisible": false,
+  "nickname": "回执丢失",
+  "roomCodeInput": "",
+  "viewport": {
+    "height": 812,
+    "width": 375
+  }
+}

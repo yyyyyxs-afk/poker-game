@@ -1,0 +1,30 @@
+{
+  "createChips": "2460",
+  "createDisabled": true,
+  "createText": "正在创建…",
+  "displayedRoom": "",
+  "errors": [
+    {
+      "id": "lobby-error",
+      "text": ""
+    },
+    {
+      "id": "create-form-error",
+      "text": ""
+    },
+    {
+      "id": "join-form-error",
+      "text": ""
+    }
+  ],
+  "gameVisible": false,
+  "joinDisabled": true,
+  "joinText": "加入",
+  "lobbyVisible": true,
+  "nickname": "回执丢失",
+  "roomCodeInput": "",
+  "viewport": {
+    "height": 812,
+    "width": 375
+  }
+}
