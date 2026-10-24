@@ -1408,6 +1408,15 @@ body.modal-open { overflow: hidden; }
   #play-stage { display:grid; grid-template-columns:minmax(0,1fr) clamp(206px,30vw,240px); min-height:0; height:100%; gap:10px; }
   #squid-progress { position:fixed; z-index:4; top:12px; right:calc(150px + env(safe-area-inset-right,0px)); left:auto; bottom:auto; font-size:10px; padding:0; pointer-events:none; }
   #table { width:100%; height:100%; min-height:0; }
+  /* 横屏矮桌：桌心三件套沿用竖屏压缩档，防止内容高(基础档约303px)超过矮桌高
+     (320 高横屏约260px)后双向溢出——上顶顶栏、下压手牌，并连带圆片兜底压牌 */
+  #table-inner { gap:6px; }
+  #stage-label { font-size:10px; letter-spacing:2px; }
+  #pot-display { gap:1px; }
+  #pot-display .pot-label { font-size:11px; }
+  #pot-display b { font-size:22px; }
+  #community { gap:5px; }
+  .card-slot, .card { width:34px; height:48px; }
   .seat.top-seat .hole-cards.is-facedown { bottom:calc(100% - 21px); }
   #hero-dock { width:100%; height:100%; min-height:0; justify-content:flex-start; overflow-y:auto; overscroll-behavior:contain; padding:0 3px 8px; gap:5px; }
   #hero-dock > * { flex-shrink:0; }
