@@ -215,6 +215,10 @@
             <button id="btn-chat-send" type="submit">发送</button>
           </form>
           <div id="chat-error" aria-live="polite"></div>
+          <details id="chat-delivery-records" class="hidden">
+            <summary>发送记录</summary>
+            <ul aria-label="待处理聊天原文"></ul>
+          </details>
         </div>
       </aside>
     </main>
@@ -368,6 +372,7 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
+  <script src="chat-delivery.js"></script>
   <script src="client.js"></script>
 </body>
 </html>

@@ -483,6 +483,7 @@ function enterRoom(code) {
   document.getElementById('lobby').classList.add('hidden');
   document.getElementById('game').classList.remove('hidden');
   document.getElementById('room-code-display').textContent = normalizedCode;
+  chatDelivery.refresh();
 }
 
 // ---------------- 断线自动重连（token 恢复座位，客户端行为） ----------------
@@ -1586,27 +1587,49 @@ function renderChats() {
     chatUnread.classList.remove('hidden');
     logToggleBtn.classList.add('has-unread');
   }
+  chatDelivery.setReadyRoom(state?.code, mySeat >= 0 && !!state?.players[mySeat]?.connected && socket.connected);
 }
 
 const chatForm = document.getElementById('chat-form');
 const chatInput = document.getElementById('chat-input');
 const chatSendBtn = document.getElementById('btn-chat-send');
 const chatError = document.getElementById('chat-error');
+let chatDraftVersion = 0;
+chatInput.addEventListener('input', () => { chatDraftVersion++; });
+const chatDelivery = createChatDelivery({
+  socket,
+  getRoom:() => activeRoomCode,
+  getDraft:() => ({value:chatInput.value,version:chatDraftVersion}),
+  clearDraft:() => {chatInput.value='';chatDraftVersion++;},
+  onChange:renderChatDelivery,
+});
+function renderChatDelivery(delivery) {
+  chatSendBtn.disabled = delivery.pending || !delivery.ready;
+  chatSendBtn.textContent = delivery.pending ? '发送中…' : '发送';
+  chatError.textContent = delivery.status;
+  chatError.dataset.kind = delivery.kind;
+  const details = document.getElementById('chat-delivery-records');
+  details.classList.toggle('hidden', !delivery.records.length);
+  details.querySelector('summary').textContent = `发送记录 · ${delivery.records.length}条待处理`;
+  const list = details.querySelector('ul');
+  list.replaceChildren();
+  delivery.records.forEach(record => {
+    const li=document.createElement('li'),text=document.createElement('p'),note=document.createElement('small');
+    text.textContent=record.raw; note.textContent=record.message;
+    li.append(text,note);
+    if (record.kind !== 'pending') {
+      const retry=document.createElement('button');
+      retry.type='button';retry.textContent=record.kind==='unconfirmed'?'核对记录后重发':'手动重发';
+      retry.disabled=delivery.pending || !delivery.ready;
+      retry.onclick=()=>chatDelivery.send(record.id);
+      li.appendChild(retry);
+    }
+    list.appendChild(li);
+  });
+}
 chatForm.addEventListener('submit', (event) => {
   event.preventDefault();
-  const text = chatInput.value.trim();
-  if (!text || chatSendBtn.disabled) return;
-  chatSendBtn.disabled = true;
-  chatError.textContent = '';
-  socket.emit('chat_message', { text }, (res) => {
-    chatSendBtn.disabled = false;
-    if (res && res.ok) {
-      chatInput.value = '';
-      chatInput.focus();
-    } else {
-      chatError.textContent = (res && res.err) || '发送失败，请重试';
-    }
-  });
+  chatDelivery.send();
 });
 
 // ---------------- 结算（两层，§17） ----------------
