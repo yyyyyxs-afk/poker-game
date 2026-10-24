@@ -5,6 +5,7 @@ const path = require('path');
 const root = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'public', 'index.html'), 'utf8');
 const client = fs.readFileSync(path.join(root, 'public', 'client.js'), 'utf8');
+const chat = fs.readFileSync(path.join(root, 'public', 'chat-delivery.js'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'public', 'style.css'), 'utf8');
 
 for (const id of [
@@ -32,7 +33,9 @@ assert.ok(html.includes('本游戏仅供好友娱乐，不涉及真钱交易。'
 assert.ok(client.includes('本局净盈亏') && client.includes('entry.delta'), '结算详情缺少单局净盈亏');
 assert.ok(client.includes('摊牌结果') && client.includes('最佳五张'), '结算详情缺少摊牌牌型复盘');
 assert.ok(client.includes('本局过程') && client.includes('state.lastResult'), '缺少行动时间线或跨局回看');
-assert.ok(client.includes("socket.emit('chat_message'") && client.includes('renderChats()'), '好友聊天未接入发送或渲染');
+assert.ok(chat.includes(".emit('chat_message'") && client.includes('chatDelivery.send()') && client.includes('renderChats()'), '好友聊天未接入发送或渲染');
+assert.ok(html.indexOf('src="chat-delivery.js"') >= 0 && html.indexOf('src="chat-delivery.js"') < html.indexOf('src="client.js"'), '聊天回执组件必须先加载');
+assert.ok(html.indexOf('src="lobby-requests.js"') >= 0 && html.indexOf('src="lobby-requests.js"') < html.indexOf('src="client.js"'), '大厅生命周期必须先加载');
 assert.ok(client.includes('p.seat === mySeat') && client.includes('0.82'), '自己的下注筹码缺少桌面下沿专用锚点');
 assert.ok(client.includes('me.raiseAllowed !== false') && client.includes('未重新开放加注权'),
   '客户端未按服务端加注权禁用操作');

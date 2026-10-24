@@ -1,0 +1,416 @@
+[
+  {
+    "at": "2026-10-24T08:52:55.585Z",
+    "event": "ready",
+    "port": 49645,
+    "seedCode": "8TNRLD",
+    "localTime": "16:52:55.585"
+  },
+  {
+    "at": "2026-10-24T08:53:08.903Z",
+    "event": "checkpoint",
+    "label": "A1_static_page_before_first_socket",
+    "localTime": "16:53:08.903"
+  },
+  {
+    "at": "2026-10-24T08:53:37.312Z",
+    "event": "checkpoint",
+    "label": "A1_create_clicked_offline",
+    "localTime": "16:53:37.312"
+  },
+  {
+    "at": "2026-10-24T08:53:37.314Z",
+    "event": "rooms",
+    "rooms": [
+      {
+        "code": "8TNRLD",
+        "stage": "waiting",
+        "players": [
+          {
+            "name": "隔离房主",
+            "connected": true
+          }
+        ]
+      }
+    ],
+    "localTime": "16:53:37.314"
+  },
+  {
+    "at": "2026-10-24T08:54:05.616Z",
+    "event": "checkpoint",
+    "label": "A1_before_recovery_no_second_click",
+    "localTime": "16:54:05.616"
+  },
+  {
+    "at": "2026-10-24T08:54:05.634Z",
+    "event": "connected",
+    "connection": 1,
+    "localTime": "16:54:05.634"
+  },
+  {
+    "at": "2026-10-24T08:54:05.645Z",
+    "event": "request",
+    "connection": 1,
+    "type": "create_room",
+    "fault": "normal",
+    "name": "初连创建",
+    "localTime": "16:54:05.645"
+  },
+  {
+    "at": "2026-10-24T08:54:05.650Z",
+    "event": "result",
+    "connection": 1,
+    "type": "create_room",
+    "ok": true,
+    "code": "QTPCHK",
+    "ack": "delivered",
+    "localTime": "16:54:05.650"
+  },
+  {
+    "at": "2026-10-24T08:54:17.451Z",
+    "event": "disconnected",
+    "connection": 1,
+    "reason": "transport close",
+    "localTime": "16:54:17.451"
+  },
+  {
+    "at": "2026-10-24T08:54:25.714Z",
+    "event": "checkpoint",
+    "label": "A2_query_before_first_socket",
+    "localTime": "16:54:25.714"
+  },
+  {
+    "at": "2026-10-24T08:54:51.692Z",
+    "event": "checkpoint",
+    "label": "A2_query_clicked_offline",
+    "localTime": "16:54:51.692"
+  },
+  {
+    "at": "2026-10-24T08:55:06.457Z",
+    "event": "checkpoint",
+    "label": "A2_before_recovery_no_second_click",
+    "localTime": "16:55:06.457"
+  },
+  {
+    "at": "2026-10-24T08:55:08.524Z",
+    "event": "connected",
+    "connection": 2,
+    "localTime": "16:55:08.524"
+  },
+  {
+    "at": "2026-10-24T08:55:08.533Z",
+    "event": "request",
+    "connection": 2,
+    "type": "room_info",
+    "fault": "normal",
+    "code": "8TNRLD",
+    "localTime": "16:55:08.533"
+  },
+  {
+    "at": "2026-10-24T08:55:08.534Z",
+    "event": "result",
+    "connection": 2,
+    "type": "room_info",
+    "ok": true,
+    "ack": "delivered",
+    "localTime": "16:55:08.534"
+  },
+  {
+    "at": "2026-10-24T08:56:34.191Z",
+    "event": "checkpoint",
+    "label": "B2_query_ack_loss_while_connected",
+    "localTime": "16:56:34.191"
+  },
+  {
+    "at": "2026-10-24T08:56:43.446Z",
+    "event": "request",
+    "connection": 2,
+    "type": "room_info",
+    "fault": "lost",
+    "code": "8TNRLD",
+    "localTime": "16:56:43.446"
+  },
+  {
+    "at": "2026-10-24T08:56:43.447Z",
+    "event": "result",
+    "connection": 2,
+    "type": "room_info",
+    "ok": true,
+    "ack": "dropped",
+    "localTime": "16:56:43.447"
+  },
+  {
+    "at": "2026-10-24T08:57:13.586Z",
+    "event": "checkpoint",
+    "label": "B2_query_still_busy",
+    "localTime": "16:57:13.586"
+  },
+  {
+    "at": "2026-10-24T08:57:13.588Z",
+    "event": "rooms",
+    "rooms": [
+      {
+        "code": "8TNRLD",
+        "stage": "waiting",
+        "players": [
+          {
+            "name": "隔离房主",
+            "connected": true
+          }
+        ]
+      },
+      {
+        "code": "QTPCHK",
+        "stage": "waiting",
+        "players": [
+          {
+            "name": "初连创建",
+            "connected": false
+          }
+        ]
+      }
+    ],
+    "localTime": "16:57:13.588"
+  },
+  {
+    "at": "2026-10-24T08:57:13.591Z",
+    "event": "disconnected",
+    "connection": 2,
+    "reason": "forced close",
+    "localTime": "16:57:13.591"
+  },
+  {
+    "at": "2026-10-24T08:57:34.676Z",
+    "event": "checkpoint",
+    "label": "B2_recovered_no_new_query",
+    "localTime": "16:57:34.676"
+  },
+  {
+    "at": "2026-10-24T08:57:35.185Z",
+    "event": "connected",
+    "connection": 3,
+    "localTime": "16:57:35.185"
+  },
+  {
+    "at": "2026-10-24T08:57:43.969Z",
+    "event": "disconnected",
+    "connection": 3,
+    "reason": "transport close",
+    "localTime": "16:57:43.969"
+  },
+  {
+    "at": "2026-10-24T08:57:44.336Z",
+    "event": "connected",
+    "connection": 4,
+    "localTime": "16:57:44.336"
+  },
+  {
+    "at": "2026-10-24T08:57:54.959Z",
+    "event": "checkpoint",
+    "label": "B1_connected_create_ack_loss",
+    "localTime": "16:57:54.959"
+  },
+  {
+    "at": "2026-10-24T08:58:04.142Z",
+    "event": "request",
+    "connection": 4,
+    "type": "create_room",
+    "fault": "lost",
+    "name": "回执丢失",
+    "localTime": "16:58:04.142"
+  },
+  {
+    "at": "2026-10-24T08:58:04.146Z",
+    "event": "result",
+    "connection": 4,
+    "type": "create_room",
+    "ok": true,
+    "code": "F88Z3G",
+    "ack": "dropped",
+    "localTime": "16:58:04.146"
+  },
+  {
+    "at": "2026-10-24T08:58:42.024Z",
+    "event": "checkpoint",
+    "label": "B1_create_still_busy",
+    "localTime": "16:58:42.024"
+  },
+  {
+    "at": "2026-10-24T08:58:42.026Z",
+    "event": "rooms",
+    "rooms": [
+      {
+        "code": "8TNRLD",
+        "stage": "waiting",
+        "players": [
+          {
+            "name": "隔离房主",
+            "connected": true
+          }
+        ]
+      },
+      {
+        "code": "QTPCHK",
+        "stage": "waiting",
+        "players": [
+          {
+            "name": "初连创建",
+            "connected": false
+          }
+        ]
+      },
+      {
+        "code": "F88Z3G",
+        "stage": "waiting",
+        "players": [
+          {
+            "name": "回执丢失",
+            "connected": true
+          }
+        ]
+      }
+    ],
+    "localTime": "16:58:42.026"
+  },
+  {
+    "at": "2026-10-24T08:58:42.028Z",
+    "event": "disconnected",
+    "connection": 4,
+    "reason": "forced close",
+    "localTime": "16:58:42.028"
+  },
+  {
+    "at": "2026-10-24T08:59:12.579Z",
+    "event": "checkpoint",
+    "label": "B1_reconnect_before_manual_retry",
+    "localTime": "16:59:12.579"
+  },
+  {
+    "at": "2026-10-24T08:59:14.333Z",
+    "event": "connected",
+    "connection": 5,
+    "localTime": "16:59:14.333"
+  },
+  {
+    "at": "2026-10-24T08:59:22.080Z",
+    "event": "rooms",
+    "rooms": [
+      {
+        "code": "8TNRLD",
+        "stage": "waiting",
+        "players": [
+          {
+            "name": "隔离房主",
+            "connected": true
+          }
+        ]
+      },
+      {
+        "code": "QTPCHK",
+        "stage": "waiting",
+        "players": [
+          {
+            "name": "初连创建",
+            "connected": false
+          }
+        ]
+      },
+      {
+        "code": "F88Z3G",
+        "stage": "waiting",
+        "players": [
+          {
+            "name": "回执丢失",
+            "connected": false
+          }
+        ]
+      }
+    ],
+    "localTime": "16:59:22.080"
+  },
+  {
+    "at": "2026-10-24T08:59:22.082Z",
+    "event": "checkpoint",
+    "label": "B1_explicit_manual_retry",
+    "localTime": "16:59:22.082"
+  },
+  {
+    "at": "2026-10-24T08:59:27.123Z",
+    "event": "request",
+    "connection": 5,
+    "type": "create_room",
+    "fault": "normal",
+    "name": "回执丢失",
+    "localTime": "16:59:27.123"
+  },
+  {
+    "at": "2026-10-24T08:59:27.126Z",
+    "event": "result",
+    "connection": 5,
+    "type": "create_room",
+    "ok": true,
+    "code": "DUK3H8",
+    "ack": "delivered",
+    "localTime": "16:59:27.126"
+  },
+  {
+    "at": "2026-10-24T08:59:32.449Z",
+    "event": "disconnected",
+    "connection": 5,
+    "reason": "transport close",
+    "localTime": "16:59:32.449"
+  },
+  {
+    "at": "2026-10-24T09:00:54.457Z",
+    "event": "checkpoint",
+    "label": "diagnosis_complete",
+    "localTime": "17:00:54.457"
+  },
+  {
+    "at": "2026-10-24T09:00:54.459Z",
+    "event": "rooms",
+    "rooms": [
+      {
+        "code": "8TNRLD",
+        "stage": "waiting",
+        "players": [
+          {
+            "name": "隔离房主",
+            "connected": true
+          }
+        ]
+      },
+      {
+        "code": "QTPCHK",
+        "stage": "waiting",
+        "players": [
+          {
+            "name": "初连创建",
+            "connected": false
+          }
+        ]
+      },
+      {
+        "code": "F88Z3G",
+        "stage": "waiting",
+        "players": [
+          {
+            "name": "回执丢失",
+            "connected": false
+          }
+        ]
+      },
+      {
+        "code": "DUK3H8",
+        "stage": "waiting",
+        "players": [
+          {
+            "name": "回执丢失",
+            "connected": false
+          }
+        ]
+      }
+    ],
+    "localTime": "17:00:54.459"
+  }
+]

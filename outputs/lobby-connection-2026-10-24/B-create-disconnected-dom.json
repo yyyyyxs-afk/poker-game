@@ -1,0 +1,30 @@
+{
+  "createChips": "2460",
+  "createDisabled": false,
+  "createText": "创建房间",
+  "displayedRoom": "",
+  "errors": [
+    {
+      "id": "lobby-error",
+      "text": ""
+    },
+    {
+      "id": "create-form-error",
+      "text": "连接中断，请重新提交"
+    },
+    {
+      "id": "join-form-error",
+      "text": ""
+    }
+  ],
+  "gameVisible": false,
+  "joinDisabled": false,
+  "joinText": "加入",
+  "lobbyVisible": true,
+  "nickname": "回执丢失",
+  "roomCodeInput": "",
+  "viewport": {
+    "height": 812,
+    "width": 375
+  }
+}

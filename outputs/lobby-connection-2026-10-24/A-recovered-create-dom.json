@@ -1,0 +1,30 @@
+{
+  "createChips": "2340",
+  "createDisabled": false,
+  "createText": "创建房间",
+  "displayedRoom": "QTPCHK",
+  "errors": [
+    {
+      "id": "lobby-error",
+      "text": ""
+    },
+    {
+      "id": "create-form-error",
+      "text": ""
+    },
+    {
+      "id": "join-form-error",
+      "text": ""
+    }
+  ],
+  "gameVisible": true,
+  "joinDisabled": false,
+  "joinText": "加入",
+  "lobbyVisible": false,
+  "nickname": "初连创建",
+  "roomCodeInput": "",
+  "viewport": {
+    "height": 812,
+    "width": 375
+  }
+}

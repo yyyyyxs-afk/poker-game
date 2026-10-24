@@ -307,33 +307,49 @@ function validateCreateFields(){
   return true;
 }
 
-/** 大厅请求只允许一个在途：同时锁住创建和加入，避免同一 socket 被快速点进多个房间。 */
-function beginLobbySubmission(kind, expectedRoom = '') {
-  if (lobbySubmission) return false;
-  lobbySubmission = kind;
-  lobbyExpectedRoom = expectedRoom;
-  for(const el of document.querySelectorAll('#create-options input,#create-options select,#create-options button,#nickname,#room-code,#btn-create,#btn-join,#btn-create-back,#btn-join-confirm,#btn-join-back'))el.disabled=true;
-  createRoomBtn.textContent = kind === 'create' ? '创建中…' : '创建房间';
-  joinRoomBtn.textContent = kind === 'join' ? '加入中…' : kind==='preview'?'查询中…':'加入';
-  const busyBtn = kind === 'create' ? document.getElementById('btn-create-confirm') : kind==='join'?document.getElementById('btn-join-confirm'):joinRoomBtn;
-  if(kind==='create')busyBtn.textContent='正在创建…';
-  if(kind==='join')busyBtn.textContent='正在加入…';
-  busyBtn.setAttribute('aria-busy', 'true');
-  showLobbyError('');
-  return true;
+const lobbyRequests=createLobbyRequests({socket,onChange:renderLobbyRequestState});
+function renderLobbyRequestState(s) {
+  lobbySubmission=s.pendingKind;
+  lobbyExpectedRoom=s.pendingCode||s.unknown?.code||'';
+  const mutationBusy=!!s.pendingKind&&s.pendingKind!=='preview';
+  for(const el of document.querySelectorAll('#create-options input,#create-options select,#create-mode button,#create-squid-settings button,#nickname,#room-code'))el.disabled=mutationBusy;
+  const createConfirm=document.getElementById('btn-create-confirm'),joinConfirm=document.getElementById('btn-join-confirm');
+  createConfirm.disabled=!!s.pendingKind||!!s.unknown;
+  joinConfirm.disabled=!!s.pendingKind||!!s.unknown||s.replacement;
+  joinRoomBtn.disabled=!!s.pendingKind||!!s.unknown||s.replacement;
+  joinRoomBtn.textContent=s.pendingKind==='preview'?'查询中…':s.unknown||s.replacement?'待核对':'加入';
+  createConfirm.textContent=s.pendingKind==='create'?'正在创建…':s.unknown?'结果待核对':s.replacement?'创建新房间':'创建房间';
+  joinConfirm.textContent=s.pendingKind==='join'?'正在加入…':s.unknown?'结果待核对':'确认加入';
+  for(const [button,kind] of [[createConfirm,'create'],[joinConfirm,'join'],[joinRoomBtn,'preview']]){
+    if(s.pendingKind===kind)button.setAttribute('aria-busy','true');else button.removeAttribute('aria-busy');
+  }
+  const connectionText={connecting:'正在连接牌局服务；可先填写资料。',failed:'连接未成功，正在重试；资料已保留。',offline:'连接已断开，正在重连；资料已保留。',ready:'已连接牌局服务。',recovered:'连接已恢复；请主动提交，不会自动执行之前操作。'};
+  const connectionLabel=document.getElementById('lobby-connection');
+  if(connectionLabel.textContent!==connectionText[s.connection])connectionLabel.textContent=connectionText[s.connection];
+  document.getElementById('lobby-request-message').textContent=s.message;
+  const details=document.getElementById('lobby-unknown');
+  details.classList.toggle('hidden',!s.unknown);
+  document.getElementById('btn-lobby-unknown-open').classList.toggle('hidden',!s.unknown);
+  if(s.unknown)document.getElementById('lobby-unknown-original').textContent=`原操作：${s.unknown.kind==='create'?'创建房间':'加入房间'} · ${s.unknown.name}${s.unknown.code?' · '+s.unknown.code:''}`;
+  else {details.open=false;document.getElementById('lobby-abandon-confirm').checked=false;}
+  document.getElementById('btn-lobby-abandon').disabled=!document.getElementById('lobby-abandon-confirm').checked;
 }
-function endLobbySubmission(kind = lobbySubmission) {
-  if (!lobbySubmission || kind !== lobbySubmission) return;
-  lobbySubmission = '';
-  lobbyExpectedRoom = '';
-  for(const el of document.querySelectorAll('#create-options input,#create-options select,#create-options button,#nickname,#room-code,#btn-create,#btn-join,#btn-create-back,#btn-join-confirm,#btn-join-back'))el.disabled=false;
-  createRoomBtn.textContent = '创建房间';
-  joinRoomBtn.textContent = '加入';
-  createRoomBtn.removeAttribute('aria-busy');
-  joinRoomBtn.removeAttribute('aria-busy');
-  for(const id of ['btn-create-confirm','btn-join-confirm'])document.getElementById(id).removeAttribute('aria-busy');
-  document.getElementById('btn-create-confirm').textContent='创建房间';
-  document.getElementById('btn-join-confirm').textContent='确认加入';
+function moveLobbyFeedback(view) {
+  document.getElementById(view==='create'?'create-feedback-slot':view==='join'?'join-feedback-slot':'lobby-feedback-slot').appendChild(document.getElementById('lobby-feedback'));
+  document.getElementById(view==='create'?'create-unknown-slot':view==='join'?'join-unknown-slot':'lobby-unknown-slot').appendChild(document.getElementById('lobby-unknown'));
+}
+document.getElementById('btn-lobby-unknown-open').onclick=()=>{
+  const details=document.getElementById('lobby-unknown');details.open=true;details.querySelector('summary').focus();details.scrollIntoView({block:'nearest'});
+};
+document.getElementById('lobby-abandon-confirm').onchange=()=>lobbyRequests.refresh();
+document.getElementById('btn-lobby-abandon').onclick=()=>{
+  if(lobbyRequests.abandonForNewRoom(document.getElementById('lobby-abandon-confirm').checked))showCreateOptions(true);
+};
+lobbyRequests.refresh();
+function sendLobbyRequest(kind,payload,callbacks) {
+  const sent=lobbyRequests.send(kind,payload,callbacks);
+  const feedback=document.getElementById('lobby-feedback');feedback.focus({preventScroll:true});feedback.scrollIntoView({block:'nearest'});
+  return sent;
 }
 
 document.getElementById('create-options').onsubmit = event => {
@@ -343,38 +359,22 @@ document.getElementById('create-options').onsubmit = event => {
   const name = getName();
   if (!name) return;
   if(!validateCreateFields())return;
-  if (!beginLobbySubmission('create')) return;
   const settings={startChips:Number(document.getElementById('create-chips').value),smallBlind:Number(document.getElementById('create-sb').value),bigBlind:Number(document.getElementById('create-bb').value),actionTime:Number(document.getElementById('create-action').value),nextHandDelay:Number(document.getElementById('create-delay').value),rebuyAllowed:document.getElementById('create-rebuy').value==='true'};
   const mode=selectedCreateMode();
-  socket.emit('create_room', { name,mode,settings,...(mode==='squid'?{squidPayment:Number(document.getElementById('create-payment').value)}:{}) }, (res) => {
-    if (lobbySubmission !== 'create') return;
-    if (res && res.ok) {
+  sendLobbyRequest('create', { name,mode,settings,...(mode==='squid'?{squidPayment:Number(document.getElementById('create-payment').value)}:{}) }, {success:res=>{
       saveAuth(res.code, name, res.token);
-      endLobbySubmission('create');
       enterRoom(res.code);
-    } else {
-      endLobbySubmission('create');
-      showLobbyError((res && res.err) || '创建失败，请稍后重试');
-    }
-  });
+  },rejected:res=>showLobbyError(res.err||'创建被拒绝，请检查资料。')});
 };
 function submitJoin() {
   const name = getName();
   const code = document.getElementById('room-code').value.trim().toUpperCase();
   if (!name) return;
   if (!/^[A-Z0-9]{6}$/.test(code)) return showLobbyError('请输入 6 位邀请码');
-  if (!beginLobbySubmission('join', code)) return;
-  socket.emit('join_room', { code, name, token: storedToken()[`${code}_${name}`] }, (res) => {
-    if (lobbySubmission !== 'join') return;
-    if (res && res.ok) {
+  sendLobbyRequest('join', { code, name, token: storedToken()[`${code}_${name}`] }, {success:res=>{
       saveAuth(res.code, name, res.token);
-      endLobbySubmission('join');
       enterRoom(res.code);
-    } else {
-      endLobbySubmission('join');
-      showLobbyError((res && res.err) || '加入失败，请稍后重试');
-    }
-  });
+  },rejected:res=>showLobbyError(res.err||'加入被拒绝，请检查资料。')});
  }
 let previewCode='';
 joinRoomBtn.onclick=()=>{
@@ -382,12 +382,8 @@ joinRoomBtn.onclick=()=>{
   if(!name)return;
   if(!/^[A-Z0-9]{6}$/.test(code))return showLobbyError('请输入6位邀请码');
   if(storedToken()[`${code}_${name}`])return submitJoin();
-  if(!beginLobbySubmission('preview',code))return;
   document.getElementById('join-preview').classList.add('hidden');
-  socket.emit('room_info',{code},res=>{
-    if(lobbySubmission!=='preview')return;
-    endLobbySubmission('preview');
-    if(!res?.ok)return showLobbyError(res?.err||'查询失败');
+  sendLobbyRequest('preview',{code},{success:res=>{
     if(document.getElementById('room-code').value.trim().toUpperCase()!==code)return;
     previewCode=code;
     const info=res.info,c=info.settings,isSquid=info.mode==='squid';
@@ -403,23 +399,28 @@ joinRoomBtn.onclick=()=>{
     for(const id of ['btn-create','join-divider','join-entry'])document.getElementById(id).classList.add('hidden');
     document.getElementById('join-name-slot').appendChild(document.getElementById('nickname-field'));
     document.getElementById('join-preview').classList.remove('hidden');
+    moveLobbyFeedback('join');
     document.getElementById('join-preview-title').focus();
-  });
+  },rejected:res=>showLobbyError(res.err||'查询失败，请核对房号。')});
 };
 document.getElementById('btn-join-confirm').onclick=()=>{
   if(previewCode!==document.getElementById('room-code').value.trim().toUpperCase())return showLobbyError('邀请码已变化，请重新查询房间说明');
   submitJoin();
 };
 function closeJoinPreview(){
+  lobbyRequests.leaveView();
   lobbyCard.classList.remove('joining');
   document.getElementById('join-preview').classList.add('hidden');
   document.getElementById('nickname-home-slot').appendChild(document.getElementById('nickname-field'));
   for(const id of ['btn-create','join-divider','join-entry'])document.getElementById(id).classList.remove('hidden');
+  moveLobbyFeedback('home');
   previewCode='';clearLobbyErrors();document.getElementById('room-code').focus();
 }
 document.getElementById('btn-join-back').onclick=closeJoinPreview;
-document.getElementById('room-code').addEventListener('input',()=>{previewCode='';document.getElementById('join-preview').classList.add('hidden');});
+document.getElementById('room-code').addEventListener('input',()=>{lobbyRequests.cancelQuery();previewCode='';document.getElementById('join-preview').classList.add('hidden');});
+document.getElementById('nickname').addEventListener('input',()=>lobbyRequests.cancelQuery());
 function showCreateOptions(open){
+  lobbyRequests.leaveView();
   lobbyCard.classList.toggle('creating',open);
   lobbyCard.classList.remove('joining');
   document.getElementById(open?'create-name-slot':'nickname-home-slot').appendChild(document.getElementById('nickname-field'));
@@ -428,6 +429,7 @@ function showCreateOptions(open){
   for(const id of ['btn-create','join-divider','join-entry'])document.getElementById(id).classList.toggle('hidden',open);
   document.querySelector('.lobby-facts').classList.toggle('hidden',open);
   document.getElementById('join-preview').classList.add('hidden');
+  moveLobbyFeedback(open?'create':'home');
   clearLobbyErrors();
   if(open){renderCreateOptions();document.querySelector('[name="create-mode"]:checked').focus();}else createRoomBtn.focus();
 }
@@ -483,6 +485,7 @@ function enterRoom(code) {
   document.getElementById('lobby').classList.add('hidden');
   document.getElementById('game').classList.remove('hidden');
   document.getElementById('room-code-display').textContent = normalizedCode;
+  chatDelivery.refresh();
 }
 
 // ---------------- 断线自动重连（token 恢复座位，客户端行为） ----------------
@@ -710,7 +713,6 @@ socket.on('connect', () => {
   // 只恢复本页已经进入的牌局；大厅里的旧 last-room 不能因网络抖动自行把页面带走。
   if (!activeRoomCode || document.getElementById('game').classList.contains('hidden')) {
     connOverlay.classList.add('hidden');
-    endLobbySubmission();
     return;
   }
   reconnectAttempts = 0;
@@ -720,9 +722,6 @@ socket.on('connect', () => {
 });
 socket.on('disconnect', () => {
   if (!activeRoomCode || document.getElementById('game').classList.contains('hidden')) {
-    const wasSubmitting = !!lobbySubmission;
-    endLobbySubmission();
-    if (wasSubmitting) showLobbyError('连接中断，请重新提交');
     return;
   }
   hideRaisePanel();
@@ -1586,27 +1585,49 @@ function renderChats() {
     chatUnread.classList.remove('hidden');
     logToggleBtn.classList.add('has-unread');
   }
+  chatDelivery.setReadyRoom(state?.code, mySeat >= 0 && !!state?.players[mySeat]?.connected && socket.connected);
 }
 
 const chatForm = document.getElementById('chat-form');
 const chatInput = document.getElementById('chat-input');
 const chatSendBtn = document.getElementById('btn-chat-send');
 const chatError = document.getElementById('chat-error');
+let chatDraftVersion = 0;
+chatInput.addEventListener('input', () => { chatDraftVersion++; });
+const chatDelivery = createChatDelivery({
+  socket,
+  getRoom:() => activeRoomCode,
+  getDraft:() => ({value:chatInput.value,version:chatDraftVersion}),
+  clearDraft:() => {chatInput.value='';chatDraftVersion++;},
+  onChange:renderChatDelivery,
+});
+function renderChatDelivery(delivery) {
+  chatSendBtn.disabled = delivery.pending || !delivery.ready;
+  chatSendBtn.textContent = delivery.pending ? '发送中…' : '发送';
+  chatError.textContent = delivery.status;
+  chatError.dataset.kind = delivery.kind;
+  const details = document.getElementById('chat-delivery-records');
+  details.classList.toggle('hidden', !delivery.records.length);
+  details.querySelector('summary').textContent = `发送记录 · ${delivery.records.length}条待处理`;
+  const list = details.querySelector('ul');
+  list.replaceChildren();
+  delivery.records.forEach(record => {
+    const li=document.createElement('li'),text=document.createElement('p'),note=document.createElement('small');
+    text.textContent=record.raw; note.textContent=record.message;
+    li.append(text,note);
+    if (record.kind !== 'pending') {
+      const retry=document.createElement('button');
+      retry.type='button';retry.textContent=record.kind==='unconfirmed'?'核对记录后重发':'手动重发';
+      retry.disabled=delivery.pending || !delivery.ready;
+      retry.onclick=()=>chatDelivery.send(record.id);
+      li.appendChild(retry);
+    }
+    list.appendChild(li);
+  });
+}
 chatForm.addEventListener('submit', (event) => {
   event.preventDefault();
-  const text = chatInput.value.trim();
-  if (!text || chatSendBtn.disabled) return;
-  chatSendBtn.disabled = true;
-  chatError.textContent = '';
-  socket.emit('chat_message', { text }, (res) => {
-    chatSendBtn.disabled = false;
-    if (res && res.ok) {
-      chatInput.value = '';
-      chatInput.focus();
-    } else {
-      chatError.textContent = (res && res.err) || '发送失败，请重试';
-    }
-  });
+  chatDelivery.send();
 });
 
 // ---------------- 结算（两层，§17） ----------------

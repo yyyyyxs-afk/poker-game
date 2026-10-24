@@ -1,0 +1,50 @@
+{
+  "browserRequestCounts": {
+    "create_room": 3,
+    "join_room": 4,
+    "room_info": 6
+  },
+  "requestsBeforeFirstActiveCreation": 0,
+  "createRequestsFromUnknownUntilExplicitNew": 1,
+  "joinDisconnectAfterSendMs": 7954,
+  "tokenRejoinResults": [
+    {
+      "at": "2026-10-24T12:38:29.230Z",
+      "event": "result",
+      "connection": 3,
+      "type": "join_room",
+      "ok": true,
+      "code": "M5LYMM",
+      "ack": "delivered"
+    }
+  ],
+  "createResults": [
+    {
+      "at": "2026-10-24T12:37:52.711Z",
+      "event": "result",
+      "connection": 2,
+      "type": "create_room",
+      "ok": true,
+      "code": "M5LYMM",
+      "ack": "delivered"
+    },
+    {
+      "at": "2026-10-24T12:44:47.582Z",
+      "event": "result",
+      "connection": 7,
+      "type": "create_room",
+      "ok": true,
+      "code": "PZQ5E3",
+      "ack": "held"
+    },
+    {
+      "at": "2026-10-24T12:49:43.375Z",
+      "event": "result",
+      "connection": 9,
+      "type": "create_room",
+      "ok": true,
+      "code": "NZS8TB",
+      "ack": "delivered"
+    }
+  ]
+}
