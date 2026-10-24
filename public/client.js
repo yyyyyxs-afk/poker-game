@@ -738,7 +738,6 @@ function render() {
     updateWinnerSeats();
     renderTableInfo();
     renderSeats();
-    renderBets();
     renderCommunity();
     renderMyArea();
     renderLogs();
@@ -748,6 +747,8 @@ function render() {
     renderNextHandStatus();
     renderResults();
     renderSquid();
+    // 手牌、操作区和冻结提示都会影响桌面高度；全部更新后再量下注坐标。
+    renderBets();
   } catch (e) {
     // 渲染异常不应白屏：把错误显示在提示区，座位区保留上次内容
     console.error(e);
@@ -1038,7 +1039,7 @@ function renderHeroSeat(me) {
       <img class="avatar-img" src="${avatarPng(me.seat)}" alt="我的头像" />${squidMarkHtml(me)}
       <div class="seat-copy">
         <strong>${escapeHtml(me.name)}</strong>
-        <span class="seat-chips">${me.chips}${me.frozen ? `<small class="frozen-chips"> 冻${me.frozen}</small>` : ''}</span>
+        ${me.frozen ? `<span class="seat-chips hero-balances"><span>可用 ${me.chips}</span><span class="hero-frozen">冻结 ${me.frozen}</span></span>` : `<span class="seat-chips">${me.chips}</span>`}
       </div>
       ${stateBadge ? `<span class="state-badge">${stateBadge}</span>` : ''}
     </div>
@@ -1059,6 +1060,7 @@ function renderBets() {
   if (state.stage === 'waiting') return;
   const tableEl = document.getElementById('table');
   const tableRect = tableEl.getBoundingClientRect();
+  const wrapRect = wrap.getBoundingClientRect();
   if (!tableRect.width) return;
 
   // 障碍：桌心中央区三件套 + 全部席位卡（含 hero；自家卡单独判定不压数字）
@@ -1098,8 +1100,8 @@ function renderBets() {
     const vlen = Math.hypot(vx, vy) || 1;
     vx /= vlen; vy /= vlen;
 
-    // 碰撞 margin 语义：正数=更严格（提前判撞），负数=允许轻擦。
-    // 中央区不允许任何压盖（+2）；其他席位卡允许轻擦 3px（密集桌的圆片贴边）；
+    // overlaps 的正 margin 缩小障碍（允许轻擦），负 margin 扩大障碍。
+    // 中央区沿边允许轻擦 2px；其他席位卡保留 3px 间距；
     // 自家卡允许贴沿 4px（圆片底边擦到卡片边框，不遮昵称/筹码数字）。
     const blocked = (px, py) => {
       const r = { left: px - halfW, right: px + halfW, top: py - halfH, bottom: py + halfH };
@@ -1116,8 +1118,9 @@ function renderBets() {
       return false;
     };
     const place = (px, py) => {
-      chip.style.left = (px - tableRect.left) + 'px';
-      chip.style.top = (py - tableRect.top) + 'px';
+      // 搜索点是视口中的中心；样式是 #bets 内的左上角（不含牌桌边框）。
+      chip.style.left = (px - wrapRect.left - halfW) + 'px';
+      chip.style.top = (py - wrapRect.top - halfH) + 'px';
       chip.style.visibility = '';
     };
 
@@ -1162,7 +1165,8 @@ function renderBets() {
     let bestScore = Infinity;
     for (const [px, py] of edges) {
       const r = { left: px - halfW, right: px + halfW, top: py - halfH, bottom: py + halfH };
-      if (r.left < 0 || r.right > tableRect.width || r.top < 0 || r.bottom > tableRect.height) continue;
+      if (r.left < tableRect.left || r.right > tableRect.right ||
+          r.top < tableRect.top || r.bottom > tableRect.bottom) continue;
       let s = 2; // 贴自家卡
       obstacles.forEach((o, i) => {
         if (overlaps(r, o, 0)) s += [3, 6, 10][i] || 5; // [label, pot, community]

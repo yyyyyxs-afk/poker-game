@@ -224,3 +224,55 @@ if (fail) {
   process.exit(1);
 }
 console.log('ALL PASS（4 布局 × 2~6 人 × 全席位：零相交、不出界；' + warns + ' 处拥挤/归属豁免已由色描边兜底）');
+
+// 2026-10-24 实测坐标回归：直接执行生产 renderBets，避免再抄一份定位算法。
+// fixtures/bet-dom.json 来自本地375/568六人DOM；这里只模拟元素尺寸和样式落点，
+// 不代替真实浏览器的字体、层级和显示检查。
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const source = fs.readFileSync(require.resolve('../public/client.js'), 'utf8');
+const renderBody = source.slice(source.indexOf('function render() {'),source.indexOf('/** 房间配置'));
+assert(renderBody.indexOf('renderBets();') > renderBody.indexOf('renderSquid();'), '操作区/冻结提示完成后才能测量下注');
+const renderSource = source.slice(source.indexOf('function renderBets() {'), source.indexOf('// 视口变化后按新布局重新定位'));
+const samples = require('./fixtures/bet-dom.json');
+function runMeasured(sample, dy = 0, forceFallback = false, width = 40) {
+  const shifted = r => ({ ...r, top:r.top + dy, bottom:r.bottom + dy });
+  const table = shifted(sample.table), origin = shifted(sample.wrap);
+  const cards = sample.seats.map(s => ({seat:s.seat, rect:shifted(s.rect)}));
+  const chips = [];
+  const element = r => ({getBoundingClientRect:() => r, classList:{contains:() => false}});
+  const wrap = {getBoundingClientRect:() => origin, appendChild:c => chips.push(c), innerHTML:''};
+  const doc = {
+    getElementById(id) {
+      if (id === 'bets') return wrap;
+      if (id === 'table') return element(table);
+      const o = sample.obstacles.find(o => o.id === id);
+      return o ? element(forceFallback ? table : shifted(o.rect)) : null;
+    },
+    querySelectorAll:() => cards.map(c => ({dataset:{seat:String(c.seat)},querySelector:() => element(c.rect)})),
+    querySelector:() => element(shifted(sample.hero)),
+    createElement:() => ({style:{setProperty(){}},offsetWidth:width,offsetHeight:18}),
+  };
+  const context = { document:doc, mySeat:0, state:{stage:'preflop',players:Array.from({length:6},(_,seat)=>({seat,roundBet:20}))} };
+  vm.runInNewContext(renderSource + '\nrenderBets();', context);
+  return {table,cards,chips:chips.map((c,seat) => ({seat,left:origin.left+parseFloat(c.style.left),top:origin.top+parseFloat(c.style.top),width,height:18}))};
+}
+for (const sample of samples) {
+  const actual = runMeasured(sample);
+  for (const c of actual.chips) {
+    assert(c.left >= actual.table.left && c.left+c.width <= actual.table.right, '下注横向出桌');
+    assert(c.top >= actual.table.top && c.top+c.height <= actual.table.bottom, '下注纵向出桌');
+    for (const s of actual.cards) {
+      // 生产搜索允许自家卡4px边框轻擦，不能压进昵称/筹码内部。
+      const inset = s.seat === c.seat ? 4 : 0;
+      assert(!(c.left+c.width>s.rect.left+inset && c.left<s.rect.right-inset && c.top+c.height>s.rect.top+inset && c.top<s.rect.bottom-inset), `下注压席位${s.seat}`);
+    }
+  }
+  for (const width of [40,56]) {
+    const base = runMeasured(sample,0,true,width);
+    const moved = runMeasured(sample,700,true,width);
+    moved.chips.forEach((c,i)=>assert(Math.abs(c.left-base.chips[i].left)<0.001 && Math.abs(c.top-700-base.chips[i].top)<0.001,'fallback必须使用同一视口坐标系'));
+  }
+}
+console.log('PASS 实测DOM夹具：生产renderBets中心换算、边框原点、fallback平移一致性（含长标签）');

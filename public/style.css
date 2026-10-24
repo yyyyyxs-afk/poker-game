@@ -443,7 +443,7 @@ body {
 
 /* ============ 下注筹码：贴自家席位短伸，席位色描边标归属 ============ */
 .bet-chip {
-  position: absolute; z-index: 2;
+  position: absolute; z-index: 4; /* 定位先避开席位文字；筹码不被邻座装饰牌背遮字。 */
   display: inline-flex; align-items: center; gap: 5px;
   padding: 3px 9px 3px 5px;
   border: 1.5px solid var(--chip-c, var(--a1-line));
@@ -1243,6 +1243,8 @@ body.modal-open { overflow: hidden; }
 #squid-progress { align-self:flex-end; color:var(--a1-text-soft); font-size:11px; line-height:18px; padding:0 4px; }
 .squid-mark { position:absolute; left:3px; bottom:1px; font-size:12px; color:#80e6c1; text-shadow:0 1px 3px #102a24; }
 .frozen-chips { font-size:9px; color:var(--a1-text-soft); font-weight:normal; white-space:nowrap; }
+#hero-seat .hero-balances { display:flex; flex-direction:column; gap:1px; font-size:12px; line-height:1.2; white-space:nowrap; }
+#hero-seat .hero-frozen { color:var(--a1-text-soft); font-weight:normal; }
 #squid-controls { max-width:520px; width:100%; font-size:12px; color:var(--a1-text-soft); }
 #squid-controls summary { text-align:center; cursor:pointer; }
 #squid-controls p { margin:8px 0; line-height:1.5; }

@@ -13,6 +13,8 @@ const poll=setInterval(()=>{
 },100);
 readline.createInterface({input:process.stdin}).on('line',async line=>{
   if(!room)return;
+  if(line==='status')return console.log('UI_STATUS='+JSON.stringify({stage:room.stage,hand:room.handNumber,players:room.players.map((p,seat)=>({seat,name:p.name,chips:p.chips,frozen:require('../squid').frozen(p),roundBet:p.roundBet}))}));
+  if(line.startsWith('raise '))return console.log('UI_RAISE='+JSON.stringify(applyAction(room,room.turnSeat,'raise',Number(line.slice(6)))));
   if(line.startsWith('bots ')){
     const count=Math.min(Number(line.slice(5)),6-room.players.filter(p=>!p.left).length);
     const current=room;
