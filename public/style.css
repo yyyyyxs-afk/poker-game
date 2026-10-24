@@ -959,12 +959,15 @@ body.modal-open { overflow: hidden; }
   .blinds { white-space: nowrap; }
   #hand-info { display: none; } /* 阶段信息由桌心 stage-label 承担，省出高度 */
 
-  /* ---- Poker Table：宽度驱动高度的跑道桌，席位围绕桌沿 ---- */
+  /* ---- Poker Table：竖椭圆牌桌（顺应手机竖屏形态），席位沿竖向长弧分布 ---- */
   #play-layout { padding: 8px 8px 10px; gap: 6px; }
   #play-stage { justify-content: flex-start; }
   #table {
     width: 100%; flex: none;
-    aspect-ratio: 1 / 1; min-height: 260px;
+    aspect-ratio: 100 / 118;
+    max-height: calc(100vh - 318px); /* 预留 Hero 手牌+操作区（vh 兜底） */
+    max-height: calc(100dvh - 318px);
+    min-height: 240px;
     border-width: 8px;
     margin-top: 2px;
   }
@@ -982,6 +985,7 @@ body.modal-open { overflow: hidden; }
   #community { gap: 7px; }
   .card-slot { width: 40px; height: 57px; }
   .card { width: 40px; height: 57px; }
+  #table-inner { gap: 7px; }
   .card .idx b { font-size: 12px; }
   .card .idx i { font-size: 9px; }
   .card .pip { font-size: 19px; }
@@ -1004,11 +1008,10 @@ body.modal-open { overflow: hidden; }
   #hero-row { gap: 12px; min-height: 56px; }
   .seat-card.me-seat { min-width: 0; padding: 5px 10px 5px 5px; }
   #my-cards { gap: 6px; }
-  #my-cards .card { width: 52px; height: 74px; }
-  #my-cards .card .idx b { font-size: 15px; }
-  #my-cards .card .idx i { font-size: 11px; }
-  #my-cards .card .pip { font-size: 26px; }
-  #turn-timer .timer-ring { width: 46px; height: 46px; }
+  #my-cards .card { width: 58px; height: 82px; }
+  #my-cards .card .idx b { font-size: 17px; }
+  #my-cards .card .idx i { font-size: 12px; }
+  #my-cards .card .pip { font-size: 29px; }  #turn-timer .timer-ring { width: 46px; height: 46px; }
   #turn-timer .timer-ring b { width: 36px; height: 36px; font-size: 13px; }
   #action-hint { font-size: 13px; min-height: 18px; }
 
@@ -1132,9 +1135,9 @@ body.modal-open { overflow: hidden; }
   .card-slot, .card { width: 34px; height: 48px; }
   #pot-display b { font-size: 22px; }
   .raise-presets .preset { font-size: 11px; }
-  #my-cards .card { width: 44px; height: 62px; }
-  #my-cards .card .idx b { font-size: 13px; }
-  #my-cards .card .pip { font-size: 22px; }
+  #my-cards .card { width: 50px; height: 70px; }
+  #my-cards .card .idx b { font-size: 14px; }
+  #my-cards .card .pip { font-size: 25px; }
 }
 
 /* 320×568：六人桌仍保留完整桌面，压缩 Dock 的垂直节奏，主操作无需页面滚动。 */

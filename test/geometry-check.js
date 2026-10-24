@@ -29,23 +29,23 @@ const OWN_MARGIN = 5;                // 归属判据：显著更近的最小差�
 
 const LAYOUTS = [
   {
-    name: '320 竖屏 1:1 桌（真机校准）',
+    name: '320 竖屏竖椭圆桌 100:118（真机校准 2026-10-24）',
     narrow: true, veryNarrow: true, landscape: false,
-    seatHalfW: 16, seatHalfH: 6.4, chipHalfW: 8, chipHalfH: 4,
+    seatHalfW: 16, seatHalfH: 6.0, chipHalfW: 8, chipHalfH: 4,
     zones: [
-      { name: 'label', x1: 40, x2: 60, y1: 23.3, y2: 27 },
-      { name: 'pot', x1: 30, x2: 70, y1: 31, y2: 45.5 },
-      { name: 'community', x1: 17, x2: 83, y1: 49.3, y2: 66 },
+      { name: 'label', x1: 40, x2: 60, y1: 33.6, y2: 37 },
+      { name: 'pot', x1: 30, x2: 70, y1: 37, y2: 46 },
+      { name: 'community', x1: 17, x2: 83, y1: 46, y2: 60.5 },
     ],
   },
   {
-    name: '375 竖屏 1:1 桌',
+    name: '390 竖屏竖椭圆桌 100:118（真机校准 2026-10-24）',
     narrow: true, veryNarrow: false, landscape: false,
-    seatHalfW: 14.2, seatHalfH: 5.2, chipHalfW: 7.8, chipHalfH: 4,
+    seatHalfW: 12.5, seatHalfH: 4.3, chipHalfW: 7.8, chipHalfH: 4,
     zones: [
-      { name: 'label', x1: 40, x2: 60, y1: 30.9, y2: 34.8 },
-      { name: 'pot', x1: 30, x2: 70, y1: 38.2, y2: 49.9 },
-      { name: 'community', x1: 18.2, x2: 81.8, y1: 53.2, y2: 69.1 },
+      { name: 'label', x1: 40, x2: 60, y1: 35, y2: 38.5 },
+      { name: 'pot', x1: 30, x2: 70, y1: 38.5, y2: 48.5 },
+      { name: 'community', x1: 18.2, x2: 81.8, y1: 48.5, y2: 63 },
     ],
   },
   {
@@ -75,12 +75,13 @@ function seatPosition(index, total, L) {
   const angleDeg = 90 + (index / total) * 360;
   const rad = (angleDeg * Math.PI) / 180;
   const { narrow, veryNarrow, landscape } = L;
-  const rx = 44, ry = narrow ? 40 : 42;
+  const rx = 44, ry = narrow ? (landscape ? 40 : 46) : 42; // 竖屏竖椭圆长轴
   let x = Math.max(narrow ? 14 : 9, Math.min(narrow ? 86 : 91, 50 + Math.cos(rad) * rx));
-  let y = Math.max(narrow ? 11 : 9, Math.min(narrow ? 80 : 71, 50 + Math.sin(rad) * ry));
+  let y = Math.max(narrow ? (landscape ? 11 : 8) : 9,
+                   Math.min(narrow ? (landscape ? 80 : 86) : 71, 50 + Math.sin(rad) * ry));
   if (narrow && index !== 0 && (x <= 30 || x >= 70)) {
     if (landscape) y = y < 50 ? Math.min(y, 24) : Math.max(y, 88);
-    else y = y < 50 ? Math.min(y, 27) : Math.max(y, veryNarrow ? 82 : 78);
+    else y = y < 50 ? Math.min(y, veryNarrow ? 24 : 26) : Math.max(y, veryNarrow ? 79 : 78);
   }
   return { x, y };
 }

@@ -894,15 +894,16 @@ function seatPosition(index, total) {
   const veryNarrow = narrow && w <= 420;
   const landscape = w > h;
   const rx = 44;
-  const ry = narrow ? 40 : 42;
+  const ry = narrow ? (landscape ? 40 : 46) : 42; // 竖屏竖椭圆长轴
   let x = Math.max(narrow ? 14 : 9, Math.min(narrow ? 86 : 91, 50 + Math.cos(rad) * rx));
-  let y = Math.max(narrow ? 11 : 9, Math.min(narrow ? 80 : 71, 50 + Math.sin(rad) * ry));
-  // 手机侧翼席位：收在中央区同一侧之外（卡片半高约 6%~9%，按桌比例分档）
+  let y = Math.max(narrow ? (landscape ? 11 : 8) : 9,
+                   Math.min(narrow ? (landscape ? 80 : 86) : 71, 50 + Math.sin(rad) * ry));
+  // 手机侧翼席位：收在中央区同一侧之外（竖桌纵向余量足，嵌放即可）
   if (narrow && index !== 0 && (x <= 30 || x >= 70)) {
     if (landscape) {
       y = y < 50 ? Math.min(y, 24) : Math.max(y, 88);
     } else {
-      y = y < 50 ? Math.min(y, 27) : Math.max(y, veryNarrow ? 82 : 78);
+      y = y < 50 ? Math.min(y, veryNarrow ? 24 : 26) : Math.max(y, veryNarrow ? 79 : 78);
     }
   }
   return { x, y };
