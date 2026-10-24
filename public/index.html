@@ -13,39 +13,59 @@
   <div id="lobby" class="screen">
     <div class="lobby-card">
       <div class="lobby-brand"><img src="assets/a1/card-back.png" alt="" /><span>POKER GAME<span>私人好友局</span></span></div>
-      <h1>和朋友，开一局。</h1>
-      <p class="lobby-tag">不必坐在一起，也能同桌尽兴。</p>
+      <div class="lobby-welcome"><h1>和朋友，开一局。</h1>
+      <p class="lobby-tag">不必坐在一起，也能同桌尽兴。</p></div>
       <div class="lobby-facts" aria-label="默认牌局设置">
         <div><b>2–6</b><span>同桌人数</span></div>
         <div><b>2,000</b><span>起始筹码</span></div>
         <div><b>10 / 20</b><span>默认盲注</span></div>
       </div>
-      <label>你的昵称
-        <input id="nickname" type="text" maxlength="8" placeholder="昵称（每人不同）" />
-      </label>
+      <header id="create-heading" class="hidden"><button id="btn-create-back" class="flow-back" type="button">← 返回</button><div><h2>创建好友局</h2><p>选好玩法，邀请朋友入座。</p></div></header>
+      <div id="nickname-home-slot"><div id="nickname-field"><label for="nickname">你的昵称</label><input id="nickname" type="text" maxlength="128" placeholder="1–8个可见字符，每人不同" aria-describedby="nickname-error" autocomplete="nickname" /><p id="nickname-error" class="field-error" role="alert"></p></div></div>
       <button id="btn-create" class="btn btn-primary">创建房间</button>
-      <section id="create-options" class="hidden" aria-label="创建房间设置">
-        <label>玩法<select id="create-mode"><option value="classic">经典德州 · 52张 · 2–6人</option><option value="squid">鱿鱼德州 · 52张 · 3–6人</option></select></label>
-        <p id="create-mode-tip">普通无限注德州扑克。</p>
-        <label>起始筹码<input id="create-chips" type="number" min="100" max="1000000" step="1" value="2000" inputmode="numeric" /></label>
-        <div class="settings-row"><label>小盲注<input id="create-sb" type="number" min="1" step="1" value="10" inputmode="numeric" /></label><label>大盲注<input id="create-bb" type="number" min="1" step="1" value="20" inputmode="numeric" /></label></div>
-        <div class="settings-row"><label>行动时长<select id="create-action"><option value="20">20秒</option><option value="30">30秒</option><option value="45" selected>45秒</option><option value="60">60秒</option></select></label><label>局间时长<select id="create-delay"><option value="5">5秒</option><option value="10">10秒</option><option value="20" selected>20秒</option></select></label></div>
-        <label>允许重买<select id="create-rebuy"><option value="true">允许</option><option value="false">禁止</option></select></label>
-        <div id="create-squid-settings" class="hidden">
-          <label>末位向每人支付多少筹码<input id="create-payment" type="number" min="1" max="1000000" step="1" value="20" inputmode="numeric" /></label>
-          <div class="payment-presets" role="group" aria-label="快捷支付额"><button type="button" data-payment="20">20</button><button type="button" data-payment="50">50</button><button type="button" data-payment="100">100</button></div>
-          <p id="create-payment-preview" aria-live="polite"></p>
-          <p class="mode-note">主池独赢得标记，无需亮牌；最多发人数−1个标记。最后未得标记者支付，冻结仍属本人但不可下注。</p>
+      <form id="create-options" class="hidden" aria-label="创建房间设置" novalidate>
+        <div class="create-scroll">
+          <fieldset id="create-mode" class="mode-picker"><legend>选择玩法</legend>
+            <label class="mode-card"><input id="mode-classic" type="radio" name="create-mode" value="classic" checked /><span><b>经典德州</b><small>52张 · 2–6人</small><em>熟悉的无限注德州</em></span></label>
+            <label class="mode-card"><input id="mode-squid" type="radio" name="create-mode" value="squid" /><span><b>鱿鱼德州</b><small>52张 · 3–6人</small><em>叠加标记与末位支付</em></span></label>
+          </fieldset>
+          <p id="create-mode-tip" class="mode-fixed">玩法创建后固定。</p>
+          <div class="create-grid">
+            <section class="create-common form-section" aria-labelledby="common-title"><h3 id="common-title">入座与筹码</h3>
+              <div class="common-fields"><div id="create-name-slot"></div>
+                <div><label for="create-chips">起始筹码</label><input id="create-chips" type="number" min="100" max="1000000" step="1" value="2000" inputmode="numeric" aria-describedby="create-chips-error" /><p id="create-chips-error" class="field-error" role="alert"></p></div>
+                <div class="stakes-field"><div class="settings-row"><label>小盲注<input id="create-sb" type="number" min="1" step="1" value="10" inputmode="numeric" aria-describedby="create-stakes-error" /></label><label>大盲注<input id="create-bb" type="number" min="1" step="1" value="20" inputmode="numeric" aria-describedby="create-stakes-error" /></label></div><p id="create-stakes-error" class="field-error" role="alert"></p></div>
+              </div>
+            </section>
+            <section id="create-squid-settings" class="form-section hidden" aria-labelledby="payment-title"><h3 id="payment-title">鱿鱼支付</h3>
+              <label for="create-payment">末位向每人支付</label><div class="payment-input"><input id="create-payment" type="number" min="1" max="1000000" step="1" value="20" inputmode="numeric" aria-describedby="create-payment-error payment-unit-note" /><span>筹码 / 人</span></div><p id="create-payment-error" class="field-error" role="alert"></p>
+              <div class="payment-presets" role="group" aria-label="快捷支付额"><button type="button" data-payment="20">20</button><button type="button" data-payment="50">50</button><button type="button" data-payment="100">100</button></div>
+              <div id="create-payment-preview" aria-live="polite"><p>以4人为例 <span>· 实际按开轮人数</span></p><div class="payment-totals"><div><output id="preview-total">60</output><span>末位总支付</span></div><div><output id="preview-frozen">60</output><span>每人开轮冻结</span></div></div></div>
+              <p id="payment-unit-note" class="mode-note">填写绝对筹码数，不是大盲倍数。</p>
+              <details class="payment-rules"><summary>标记与冻结规则</summary><p>主池独赢得标记并解冻，无需亮牌；平分、仅赢边池和纯退款不算。每轮最多发人数−1个标记，最后未得标记者支付。冻结仍属本人，但不能下注。</p></details>
+            </section>
+          </div>
+          <details id="create-advanced" class="form-section"><summary><span>节奏与重买</span><small id="advanced-summary">45秒行动 · 20秒局间 · 允许重买</small></summary><div class="advanced-fields">
+            <label>行动时长<select id="create-action"><option value="20">20秒</option><option value="30">30秒</option><option value="45" selected>45秒</option><option value="60">60秒</option></select></label>
+            <label>局间时长<select id="create-delay"><option value="5">5秒</option><option value="10">10秒</option><option value="20" selected>20秒</option></select></label>
+            <label>允许重买<select id="create-rebuy"><option value="true">允许</option><option value="false">禁止</option></select></label>
+          </div></details>
         </div>
-        <div class="create-actions"><button id="btn-create-back" class="btn btn-secondary" type="button">返回</button><button id="btn-create-confirm" class="btn btn-primary" type="button">确认创建</button></div>
-      </section>
+        <div class="create-actions"><p id="create-form-error" class="field-error" role="alert" tabindex="-1"></p><div class="create-action-row"><button id="btn-create-cancel" class="btn btn-secondary" type="button">返回大厅</button><button id="btn-create-confirm" class="btn btn-primary" type="submit">创建房间</button></div></div>
+      </form>
       <div id="join-divider" class="divider">或加入好友房间</div>
       <div id="join-entry" class="join-row">
         <input id="room-code" type="text" maxlength="6" placeholder="6 位邀请码" aria-label="好友房间邀请码"
-               autocapitalize="characters" autocomplete="off" spellcheck="false" />
+               autocapitalize="characters" autocomplete="off" spellcheck="false" aria-describedby="room-code-error" />
         <button id="btn-join" class="btn btn-secondary">加入</button>
       </div>
-      <section id="join-preview" class="hidden" aria-label="加入前房间说明"><h2>房间说明</h2><p id="join-preview-text"></p><button id="btn-join-confirm" class="btn btn-primary" type="button">确认加入</button></section>
+      <p id="room-code-error" class="field-error" role="alert"></p>
+      <section id="join-preview" class="hidden" aria-label="加入前房间说明"><div class="join-scroll"><header><p class="preview-eyebrow">房间 <b id="preview-room-code"></b></p><h2 id="join-preview-title" tabindex="-1">确认加入</h2><p id="join-mode-meta"></p></header><div id="join-name-slot"></div>
+        <dl class="preview-parameters"><div><dt>起始筹码</dt><dd id="join-start-chips"></dd></div><div><dt>小盲 / 大盲</dt><dd id="join-blinds"></dd></div></dl><p id="join-tempo"></p>
+        <div id="join-squid-summary" class="hidden"><span>下轮向每人支付</span><p><strong id="join-payment"></strong><span>筹码</span></p><small>新玩家从下一轮参加，冻结按实际开轮人数计算。</small></div>
+        <p class="mode-fixed">玩法创建后固定，加入时以房主当前设置为准。</p></div><div class="join-footer"><p id="join-form-error" class="field-error" role="alert" tabindex="-1"></p>
+        <div class="preview-actions"><button id="btn-join-back" class="btn btn-secondary" type="button">检查房号</button><button id="btn-join-confirm" class="btn btn-primary" type="button">确认加入</button></div></div>
+      </section>
       <div id="lobby-error" class="error" role="status"></div>
       <button id="btn-rules-lobby" class="lobby-help-btn" type="button">第一次玩？查看 2 分钟说明</button>
       <p class="lobby-footnote">无限注德州扑克 · 仅供虚拟筹码娱乐</p>

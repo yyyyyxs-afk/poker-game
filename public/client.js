@@ -276,16 +276,48 @@ const createRoomBtn = document.getElementById('btn-create');
 const joinRoomBtn = document.getElementById('btn-join');
 let lobbySubmission = '';
 let lobbyExpectedRoom = '';
+const lobbyCard = document.querySelector('.lobby-card');
+const fieldErrorIds = {nickname:'nickname-error','room-code':'room-code-error','create-chips':'create-chips-error','create-sb':'create-stakes-error','create-bb':'create-stakes-error','create-payment':'create-payment-error'};
+function clearFieldError(id) {
+  const el=document.getElementById(id);
+  el.removeAttribute('aria-invalid');
+  document.getElementById(fieldErrorIds[id]).textContent='';
+}
+function clearLobbyErrors() {
+  Object.keys(fieldErrorIds).forEach(clearFieldError);
+  for(const id of ['lobby-error','create-form-error','join-form-error'])document.getElementById(id).textContent='';
+}
+function fieldError(id,message) {
+  const el=document.getElementById(id);
+  el.setAttribute('aria-invalid','true');
+  document.getElementById(fieldErrorIds[id]).textContent=message;
+  el.focus();
+  el.scrollIntoView({block:'center'});
+  return false;
+}
+function selectedCreateMode(){return document.querySelector('[name="create-mode"]:checked').value;}
+function validateCreateFields(){
+  const sc=Number(document.getElementById('create-chips').value),sb=Number(document.getElementById('create-sb').value),bb=Number(document.getElementById('create-bb').value);
+  if(!Number.isSafeInteger(sc)||sc<100||sc>1000000)return fieldError('create-chips','起始筹码请填100–1,000,000的整数。');
+  if(!Number.isSafeInteger(sb)||sb<1)return fieldError('create-sb','小盲注请填正整数。');
+  if(!Number.isSafeInteger(bb)||bb<sb)return fieldError('create-bb','大盲注须为整数，且不低于小盲注。');
+  if(bb>Math.floor(sc/20))return fieldError('create-bb','起始筹码至少为大盲的20倍，请调整盲注或筹码。');
+  const payment=Number(document.getElementById('create-payment').value);
+  if(selectedCreateMode()==='squid'&&(!Number.isSafeInteger(payment)||payment<1||payment>1000000))return fieldError('create-payment','每人支付额请填1–1,000,000的整数筹码。');
+  return true;
+}
 
 /** 大厅请求只允许一个在途：同时锁住创建和加入，避免同一 socket 被快速点进多个房间。 */
 function beginLobbySubmission(kind, expectedRoom = '') {
   if (lobbySubmission) return false;
   lobbySubmission = kind;
   lobbyExpectedRoom = expectedRoom;
-  for(const id of ['btn-create','btn-join','btn-create-confirm','btn-create-back','btn-join-confirm'])document.getElementById(id).disabled=true;
+  for(const el of document.querySelectorAll('#create-options input,#create-options select,#create-options button,#nickname,#room-code,#btn-create,#btn-join,#btn-create-back,#btn-join-confirm,#btn-join-back'))el.disabled=true;
   createRoomBtn.textContent = kind === 'create' ? '创建中…' : '创建房间';
   joinRoomBtn.textContent = kind === 'join' ? '加入中…' : kind==='preview'?'查询中…':'加入';
-  const busyBtn = kind === 'create' ? createRoomBtn : joinRoomBtn;
+  const busyBtn = kind === 'create' ? document.getElementById('btn-create-confirm') : kind==='join'?document.getElementById('btn-join-confirm'):joinRoomBtn;
+  if(kind==='create')busyBtn.textContent='正在创建…';
+  if(kind==='join')busyBtn.textContent='正在加入…';
   busyBtn.setAttribute('aria-busy', 'true');
   showLobbyError('');
   return true;
@@ -294,19 +326,26 @@ function endLobbySubmission(kind = lobbySubmission) {
   if (!lobbySubmission || kind !== lobbySubmission) return;
   lobbySubmission = '';
   lobbyExpectedRoom = '';
-  for(const id of ['btn-create','btn-join','btn-create-confirm','btn-create-back','btn-join-confirm'])document.getElementById(id).disabled=false;
+  for(const el of document.querySelectorAll('#create-options input,#create-options select,#create-options button,#nickname,#room-code,#btn-create,#btn-join,#btn-create-back,#btn-join-confirm,#btn-join-back'))el.disabled=false;
   createRoomBtn.textContent = '创建房间';
   joinRoomBtn.textContent = '加入';
   createRoomBtn.removeAttribute('aria-busy');
   joinRoomBtn.removeAttribute('aria-busy');
+  for(const id of ['btn-create-confirm','btn-join-confirm'])document.getElementById(id).removeAttribute('aria-busy');
+  document.getElementById('btn-create-confirm').textContent='创建房间';
+  document.getElementById('btn-join-confirm').textContent='确认加入';
 }
 
-document.getElementById('btn-create-confirm').onclick = () => {
+document.getElementById('create-options').onsubmit = event => {
+  event.preventDefault();
+  if(lobbySubmission)return;
+  clearLobbyErrors();
   const name = getName();
   if (!name) return;
+  if(!validateCreateFields())return;
   if (!beginLobbySubmission('create')) return;
   const settings={startChips:Number(document.getElementById('create-chips').value),smallBlind:Number(document.getElementById('create-sb').value),bigBlind:Number(document.getElementById('create-bb').value),actionTime:Number(document.getElementById('create-action').value),nextHandDelay:Number(document.getElementById('create-delay').value),rebuyAllowed:document.getElementById('create-rebuy').value==='true'};
-  const mode=document.getElementById('create-mode').value;
+  const mode=selectedCreateMode();
   socket.emit('create_room', { name,mode,settings,...(mode==='squid'?{squidPayment:Number(document.getElementById('create-payment').value)}:{}) }, (res) => {
     if (lobbySubmission !== 'create') return;
     if (res && res.ok) {
@@ -351,45 +390,87 @@ joinRoomBtn.onclick=()=>{
     if(!res?.ok)return showLobbyError(res?.err||'查询失败');
     if(document.getElementById('room-code').value.trim().toUpperCase()!==code)return;
     previewCode=code;
-    const info=res.info,c=info.settings;
-    document.getElementById('join-preview-text').textContent=`${info.mode==='squid'?'鱿鱼德州 · 52张 · 3–6人':'经典德州 · 52张 · 2–6人'}。起始${c.startChips}，盲注${c.smallBlind}/${c.bigBlind}，行动${c.actionTime}秒，局间${c.nextHandDelay}秒，${c.rebuyAllowed?'允许':'禁止'}重买。${info.mode==='squid'?`下轮末位向每人支付${info.squidPayment}筹码，新加入者从下一轮参加；冻结按实际开轮人数计算。`:''}玩法固定，加入时以房主当前设置为准。`;
+    const info=res.info,c=info.settings,isSquid=info.mode==='squid';
+    document.getElementById('preview-room-code').textContent=code;
+    document.getElementById('join-preview-title').textContent=isSquid?'加入鱿鱼德州':'加入经典德州';
+    document.getElementById('join-mode-meta').textContent=isSquid?'普通52张德州＋经典鱿鱼 · 3–6人':'普通52张无限注德州 · 2–6人';
+    document.getElementById('join-start-chips').textContent=c.startChips.toLocaleString('zh-CN');
+    document.getElementById('join-blinds').textContent=`${c.smallBlind} / ${c.bigBlind}`;
+    document.getElementById('join-tempo').textContent=`${c.actionTime}秒行动 · ${c.nextHandDelay}秒局间 · ${c.rebuyAllowed?'允许':'禁止'}重买`;
+    document.getElementById('join-squid-summary').classList.toggle('hidden',!isSquid);
+    document.getElementById('join-payment').textContent=isSquid?info.squidPayment.toLocaleString('zh-CN'):'';
+    lobbyCard.classList.add('joining');
+    for(const id of ['btn-create','join-divider','join-entry'])document.getElementById(id).classList.add('hidden');
+    document.getElementById('join-name-slot').appendChild(document.getElementById('nickname-field'));
     document.getElementById('join-preview').classList.remove('hidden');
+    document.getElementById('join-preview-title').focus();
   });
 };
 document.getElementById('btn-join-confirm').onclick=()=>{
   if(previewCode!==document.getElementById('room-code').value.trim().toUpperCase())return showLobbyError('邀请码已变化，请重新查询房间说明');
   submitJoin();
 };
-document.getElementById('room-code').addEventListener('input',()=>document.getElementById('join-preview').classList.add('hidden'));
+function closeJoinPreview(){
+  lobbyCard.classList.remove('joining');
+  document.getElementById('join-preview').classList.add('hidden');
+  document.getElementById('nickname-home-slot').appendChild(document.getElementById('nickname-field'));
+  for(const id of ['btn-create','join-divider','join-entry'])document.getElementById(id).classList.remove('hidden');
+  previewCode='';clearLobbyErrors();document.getElementById('room-code').focus();
+}
+document.getElementById('btn-join-back').onclick=closeJoinPreview;
+document.getElementById('room-code').addEventListener('input',()=>{previewCode='';document.getElementById('join-preview').classList.add('hidden');});
 function showCreateOptions(open){
+  lobbyCard.classList.toggle('creating',open);
+  lobbyCard.classList.remove('joining');
+  document.getElementById(open?'create-name-slot':'nickname-home-slot').appendChild(document.getElementById('nickname-field'));
   document.getElementById('create-options').classList.toggle('hidden',!open);
+  document.getElementById('create-heading').classList.toggle('hidden',!open);
   for(const id of ['btn-create','join-divider','join-entry'])document.getElementById(id).classList.toggle('hidden',open);
   document.querySelector('.lobby-facts').classList.toggle('hidden',open);
   document.getElementById('join-preview').classList.add('hidden');
-  showLobbyError('');
-  if(open)document.getElementById('create-mode').focus();else createRoomBtn.focus();
+  clearLobbyErrors();
+  if(open){renderCreateOptions();document.querySelector('[name="create-mode"]:checked').focus();}else createRoomBtn.focus();
 }
 createRoomBtn.onclick=()=>showCreateOptions(true);
 document.getElementById('btn-create-back').onclick=()=>showCreateOptions(false);
+document.getElementById('btn-create-cancel').onclick=()=>showCreateOptions(false);
 let createPaymentTouched=false;
 function renderCreateOptions(){
-  const isSquid=document.getElementById('create-mode').value==='squid';
+  const isSquid=selectedCreateMode()==='squid';
+  lobbyCard.classList.toggle('classic',!isSquid);
   document.getElementById('create-squid-settings').classList.toggle('hidden',!isSquid);
-  document.getElementById('create-mode-tip').textContent=isSquid?'普通52张德州叠加经典鱿鱼；玩法创建后固定。':'普通52张无限注德州扑克；玩法创建后固定。';
+  document.getElementById('create-mode-tip').textContent='玩法创建后固定，入房后不能切换。';
   const p=Number(document.getElementById('create-payment').value);
-  document.getElementById('create-payment-preview').textContent=Number.isSafeInteger(p)&&p>=1&&p<=1000000?`以4人为例，实际按开轮人数：末位总付${3*p}，每人开轮冻结${3*p}。金额为绝对筹码数，不是大盲倍数。`:'请输入1–1,000,000的整数筹码。';
+  const total=Number.isSafeInteger(p)&&p>=1&&p<=1000000?(3*p).toLocaleString('zh-CN'):'—';
+  document.getElementById('preview-total').textContent=total;
+  document.getElementById('preview-frozen').textContent=total;
+  document.querySelectorAll('[data-payment]').forEach(b=>b.setAttribute('aria-pressed',String(Number(b.dataset.payment)===p)));
+  document.getElementById('advanced-summary').textContent=`${document.getElementById('create-action').value}秒行动 · ${document.getElementById('create-delay').value}秒局间 · ${document.getElementById('create-rebuy').value==='true'?'允许':'禁止'}重买`;
 }
 document.getElementById('create-mode').onchange=renderCreateOptions;
 document.getElementById('create-bb').oninput=()=>{if(!createPaymentTouched)document.getElementById('create-payment').value=document.getElementById('create-bb').value;renderCreateOptions();};
 document.getElementById('create-payment').oninput=()=>{createPaymentTouched=true;renderCreateOptions();};
-document.querySelectorAll('[data-payment]').forEach(b=>b.onclick=()=>{createPaymentTouched=true;document.getElementById('create-payment').value=b.dataset.payment;renderCreateOptions();});
+document.querySelectorAll('[data-payment]').forEach(b=>b.onclick=()=>{createPaymentTouched=true;document.getElementById('create-payment').value=b.dataset.payment;clearFieldError('create-payment');renderCreateOptions();});
+for(const id of ['create-action','create-delay','create-rebuy'])document.getElementById(id).onchange=renderCreateOptions;
+Object.keys(fieldErrorIds).forEach(id=>document.getElementById(id).addEventListener('input',()=>{clearFieldError(id);document.getElementById('create-form-error').textContent='';document.getElementById('join-form-error').textContent='';}));
 renderCreateOptions();
 function getName() {
   const n = document.getElementById('nickname').value.trim();
-  if (!n) { showLobbyError('请先填写昵称'); return null; }
+  if (!n) { fieldError('nickname','请先填写昵称。'); return null; }
+  const normalized=n.normalize('NFKC'),count=typeof Intl.Segmenter==='function'?[...new Intl.Segmenter('zh',{granularity:'grapheme'}).segment(normalized)].length:Array.from(normalized).length;
+  if(count>8||/[\p{Cc}\p{Cf}\p{Cs}]/u.test(normalized)||!/[\p{L}\p{N}\p{P}\p{S}]/u.test(normalized)){fieldError('nickname','昵称须为1–8个可见字符，不能含控制或零宽字符。');return null;}
   return n;
 }
-function showLobbyError(msg) { document.getElementById('lobby-error').textContent = msg; }
+function showLobbyError(msg) {
+  if(!msg){clearLobbyErrors();return;}
+  if(/昵称/.test(msg)){fieldError('nickname',msg);return;}
+  if(lobbyCard.classList.contains('creating')){
+    const field=/支付/.test(msg)?'create-payment':/盲注/.test(msg)?'create-bb':/起始筹码/.test(msg)?'create-chips':null;
+    if(field){fieldError(field,msg);return;}
+  }else if(!lobbyCard.classList.contains('joining')){fieldError('room-code',msg);return;}
+  const el=document.getElementById(lobbyCard.classList.contains('creating')?'create-form-error':'join-form-error');
+  el.textContent=msg;el.focus();
+}
 
 function enterRoom(code) {
   const normalizedCode = String(code || '').trim().toUpperCase();
