@@ -882,6 +882,8 @@ function renderSeats() {
       (winnerSeats.has(p.seat) ? ' winner-seat' : '') +
       (p.connected ? '' : ' offline');
     div.dataset.seat = p.seat;
+    if (pos.y > 70) div.classList.add('lower-wing');
+    if (pos.y < 20 && pos.x > 30 && pos.x < 70) div.classList.add('top-seat');
 
     div.innerHTML = `
       <div class="hole-cards"></div>
@@ -1233,7 +1235,7 @@ function renderMyArea() {
 function waitingTipText() {
   if (state.gameOver) return '游戏已结束';
   const count = state.players.length;
-  if(state.mode==='squid')return state.squid?.waitingReason || (state.isHost?`${count}名玩家已就绪，可开始鱿鱼德州`:`${count}名玩家已就绪，等待房主开始鱿鱼德州`);
+  if(state.mode==='squid'){const ready=state.players.filter(p=>p.connected&&!p.sittingOut&&!p.left).length;return ready<3?`当前有效${ready}人，等待至少3人开局`:state.isHost?`${ready}名玩家已就绪，可开始鱿鱼德州`:`${ready}名玩家已就绪，等待房主开始鱿鱼德州`;}
   if (count < 2) return `把房号 ${state.code} 发给朋友，凑齐 2 人即可开局`;
   return state.isHost ? `${count} 名玩家已就绪，可以开始游戏`
     : `${count} 名玩家已就绪，等待房主开始`;
@@ -1392,14 +1394,21 @@ function raiseContextKey(me) {
 document.getElementById('raise-scrim').addEventListener('click', hideRaisePanel);
 // 键盘弹起兜底（仅手机）：软键盘把抽屉盖住时，用 visualViewport 实测
 // 键盘高度把抽屉抬到键盘上方；键盘收起自动归位。主路径（快捷/滑条/步进）不依赖键盘。
-if (window.visualViewport && window.matchMedia('(max-width: 900px)').matches) {
-  const raisePanel = document.getElementById('raise-panel');
-  visualViewport.addEventListener('resize', () => {
-    if (!raiseOpen) return;
-    const keyboard = Math.max(0, window.innerHeight - visualViewport.height - visualViewport.offsetTop);
-    raisePanel.style.bottom = keyboard > 0 ? keyboard + 'px' : '';
-  });
+function syncVisibleViewport(){
+  const v=window.visualViewport,height=v?.height||window.innerHeight,top=v?.offsetTop||0;
+  document.documentElement.style.setProperty('--visible-height',`${height}px`);
+  document.documentElement.style.setProperty('--visible-top',`${top}px`);
+  document.documentElement.style.setProperty('--keyboard-inset',`${Math.max(0,window.innerHeight-height-top)}px`);
 }
+syncVisibleViewport();
+window.visualViewport?.addEventListener('resize',syncVisibleViewport);
+window.visualViewport?.addEventListener('scroll',syncVisibleViewport);
+window.addEventListener('resize',()=>{
+  syncVisibleViewport();
+  // 仅重排环桌席位和筹码，不重建房间/手牌/操作面板，不重置未提交的输入。
+  if(state){renderSeats();renderBets();}
+});
+
 document.getElementById('raise-input').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') confirmRaise();
 });
@@ -1923,7 +1932,7 @@ function renderForfeitShowcase() {
 
 }
 setInterval(()=>{if(isForfeitIntermission()) document.getElementById('next-hand-status').textContent=forfeitStatus();},1000);
-window.addEventListener('resize', () => { if (isForfeitIntermission()) { renderSeats(); renderBets(); } });
+
 
 // 鱿鱼仅使用服务器公开的标记与资产，不读取或推测底牌。
 let squidSeenRoom='', squidSeenSeq=null;
