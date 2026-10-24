@@ -4,6 +4,7 @@ const readline=require('node:readline');
 const {io:connect}=require('socket.io-client');
 const {server,io,rooms}=require('../server');
 const faults={create_room:'normal',room_info:'normal',join_room:'normal'};
+const held=[];
 let offline=false,current,seed,connection=0;
 const logFile=process.argv[2];
 function log(event,detail={}) {
@@ -30,8 +31,9 @@ io.on('connection',socket=>{
     socket.on(event,(payload,ack)=>{
       const fault=faults[event];log('request',{connection:id,type:event,fault,name:payload?.name,code:payload?.code});
       handler(payload,result=>{
-        log('result',{connection:id,type:event,ok:result?.ok,code:result?.code,err:result?.err,ack:fault==='lost'?'dropped':'delivered'});
-        if(fault!=='lost')ack?.(result);
+        log('result',{connection:id,type:event,ok:result?.ok,code:result?.code,err:result?.err,ack:fault==='lost'?'dropped':fault==='hold'?'held':'delivered'});
+        if(fault==='hold')held.push(()=>{log('late_ack_released',{connection:id,type:event});ack?.(result);});
+        else if(fault!=='lost')ack?.(result);
       });
     });
   }
@@ -45,7 +47,8 @@ server.listen(0,'127.0.0.1',async()=>{
 });
 readline.createInterface({input:process.stdin}).on('line',line=>{
   const [command,event,mode]=line.split(' ');
-  if(command==='fault'&&Object.hasOwn(faults,event)&&['normal','lost'].includes(mode))faults[event]=mode;
+  if(command==='fault'&&Object.hasOwn(faults,event)&&['normal','lost','hold'].includes(mode))faults[event]=mode;
+  else if(command==='release')held.shift()?.();
   else if(command==='offline'){offline=true;current?.conn.close();}
   else if(command==='online')offline=false;
   else if(command==='status')log('rooms',{rooms:[...rooms.values()].map(r=>({code:r.code,stage:r.stage,players:r.players.map(p=>({name:p.name,connected:p.connected,left:p.left}))}))});

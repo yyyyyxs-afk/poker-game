@@ -13,6 +13,7 @@
     "test:identity": "node test/identity.test.js",
     "test:friends": "node test/friends.test.js",
     "test:chat-delivery": "node test/chat-delivery.test.js",
+    "test:lobby-requests": "node test/lobby-requests.test.js",
     "test:squid": "node test/squid.test.js",
     "test:mode-config": "node test/mode-config.test.js",
     "test:smoke": "node test/smoke.test.js"

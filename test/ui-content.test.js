@@ -35,6 +35,7 @@ assert.ok(client.includes('摊牌结果') && client.includes('最佳五张'), '�
 assert.ok(client.includes('本局过程') && client.includes('state.lastResult'), '缺少行动时间线或跨局回看');
 assert.ok(chat.includes(".emit('chat_message'") && client.includes('chatDelivery.send()') && client.includes('renderChats()'), '好友聊天未接入发送或渲染');
 assert.ok(html.indexOf('src="chat-delivery.js"') >= 0 && html.indexOf('src="chat-delivery.js"') < html.indexOf('src="client.js"'), '聊天回执组件必须先加载');
+assert.ok(html.indexOf('src="lobby-requests.js"') >= 0 && html.indexOf('src="lobby-requests.js"') < html.indexOf('src="client.js"'), '大厅生命周期必须先加载');
 assert.ok(client.includes('p.seat === mySeat') && client.includes('0.82'), '自己的下注筹码缺少桌面下沿专用锚点');
 assert.ok(client.includes('me.raiseAllowed !== false') && client.includes('未重新开放加注权'),
   '客户端未按服务端加注权禁用操作');

@@ -20,11 +20,14 @@
         <div><b>2,000</b><span>起始筹码</span></div>
         <div><b>10 / 20</b><span>默认盲注</span></div>
       </div>
+      <div id="lobby-feedback-slot"><section id="lobby-feedback" tabindex="-1" aria-label="大厅连接与操作状态"><p id="lobby-connection" aria-live="polite">正在连接牌局服务；可先填写资料。</p><p id="lobby-request-message" aria-live="polite"></p><button id="btn-lobby-unknown-open" class="flow-back hidden" type="button">查看未确认操作</button></section></div>
+      <div id="lobby-unknown-slot"><details id="lobby-unknown" class="hidden"><summary>未确认操作</summary><p id="lobby-unknown-original"></p><p>原房可能仍存在。返回或编辑不会撤销原操作，也不会恢复已丢失的凭证。下方选择会放弃等待，并准备创建另一个新房间，不会自动建房。</p><label><input id="lobby-abandon-confirm" type="checkbox" />我知道原房可能仍存在，另建会产生不同房间</label><button id="btn-lobby-abandon" class="btn btn-secondary" type="button" disabled>放弃等待，另建新房</button></details></div>
       <header id="create-heading" class="hidden"><button id="btn-create-back" class="flow-back" type="button">← 返回</button><div><h2>创建好友局</h2><p>选好玩法，邀请朋友入座。</p></div></header>
       <div id="nickname-home-slot"><div id="nickname-field"><label for="nickname">你的昵称</label><input id="nickname" type="text" maxlength="128" placeholder="1–8个可见字符，每人不同" aria-describedby="nickname-error" autocomplete="nickname" /><p id="nickname-error" class="field-error" role="alert"></p></div></div>
       <button id="btn-create" class="btn btn-primary">创建房间</button>
       <form id="create-options" class="hidden" aria-label="创建房间设置" novalidate>
         <div class="create-scroll">
+          <div id="create-unknown-slot"></div>
           <fieldset id="create-mode" class="mode-picker"><legend>选择玩法</legend>
             <label class="mode-card"><input id="mode-classic" type="radio" name="create-mode" value="classic" checked /><span><b>经典德州</b><small>52张 · 2–6人</small><em>熟悉的无限注德州</em></span></label>
             <label class="mode-card"><input id="mode-squid" type="radio" name="create-mode" value="squid" /><span><b>鱿鱼德州</b><small>52张 · 3–6人</small><em>叠加标记与末位支付</em></span></label>
@@ -51,7 +54,7 @@
             <label>允许重买<select id="create-rebuy"><option value="true">允许</option><option value="false">禁止</option></select></label>
           </div></details>
         </div>
-        <div class="create-actions"><p id="create-form-error" class="field-error" role="alert" tabindex="-1"></p><div class="create-action-row"><button id="btn-create-cancel" class="btn btn-secondary" type="button">返回大厅</button><button id="btn-create-confirm" class="btn btn-primary" type="submit">创建房间</button></div></div>
+        <div class="create-actions"><div id="create-feedback-slot"></div><p id="create-form-error" class="field-error" role="alert" tabindex="-1"></p><div class="create-action-row"><button id="btn-create-cancel" class="btn btn-secondary" type="button">返回大厅</button><button id="btn-create-confirm" class="btn btn-primary" type="submit">创建房间</button></div></div>
       </form>
       <div id="join-divider" class="divider">或加入好友房间</div>
       <div id="join-entry" class="join-row">
@@ -60,10 +63,10 @@
         <button id="btn-join" class="btn btn-secondary">加入</button>
       </div>
       <p id="room-code-error" class="field-error" role="alert"></p>
-      <section id="join-preview" class="hidden" aria-label="加入前房间说明"><div class="join-scroll"><header><p class="preview-eyebrow">房间 <b id="preview-room-code"></b></p><h2 id="join-preview-title" tabindex="-1">确认加入</h2><p id="join-mode-meta"></p></header><div id="join-name-slot"></div>
+      <section id="join-preview" class="hidden" aria-label="加入前房间说明"><div class="join-scroll"><div id="join-unknown-slot"></div><header><p class="preview-eyebrow">房间 <b id="preview-room-code"></b></p><h2 id="join-preview-title" tabindex="-1">确认加入</h2><p id="join-mode-meta"></p></header><div id="join-name-slot"></div>
         <dl class="preview-parameters"><div><dt>起始筹码</dt><dd id="join-start-chips"></dd></div><div><dt>小盲 / 大盲</dt><dd id="join-blinds"></dd></div></dl><p id="join-tempo"></p>
         <div id="join-squid-summary" class="hidden"><span>下轮向每人支付</span><p><strong id="join-payment"></strong><span>筹码</span></p><small>新玩家从下一轮参加，冻结按实际开轮人数计算。</small></div>
-        <p class="mode-fixed">玩法创建后固定，加入时以房主当前设置为准。</p></div><div class="join-footer"><p id="join-form-error" class="field-error" role="alert" tabindex="-1"></p>
+        <p class="mode-fixed">玩法创建后固定，加入时以房主当前设置为准。</p></div><div class="join-footer"><div id="join-feedback-slot"></div><p id="join-form-error" class="field-error" role="alert" tabindex="-1"></p>
         <div class="preview-actions"><button id="btn-join-back" class="btn btn-secondary" type="button">检查房号</button><button id="btn-join-confirm" class="btn btn-primary" type="button">确认加入</button></div></div>
       </section>
       <div id="lobby-error" class="error" role="status"></div>
@@ -373,6 +376,7 @@
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="chat-delivery.js"></script>
+  <script src="lobby-requests.js"></script>
   <script src="client.js"></script>
 </body>
 </html>
