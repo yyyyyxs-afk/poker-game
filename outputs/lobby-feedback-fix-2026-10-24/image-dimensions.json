@@ -1,0 +1,134 @@
+[
+  {
+    "file": "01-offline-create-editable-375.jpg",
+    "cssViewport": [
+      375,
+      812
+    ],
+    "imagePixels": [
+      375,
+      812
+    ]
+  },
+  {
+    "file": "02-offline-query-568.jpg",
+    "cssViewport": [
+      568,
+      320
+    ],
+    "imagePixels": [
+      553,
+      312
+    ]
+  },
+  {
+    "file": "03-recovered-no-auto-create.jpg",
+    "cssViewport": [
+      375,
+      812
+    ],
+    "imagePixels": [
+      375,
+      812
+    ]
+  },
+  {
+    "file": "04-query-timeout-manual-568.jpg",
+    "cssViewport": [
+      568,
+      320
+    ],
+    "imagePixels": [
+      553,
+      312
+    ]
+  },
+  {
+    "file": "05-query-manual-retry-preview.jpg",
+    "cssViewport": [
+      568,
+      320
+    ],
+    "imagePixels": [
+      568,
+      320
+    ]
+  },
+  {
+    "file": "06-create-unknown-editable-375.jpg",
+    "cssViewport": [
+      375,
+      812
+    ],
+    "imagePixels": [
+      375,
+      812
+    ]
+  },
+  {
+    "file": "07-create-unknown-disconnected-568.jpg",
+    "cssViewport": [
+      568,
+      320
+    ],
+    "imagePixels": [
+      568,
+      320
+    ]
+  },
+  {
+    "file": "08-explicit-abandon-explanation-375.jpg",
+    "cssViewport": [
+      375,
+      812
+    ],
+    "imagePixels": [
+      375,
+      812
+    ]
+  },
+  {
+    "file": "09-abandon-control-reachable-568.jpg",
+    "cssViewport": [
+      568,
+      320
+    ],
+    "imagePixels": [
+      568,
+      320
+    ]
+  },
+  {
+    "file": "10-new-room-requires-fresh-submit.jpg",
+    "cssViewport": [
+      375,
+      812
+    ],
+    "imagePixels": [
+      375,
+      812
+    ]
+  },
+  {
+    "file": "11-join-disconnect-unknown-568.jpg",
+    "cssViewport": [
+      568,
+      320
+    ],
+    "imagePixels": [
+      568,
+      320
+    ]
+  },
+  {
+    "file": "12-query-cancel-keeps-new-flow.jpg",
+    "cssViewport": [
+      1280,
+      720
+    ],
+    "imagePixels": [
+      1280,
+      720
+    ]
+  }
+]
