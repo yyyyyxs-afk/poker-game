@@ -276,17 +276,48 @@ const createRoomBtn = document.getElementById('btn-create');
 const joinRoomBtn = document.getElementById('btn-join');
 let lobbySubmission = '';
 let lobbyExpectedRoom = '';
+const lobbyCard = document.querySelector('.lobby-card');
+const fieldErrorIds = {nickname:'nickname-error','room-code':'room-code-error','create-chips':'create-chips-error','create-sb':'create-stakes-error','create-bb':'create-stakes-error','create-payment':'create-payment-error'};
+function clearFieldError(id) {
+  const el=document.getElementById(id);
+  el.removeAttribute('aria-invalid');
+  document.getElementById(fieldErrorIds[id]).textContent='';
+}
+function clearLobbyErrors() {
+  Object.keys(fieldErrorIds).forEach(clearFieldError);
+  for(const id of ['lobby-error','create-form-error','join-form-error'])document.getElementById(id).textContent='';
+}
+function fieldError(id,message) {
+  const el=document.getElementById(id);
+  el.setAttribute('aria-invalid','true');
+  document.getElementById(fieldErrorIds[id]).textContent=message;
+  el.focus();
+  el.scrollIntoView({block:'center'});
+  return false;
+}
+function selectedCreateMode(){return document.querySelector('[name="create-mode"]:checked').value;}
+function validateCreateFields(){
+  const sc=Number(document.getElementById('create-chips').value),sb=Number(document.getElementById('create-sb').value),bb=Number(document.getElementById('create-bb').value);
+  if(!Number.isSafeInteger(sc)||sc<100||sc>1000000)return fieldError('create-chips','起始筹码请填100–1,000,000的整数。');
+  if(!Number.isSafeInteger(sb)||sb<1)return fieldError('create-sb','小盲注请填正整数。');
+  if(!Number.isSafeInteger(bb)||bb<sb)return fieldError('create-bb','大盲注须为整数，且不低于小盲注。');
+  if(bb>Math.floor(sc/20))return fieldError('create-bb','起始筹码至少为大盲的20倍，请调整盲注或筹码。');
+  const payment=Number(document.getElementById('create-payment').value);
+  if(selectedCreateMode()==='squid'&&(!Number.isSafeInteger(payment)||payment<1||payment>1000000))return fieldError('create-payment','每人支付额请填1–1,000,000的整数筹码。');
+  return true;
+}
 
 /** 大厅请求只允许一个在途：同时锁住创建和加入，避免同一 socket 被快速点进多个房间。 */
 function beginLobbySubmission(kind, expectedRoom = '') {
   if (lobbySubmission) return false;
   lobbySubmission = kind;
   lobbyExpectedRoom = expectedRoom;
-  createRoomBtn.disabled = true;
-  joinRoomBtn.disabled = true;
+  for(const el of document.querySelectorAll('#create-options input,#create-options select,#create-options button,#nickname,#room-code,#btn-create,#btn-join,#btn-create-back,#btn-join-confirm,#btn-join-back'))el.disabled=true;
   createRoomBtn.textContent = kind === 'create' ? '创建中…' : '创建房间';
-  joinRoomBtn.textContent = kind === 'join' ? '加入中…' : '加入';
-  const busyBtn = kind === 'create' ? createRoomBtn : joinRoomBtn;
+  joinRoomBtn.textContent = kind === 'join' ? '加入中…' : kind==='preview'?'查询中…':'加入';
+  const busyBtn = kind === 'create' ? document.getElementById('btn-create-confirm') : kind==='join'?document.getElementById('btn-join-confirm'):joinRoomBtn;
+  if(kind==='create')busyBtn.textContent='正在创建…';
+  if(kind==='join')busyBtn.textContent='正在加入…';
   busyBtn.setAttribute('aria-busy', 'true');
   showLobbyError('');
   return true;
@@ -295,19 +326,27 @@ function endLobbySubmission(kind = lobbySubmission) {
   if (!lobbySubmission || kind !== lobbySubmission) return;
   lobbySubmission = '';
   lobbyExpectedRoom = '';
-  createRoomBtn.disabled = false;
-  joinRoomBtn.disabled = false;
+  for(const el of document.querySelectorAll('#create-options input,#create-options select,#create-options button,#nickname,#room-code,#btn-create,#btn-join,#btn-create-back,#btn-join-confirm,#btn-join-back'))el.disabled=false;
   createRoomBtn.textContent = '创建房间';
   joinRoomBtn.textContent = '加入';
   createRoomBtn.removeAttribute('aria-busy');
   joinRoomBtn.removeAttribute('aria-busy');
+  for(const id of ['btn-create-confirm','btn-join-confirm'])document.getElementById(id).removeAttribute('aria-busy');
+  document.getElementById('btn-create-confirm').textContent='创建房间';
+  document.getElementById('btn-join-confirm').textContent='确认加入';
 }
 
-createRoomBtn.onclick = () => {
+document.getElementById('create-options').onsubmit = event => {
+  event.preventDefault();
+  if(lobbySubmission)return;
+  clearLobbyErrors();
   const name = getName();
   if (!name) return;
+  if(!validateCreateFields())return;
   if (!beginLobbySubmission('create')) return;
-  socket.emit('create_room', { name }, (res) => {
+  const settings={startChips:Number(document.getElementById('create-chips').value),smallBlind:Number(document.getElementById('create-sb').value),bigBlind:Number(document.getElementById('create-bb').value),actionTime:Number(document.getElementById('create-action').value),nextHandDelay:Number(document.getElementById('create-delay').value),rebuyAllowed:document.getElementById('create-rebuy').value==='true'};
+  const mode=selectedCreateMode();
+  socket.emit('create_room', { name,mode,settings,...(mode==='squid'?{squidPayment:Number(document.getElementById('create-payment').value)}:{}) }, (res) => {
     if (lobbySubmission !== 'create') return;
     if (res && res.ok) {
       saveAuth(res.code, name, res.token);
@@ -319,7 +358,7 @@ createRoomBtn.onclick = () => {
     }
   });
 };
-joinRoomBtn.onclick = () => {
+function submitJoin() {
   const name = getName();
   const code = document.getElementById('room-code').value.trim().toUpperCase();
   if (!name) return;
@@ -336,13 +375,102 @@ joinRoomBtn.onclick = () => {
       showLobbyError((res && res.err) || '加入失败，请稍后重试');
     }
   });
+ }
+let previewCode='';
+joinRoomBtn.onclick=()=>{
+  const name=getName(),code=document.getElementById('room-code').value.trim().toUpperCase();
+  if(!name)return;
+  if(!/^[A-Z0-9]{6}$/.test(code))return showLobbyError('请输入6位邀请码');
+  if(storedToken()[`${code}_${name}`])return submitJoin();
+  if(!beginLobbySubmission('preview',code))return;
+  document.getElementById('join-preview').classList.add('hidden');
+  socket.emit('room_info',{code},res=>{
+    if(lobbySubmission!=='preview')return;
+    endLobbySubmission('preview');
+    if(!res?.ok)return showLobbyError(res?.err||'查询失败');
+    if(document.getElementById('room-code').value.trim().toUpperCase()!==code)return;
+    previewCode=code;
+    const info=res.info,c=info.settings,isSquid=info.mode==='squid';
+    document.getElementById('preview-room-code').textContent=code;
+    document.getElementById('join-preview-title').textContent=isSquid?'加入鱿鱼德州':'加入经典德州';
+    document.getElementById('join-mode-meta').textContent=isSquid?'普通52张德州＋经典鱿鱼 · 3–6人':'普通52张无限注德州 · 2–6人';
+    document.getElementById('join-start-chips').textContent=c.startChips.toLocaleString('zh-CN');
+    document.getElementById('join-blinds').textContent=`${c.smallBlind} / ${c.bigBlind}`;
+    document.getElementById('join-tempo').textContent=`${c.actionTime}秒行动 · ${c.nextHandDelay}秒局间 · ${c.rebuyAllowed?'允许':'禁止'}重买`;
+    document.getElementById('join-squid-summary').classList.toggle('hidden',!isSquid);
+    document.getElementById('join-payment').textContent=isSquid?info.squidPayment.toLocaleString('zh-CN'):'';
+    lobbyCard.classList.add('joining');
+    for(const id of ['btn-create','join-divider','join-entry'])document.getElementById(id).classList.add('hidden');
+    document.getElementById('join-name-slot').appendChild(document.getElementById('nickname-field'));
+    document.getElementById('join-preview').classList.remove('hidden');
+    document.getElementById('join-preview-title').focus();
+  });
 };
+document.getElementById('btn-join-confirm').onclick=()=>{
+  if(previewCode!==document.getElementById('room-code').value.trim().toUpperCase())return showLobbyError('邀请码已变化，请重新查询房间说明');
+  submitJoin();
+};
+function closeJoinPreview(){
+  lobbyCard.classList.remove('joining');
+  document.getElementById('join-preview').classList.add('hidden');
+  document.getElementById('nickname-home-slot').appendChild(document.getElementById('nickname-field'));
+  for(const id of ['btn-create','join-divider','join-entry'])document.getElementById(id).classList.remove('hidden');
+  previewCode='';clearLobbyErrors();document.getElementById('room-code').focus();
+}
+document.getElementById('btn-join-back').onclick=closeJoinPreview;
+document.getElementById('room-code').addEventListener('input',()=>{previewCode='';document.getElementById('join-preview').classList.add('hidden');});
+function showCreateOptions(open){
+  lobbyCard.classList.toggle('creating',open);
+  lobbyCard.classList.remove('joining');
+  document.getElementById(open?'create-name-slot':'nickname-home-slot').appendChild(document.getElementById('nickname-field'));
+  document.getElementById('create-options').classList.toggle('hidden',!open);
+  document.getElementById('create-heading').classList.toggle('hidden',!open);
+  for(const id of ['btn-create','join-divider','join-entry'])document.getElementById(id).classList.toggle('hidden',open);
+  document.querySelector('.lobby-facts').classList.toggle('hidden',open);
+  document.getElementById('join-preview').classList.add('hidden');
+  clearLobbyErrors();
+  if(open){renderCreateOptions();document.querySelector('[name="create-mode"]:checked').focus();}else createRoomBtn.focus();
+}
+createRoomBtn.onclick=()=>showCreateOptions(true);
+document.getElementById('btn-create-back').onclick=()=>showCreateOptions(false);
+document.getElementById('btn-create-cancel').onclick=()=>showCreateOptions(false);
+let createPaymentTouched=false;
+function renderCreateOptions(){
+  const isSquid=selectedCreateMode()==='squid';
+  lobbyCard.classList.toggle('classic',!isSquid);
+  document.getElementById('create-squid-settings').classList.toggle('hidden',!isSquid);
+  document.getElementById('create-mode-tip').textContent='玩法创建后固定，入房后不能切换。';
+  const p=Number(document.getElementById('create-payment').value);
+  const total=Number.isSafeInteger(p)&&p>=1&&p<=1000000?(3*p).toLocaleString('zh-CN'):'—';
+  document.getElementById('preview-total').textContent=total;
+  document.getElementById('preview-frozen').textContent=total;
+  document.querySelectorAll('[data-payment]').forEach(b=>b.setAttribute('aria-pressed',String(Number(b.dataset.payment)===p)));
+  document.getElementById('advanced-summary').textContent=`${document.getElementById('create-action').value}秒行动 · ${document.getElementById('create-delay').value}秒局间 · ${document.getElementById('create-rebuy').value==='true'?'允许':'禁止'}重买`;
+}
+document.getElementById('create-mode').onchange=renderCreateOptions;
+document.getElementById('create-bb').oninput=()=>{if(!createPaymentTouched)document.getElementById('create-payment').value=document.getElementById('create-bb').value;renderCreateOptions();};
+document.getElementById('create-payment').oninput=()=>{createPaymentTouched=true;renderCreateOptions();};
+document.querySelectorAll('[data-payment]').forEach(b=>b.onclick=()=>{createPaymentTouched=true;document.getElementById('create-payment').value=b.dataset.payment;clearFieldError('create-payment');renderCreateOptions();});
+for(const id of ['create-action','create-delay','create-rebuy'])document.getElementById(id).onchange=renderCreateOptions;
+Object.keys(fieldErrorIds).forEach(id=>document.getElementById(id).addEventListener('input',()=>{clearFieldError(id);document.getElementById('create-form-error').textContent='';document.getElementById('join-form-error').textContent='';}));
+renderCreateOptions();
 function getName() {
   const n = document.getElementById('nickname').value.trim();
-  if (!n) { showLobbyError('请先填写昵称'); return null; }
+  if (!n) { fieldError('nickname','请先填写昵称。'); return null; }
+  const normalized=n.normalize('NFKC'),count=typeof Intl.Segmenter==='function'?[...new Intl.Segmenter('zh',{granularity:'grapheme'}).segment(normalized)].length:Array.from(normalized).length;
+  if(count>8||/[\p{Cc}\p{Cf}\p{Cs}]/u.test(normalized)||!/[\p{L}\p{N}\p{P}\p{S}]/u.test(normalized)){fieldError('nickname','昵称须为1–8个可见字符，不能含控制或零宽字符。');return null;}
   return n;
 }
-function showLobbyError(msg) { document.getElementById('lobby-error').textContent = msg; }
+function showLobbyError(msg) {
+  if(!msg){clearLobbyErrors();return;}
+  if(/昵称/.test(msg)){fieldError('nickname',msg);return;}
+  if(lobbyCard.classList.contains('creating')){
+    const field=/支付/.test(msg)?'create-payment':/盲注/.test(msg)?'create-bb':/起始筹码/.test(msg)?'create-chips':null;
+    if(field){fieldError(field,msg);return;}
+  }else if(!lobbyCard.classList.contains('joining')){fieldError('room-code',msg);return;}
+  const el=document.getElementById(lobbyCard.classList.contains('creating')?'create-form-error':'join-form-error');
+  el.textContent=msg;el.focus();
+}
 
 function enterRoom(code) {
   const normalizedCode = String(code || '').trim().toUpperCase();
@@ -606,10 +734,10 @@ function render() {
   if (!state) return;
   try {
     renderForfeitShowcase();
+    updateSquidMarks();
     updateWinnerSeats();
     renderTableInfo();
     renderSeats();
-    renderBets();
     renderCommunity();
     renderMyArea();
     renderLogs();
@@ -618,6 +746,9 @@ function render() {
     renderIdentityControls();
     renderNextHandStatus();
     renderResults();
+    renderSquid();
+    // 手牌、操作区和冻结提示都会影响桌面高度；全部更新后再量下注坐标。
+    renderBets();
   } catch (e) {
     // 渲染异常不应白屏：把错误显示在提示区，座位区保留上次内容
     console.error(e);
@@ -795,10 +926,10 @@ function seatCardHtml(p, isMe) {
     ? '<span class="dealer-badge" title="庄家">D</span>' : '';
   return `
     ${dealer}
-    <img class="avatar-img" src="${avatarPng(p.seat)}" alt="${escapeHtml(p.name)} 的头像" />
+    <img class="avatar-img" src="${avatarPng(p.seat)}" alt="${escapeHtml(p.name)} 的头像" />${squidMarkHtml(p)}
     <div class="seat-copy">
       <strong>${escapeHtml(p.name)}</strong>
-      <span class="seat-chips">${p.chips}</span>
+      <span class="seat-chips">${p.chips}${p.frozen ? `<small class="frozen-chips"> 冻${p.frozen}</small>` : ''}</span>
 
     </div>
     ${stateBadge ? `<span class="state-badge">${stateBadge}</span>` : ''}
@@ -833,6 +964,8 @@ function renderSeats() {
       (winnerSeats.has(p.seat) ? ' winner-seat' : '') +
       (p.connected ? '' : ' offline');
     div.dataset.seat = p.seat;
+    if (pos.y > 70) div.classList.add('lower-wing');
+    if (pos.y < 20 && pos.x > 30 && pos.x < 70) div.classList.add('top-seat');
 
     div.innerHTML = `
       <div class="hole-cards"></div>
@@ -903,10 +1036,10 @@ function renderHeroSeat(me) {
   box.innerHTML = `
     <div class="seat-card me-seat${isTurn ? ' is-current' : ''}${me.folded ? ' folded-seat' : ''}${winnerSeats.has(me.seat) ? ' winner-seat' : ''}">
       ${me.isDealer && state.stage !== 'waiting' ? '<span class="dealer-badge" title="庄家">D</span>' : ''}
-      <img class="avatar-img" src="${avatarPng(me.seat)}" alt="我的头像" />
+      <img class="avatar-img" src="${avatarPng(me.seat)}" alt="我的头像" />${squidMarkHtml(me)}
       <div class="seat-copy">
         <strong>${escapeHtml(me.name)}</strong>
-        <span class="seat-chips">${me.chips}</span>
+        ${me.frozen ? `<span class="seat-chips hero-balances"><span>可用 ${me.chips}</span><span class="hero-frozen">冻结 ${me.frozen}</span></span>` : `<span class="seat-chips">${me.chips}</span>`}
       </div>
       ${stateBadge ? `<span class="state-badge">${stateBadge}</span>` : ''}
     </div>
@@ -927,6 +1060,7 @@ function renderBets() {
   if (state.stage === 'waiting') return;
   const tableEl = document.getElementById('table');
   const tableRect = tableEl.getBoundingClientRect();
+  const wrapRect = wrap.getBoundingClientRect();
   if (!tableRect.width) return;
 
   // 障碍：桌心中央区三件套 + 全部席位卡（含 hero；自家卡单独判定不压数字）
@@ -966,8 +1100,8 @@ function renderBets() {
     const vlen = Math.hypot(vx, vy) || 1;
     vx /= vlen; vy /= vlen;
 
-    // 碰撞 margin 语义：正数=更严格（提前判撞），负数=允许轻擦。
-    // 中央区不允许任何压盖（+2）；其他席位卡允许轻擦 3px（密集桌的圆片贴边）；
+    // overlaps 的正 margin 缩小障碍（允许轻擦），负 margin 扩大障碍。
+    // 中央区沿边允许轻擦 2px；其他席位卡保留 3px 间距；
     // 自家卡允许贴沿 4px（圆片底边擦到卡片边框，不遮昵称/筹码数字）。
     const blocked = (px, py) => {
       const r = { left: px - halfW, right: px + halfW, top: py - halfH, bottom: py + halfH };
@@ -984,8 +1118,9 @@ function renderBets() {
       return false;
     };
     const place = (px, py) => {
-      chip.style.left = (px - tableRect.left) + 'px';
-      chip.style.top = (py - tableRect.top) + 'px';
+      // 搜索点是视口中的中心；样式是 #bets 内的左上角（不含牌桌边框）。
+      chip.style.left = (px - wrapRect.left - halfW) + 'px';
+      chip.style.top = (py - wrapRect.top - halfH) + 'px';
       chip.style.visibility = '';
     };
 
@@ -1030,7 +1165,8 @@ function renderBets() {
     let bestScore = Infinity;
     for (const [px, py] of edges) {
       const r = { left: px - halfW, right: px + halfW, top: py - halfH, bottom: py + halfH };
-      if (r.left < 0 || r.right > tableRect.width || r.top < 0 || r.bottom > tableRect.height) continue;
+      if (r.left < tableRect.left || r.right > tableRect.right ||
+          r.top < tableRect.top || r.bottom > tableRect.bottom) continue;
       let s = 2; // 贴自家卡
       obstacles.forEach((o, i) => {
         if (overlaps(r, o, 0)) s += [3, 6, 10][i] || 5; // [label, pot, community]
@@ -1127,10 +1263,10 @@ function renderMyArea() {
   const sitOutBtn = document.getElementById('btn-sit-out');
   const sitBackBtn = document.getElementById('btn-sit-back');
   const showStart = state.stage === 'waiting' && state.isHost
-    && !state.gameOver && state.players.length >= 2;
+    && !state.gameOver && state.players.filter(p=>!p.left&&p.connected&&!p.sittingOut).length >= (state.mode==='squid'?3:2);
   startBtn.classList.toggle('hidden', !showStart);
   const showRebuy = !state.gameOver && ['waiting', 'handover'].includes(state.stage)
-    && me && me.chips === 0;
+    && me && cfg().rebuyAllowed !== false && (me.chips === 0 || (state.squid?.enabled && !state.squid.current && state.squid.waitingReason && me.chips <= (state.players.filter(p=>p.connected&&!p.sittingOut&&!p.left).length-1)*state.squid.payment));
   rebuyBtn.classList.toggle('hidden', !showRebuy);
   rebuyBtn.textContent = `重新买入（补充 ${cfg().startChips} 筹码）`;
   // 暂离/坐回按钮：对局中或局间都可以暂离；暂离状态显示坐回按钮
@@ -1184,6 +1320,7 @@ function renderMyArea() {
 function waitingTipText() {
   if (state.gameOver) return '游戏已结束';
   const count = state.players.length;
+  if(state.mode==='squid'){const ready=state.players.filter(p=>p.connected&&!p.sittingOut&&!p.left).length;return ready<3?`当前有效${ready}人，等待至少3人开局`:state.isHost?`${ready}名玩家已就绪，可开始鱿鱼德州`:`${ready}名玩家已就绪，等待房主开始鱿鱼德州`;}
   if (count < 2) return `把房号 ${state.code} 发给朋友，凑齐 2 人即可开局`;
   return state.isHost ? `${count} 名玩家已就绪，可以开始游戏`
     : `${count} 名玩家已就绪，等待房主开始`;
@@ -1342,14 +1479,21 @@ function raiseContextKey(me) {
 document.getElementById('raise-scrim').addEventListener('click', hideRaisePanel);
 // 键盘弹起兜底（仅手机）：软键盘把抽屉盖住时，用 visualViewport 实测
 // 键盘高度把抽屉抬到键盘上方；键盘收起自动归位。主路径（快捷/滑条/步进）不依赖键盘。
-if (window.visualViewport && window.matchMedia('(max-width: 900px)').matches) {
-  const raisePanel = document.getElementById('raise-panel');
-  visualViewport.addEventListener('resize', () => {
-    if (!raiseOpen) return;
-    const keyboard = Math.max(0, window.innerHeight - visualViewport.height - visualViewport.offsetTop);
-    raisePanel.style.bottom = keyboard > 0 ? keyboard + 'px' : '';
-  });
+function syncVisibleViewport(){
+  const v=window.visualViewport,height=v?.height||window.innerHeight,top=v?.offsetTop||0;
+  document.documentElement.style.setProperty('--visible-height',`${height}px`);
+  document.documentElement.style.setProperty('--visible-top',`${top}px`);
+  document.documentElement.style.setProperty('--keyboard-inset',`${Math.max(0,window.innerHeight-height-top)}px`);
 }
+syncVisibleViewport();
+window.visualViewport?.addEventListener('resize',syncVisibleViewport);
+window.visualViewport?.addEventListener('scroll',syncVisibleViewport);
+window.addEventListener('resize',()=>{
+  syncVisibleViewport();
+  // 仅重排环桌席位和筹码，不重建房间/手牌/操作面板，不重置未提交的输入。
+  if(state){renderSeats();renderBets();}
+});
+
 document.getElementById('raise-input').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') confirmRaise();
 });
@@ -1629,7 +1773,7 @@ function renderSession() {
   box.classList.remove('hidden');
   const tbody = box.querySelector('tbody');
   tbody.innerHTML = list.map((e) => {
-    const chips = e.left ? '已离场' : e.chips;
+    const chips = e.left ? '已离场' : `${e.estate ?? e.chips}${e.frozen ? `（冻${e.frozen}）` : ''}`;
     const plCls = e.pl > 0 ? 'pl-pos' : e.pl < 0 ? 'pl-neg' : '';
     const plText = (e.pl > 0 ? '+' : '') + e.pl;
     return `<tr>
@@ -1873,4 +2017,64 @@ function renderForfeitShowcase() {
 
 }
 setInterval(()=>{if(isForfeitIntermission()) document.getElementById('next-hand-status').textContent=forfeitStatus();},1000);
-window.addEventListener('resize', () => { if (isForfeitIntermission()) { renderSeats(); renderBets(); } });
+
+
+// 鱿鱼仅使用服务器公开的标记与资产，不读取或推测底牌。
+let squidSeenRoom='', squidSeenSeq=null;
+const squidGlow=new Map();
+function updateSquidMarks(){
+  const s=state.squid;if(!s)return;
+  if(squidSeenRoom!==state.code){squidSeenRoom=state.code;squidSeenSeq=null;squidGlow.clear();}
+  const history=s.history||[],seq=history.at(-1)?.seq||0;
+  if(squidSeenSeq!==null)for(const e of history)if(e.seq>squidSeenSeq&&e.type==='mark')squidGlow.set(e.name,Date.now());
+  squidSeenSeq=seq;
+}
+function squidMarkHtml(p){
+  const s=state.squid;if(!s?.enabled)return '';
+  let marked=s.current?.members.some(m=>m.name===p.name&&m.marked);
+  if(!s.current&&state.stage==='handover'&&state.results?.squidEvents?.some(e=>e.type==='payment'&&e.round===s.round))
+    marked=(s.history||[]).some(e=>e.round===s.round&&e.type==='mark'&&e.name===p.name);
+  if(!marked)return '';
+  const elapsed=Date.now()-(squidGlow.get(p.name)||0),glow=elapsed<650;
+  return `<span class="squid-mark${glow?' squid-glow':''}" ${glow?`style="animation-delay:-${elapsed}ms"`:''} title="本轮已得鱿鱼标记" aria-label="本轮已得鱿鱼标记">◆</span>`;
+}
+function squidEventText(e){
+  if(e.type==='round')return `第${e.round}轮开始：${e.names.join('、')}；大盲${e.bb}，向每人支付${e.payment??e.bb}，每人冻结${(e.names.length-1)*(e.payment??e.bb)}`;
+  if(e.type==='mark')return `${e.name} 主池独赢，得到标记并解冻`;
+  if(e.type==='payment')return `${e.from} 支付${e.total}，${e.to.join('、')}各收${e.payment??e.bb}筹码`;
+  return `第${e.round}轮取消并解冻：${e.reason}`;
+}
+function renderSquid(){
+  const s=state.squid||{enabled:false},safe=['waiting','handover'].includes(state.stage);
+  const progress=document.getElementById('squid-progress');
+  progress.classList.toggle('hidden',!s.enabled);
+  progress.textContent=s.current?`鱿鱼第${s.current.round}轮 · 已发${s.current.members.filter(m=>m.marked).length}/${s.current.members.length-1}`:`鱿鱼 · ${s.round?`第${s.round}轮已结束`:'等待开轮'}`;
+  const controls=document.getElementById('squid-controls');
+  controls.classList.toggle('hidden',!s.enabled||!state.isHost||!safe);
+  document.getElementById('btn-squid-cancel').classList.toggle('hidden',!s.current);
+  const roomPayment=document.getElementById('room-payment');
+  if(roomPayment.dataset.saved!==String(s.payment)){
+    if(document.activeElement!==roomPayment)roomPayment.value=s.payment;
+    roomPayment.dataset.saved=String(s.payment);
+  }
+  document.getElementById('squid-current-setting').textContent=s.current?`本轮向每人支付${s.current.payment}；下轮向每人支付${s.payment}。保存只改变下轮，本轮冻结和标记不变。`:`下轮向每人支付${s.payment}筹码。`;
+  document.querySelector('#room-setup summary').textContent=state.mode==='squid'?'鱿鱼德州 · 房间设置':'经典德州 · 房间设置';
+  document.getElementById('room-mode-info').textContent=state.mode==='squid'?'普通52张德州＋经典鱿鱼，3–6人。主池独赢得标记；一轮最多发人数−1个，最后未得标记者支付。玩法固定。':'普通52张德州扑克，2–6人。玩法固定。';
+  const c=cfg();
+  document.getElementById('room-settings-info').textContent=`起始${c.startChips} · 盲注${c.smallBlind}/${c.bigBlind} · 行动${c.actionTime}秒 · 局间${c.nextHandDelay}秒 · ${c.rebuyAllowed===false?'禁止':'允许'}重买`;
+  const preview=document.getElementById('room-payment-preview'),n=state.players.filter(p=>p.connected&&!p.sittingOut&&!p.left).length;
+  preview.classList.toggle('hidden',!s.enabled);
+  preview.textContent=s.current?`本轮${s.current.members.length}人，向每人支付${s.current.payment}，每人初始冻结${(s.current.members.length-1)*s.current.payment}；下轮向每人支付${s.payment}。新玩家下轮参加。`:n<3?`当前有效${n}人，不足3人，等待开轮。向每人支付${s.payment}。`:`当前有效${n}人：下轮末位总付${(n-1)*s.payment}，每人开轮冻结${(n-1)*s.payment}。实际以开轮人数为准。`;
+  const events=state.stage==='handover'?(state.results?.squidEvents||[]):[];
+  const payment=events.findLast(e=>e.type==='payment');
+  const last=(s.history||[]).at(-1);
+  const summary=document.getElementById('squid-summary');
+  summary.textContent=s.waitingReason||(payment?`鱿鱼：${payment.from} 付${payment.total} · 其余${payment.to.length}人各收${payment.payment??payment.bb}`:(safe&&last?.type==='cancel'?squidEventText(last):''));
+  summary.classList.toggle('hidden',!summary.textContent);
+  const r=state.stage==='handover'?state.results:state.lastResult;
+  const detail=document.getElementById('squid-result'),detailEvents=r?.squidEvents||[];
+  detail.classList.toggle('hidden',!detailEvents.length);
+  detail.innerHTML=detailEvents.length?`<h3>鱿鱼记录</h3>${detailEvents.map(e=>`<p>${escapeHtml(squidEventText(e))}</p>`).join('')}<p>本局净盈亏已含鱿鱼收付；底池分得金额仅为德州结算。冻结、解冻不计盈亏。</p>`:'';
+}
+document.getElementById('btn-squid-payment-save').onclick=()=>socket.emit('set_squid_payment',{payment:Number(document.getElementById('room-payment').value)},r=>{if(!r?.ok)flashTip(r?.err||'保存失败');else flashTip('已保存，仅下一轮生效');});
+document.getElementById('btn-squid-cancel').onclick=()=>socket.emit('cancel_squid_round',null,r=>{if(!r?.ok)flashTip(r?.err||'操作失败');});

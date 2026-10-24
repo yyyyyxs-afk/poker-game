@@ -4,6 +4,8 @@
  * 规则：无限注德州扑克 (No-Limit Texas Hold'em)
  * 流程：发牌 -> 翻牌前 -> 翻牌 -> 转牌 -> 河牌 -> 摊牌（含边池分配）
  */
+const squid = require('./squid');
+const {parseCreate,paymentError}=require('./room-config');
 const express = require('express');
 const http = require('http');
 const path = require('path');
@@ -196,6 +198,7 @@ function createRoom(hostName) {
     logs: [],
     results: null,         // 摊牌结果
     lastResult: null,      // 最近一局完整复盘；开下一局后仍可回看
+    handSquidEvents: [],
     handActions: [],       // 当前一手的结构化行动时间线
     chatMessages: [],      // 最近 50 条好友聊天
     nextChatId: 1,
@@ -249,7 +252,7 @@ function compactLeftPlayers(room) {
   }
 
   room.players.filter((p) => !p || p.left).forEach((p) => {
-    if (p) room.economyTotal -= p.chips;
+    if (p) room.economyTotal -= squid.estate(p);
   });
   room.players = room.players.filter((p) => p && !p.left);
   room.dealerSeat = dealerAnchor ? room.players.indexOf(dealerAnchor) : -1;
@@ -312,6 +315,8 @@ function pay(p, amount) {
 // ---------------- 一局流程 ----------------
 function startHand(room) {
   if (room.stage === 'handover' && room.nextHandPaused) return;
+  const waitingReason = squid.check(room);
+  if (waitingReason) { broadcast(room); return { ok:false, err:waitingReason }; }
   const seated = room.players.filter((p) => p && !p.left);
   if (seated.length < MIN_PLAYERS) return;
 
@@ -349,6 +354,8 @@ function startHand(room) {
     broadcast(room);
     return;
   }
+  const squidReason = squid.prepare(room);
+  if (squidReason) { broadcast(room); return { ok:false, err:squidReason }; }
   if (room.players.length > MAX_PLAYERS) room.players = room.players.slice(0, MAX_PLAYERS);
 
   const sbAmt = room.settings.smallBlind;
@@ -369,7 +376,7 @@ function startHand(room) {
     if (!p) return;
     // 记录本手开局时的筹码，结算后用于生成“本局筹码变化”。
     // 必须在扣除盲注前记录，才能反映这一整手的真实盈亏。
-    p.handStartChips = p.chips;
+    p.handStartChips = squid.estate(p);
     // 暂离或 0 筹码玩家不参与本局
     if (p.sittingOut || p.chips <= 0 || !p.connected) {
       p.inHand = false;
@@ -783,9 +790,12 @@ function showdown(room) {
 function endHand(room) {
   room.stage = 'handover';
   clearTurnTimer(room);
-  // 只统计实际参与本手的玩家；所有 delta 相加应为 0。
+  // 包括本手未入局但收到/支付鱿鱼筹码的玩家；所有 delta 相加应为 0。
   // 在离场玩家战绩入账前生成，保留完整的本手座位和结算快照。
   if (room.results) {
+    squid.finishHand(room);
+    room.results.squidEvents = room.handSquidEvents || [];
+    room.handSquidEvents = [];
     room.results.handNumber = room.handNumber;
     room.results.community = [...room.community];
     room.results.actions = room.handActions.map((entry) => ({
@@ -794,12 +804,14 @@ function endHand(room) {
     }));
     room.results.changes = room.players
       .map((p, seat) => ({ p, seat }))
-      .filter(({ p }) => p && p.inHand)
+      .filter(({ p }) => p && (p.inHand || squid.estate(p) !== p.handStartChips))
       .map(({ p, seat }) => ({
         seat,
         name: p.name,
-        delta: p.chips - (Number.isFinite(p.handStartChips) ? p.handStartChips : p.chips),
+        delta: squid.estate(p) - (Number.isFinite(p.handStartChips) ? p.handStartChips : squid.estate(p)),
         chips: p.chips,
+        frozen: squid.frozen(p),
+        estate: squid.estate(p),
       }));
     room.lastResult = room.results;
   }
@@ -815,11 +827,18 @@ function endHand(room) {
  * 0 筹码玩家不阻塞——他们可以选择重买或暂离，定时器照常倒计时。
  * 如果实在凑不齐 2 人可参与（都走了或都 0 筹码），进入 gameOver。
  */
+// 资格恢复只补缺失的局间排期，不能延长仍有效的倒计时或绕过显式暂停。
+function resumeNextHandIfReady(room) {
+  if (room.stage !== 'handover' || room.gameOver || room.nextHandPaused || room.nextHandTimer) return;
+  scheduleNextHandIfReady(room);
+}
+
 function scheduleNextHandIfReady(room) {
   clearTimeout(room.nextHandTimer);
   room.nextHandTimer = null;
   room.nextHandDeadline = 0;
   if (room.stage !== 'handover' || room.nextHandPaused) return;
+  if (squid.check(room)) { broadcast(room); return; }
   const playable = room.players.filter((p) => p && !p.left && !p.sittingOut && p.chips > 0 && p.connected);
   if (playable.length < MIN_PLAYERS) {
     // 看看有没有可能通过重买凑齐
@@ -890,6 +909,8 @@ function sanitizeState(room, viewerSocketId) {
     bigBlind: room.settings.bigBlind,
     startChips: room.settings.startChips,
     settings: room.settings,
+    mode: room.mode || 'classic',
+    squid: squid.snapshot(room),
     isHost: !!viewer && viewer.name === room.hostName,
     hostName: room.hostName,
     nextHandPaused: !!room.nextHandPaused,
@@ -912,8 +933,8 @@ function sanitizeState(room, viewerSocketId) {
       ...[...room.session.entries()].map(([n, st]) => {
         // 对局中主动离开的玩家会以 left 标记留到本手结算，仍需把其筹码/下注计入实时零和。
         const sp = room.players.find((x) => x && x.name === n);
-        const owned = sp ? sp.chips + (['showdown', 'handover'].includes(room.stage) ? 0 : sp.totalBet) : 0;
-        return { name: n, buyIn: st.buyIn, chips: sp ? sp.chips : 0, pl: owned - st.buyIn, hands: st.hands, wins: st.wins, left: !!(sp && sp.left) };
+        const owned = sp ? squid.estate(sp) + (['showdown', 'handover'].includes(room.stage) ? 0 : sp.totalBet) : 0;
+        return { name: n, buyIn: st.buyIn, chips: sp ? sp.chips : 0, frozen: sp ? squid.frozen(sp) : 0, estate: owned, pl: owned - st.buyIn, hands: st.hands, wins: st.wins, left: !!(sp && sp.left) };
       }),
       ...room.sessionLeft.map((e) => ({ ...e, chips: null, left: true })),
     ],
@@ -929,6 +950,7 @@ function sanitizeState(room, viewerSocketId) {
       avatarId: p.avatarId,
       lobbySeat: p.lobbySeat,
       chips: p.chips,
+      frozen: squid.frozen(p),
       roundBet: p.roundBet,
       totalBet: p.totalBet,
       folded: p.folded,
@@ -948,6 +970,7 @@ function sanitizeState(room, viewerSocketId) {
 }
 
 function broadcast(room) {
+  if (['waiting','handover'].includes(room.stage)) squid.check(room);
   for (const p of room.players) {
     if (p && p.socketId && p.connected) {
       io.to(p.socketId).emit('state', sanitizeState(room, p.socketId));
@@ -1069,13 +1092,35 @@ io.on('connection', (socket) => {
 
     if (!allowRequestRate(guards.create, clientKey, reply, '创建房间过于频繁，请稍后再试')) return;
 
+    const config=parseCreate(data);
+    if(config.err)return reply({ok:false,err:config.err});
     const room = createRoom(nick.name);
+    room.mode=config.mode;
+    room.settings=config.settings;
+    room.squid={enabled:config.mode==='squid',payment:config.payment,round:0,current:null,waitingReason:null};
     const res = joinPlayer(room, socket, nick.name);
     if (res.err) {
       rooms.delete(room.code);
       return reply({ ok: false, err: res.err });
     }
     reply({ ok: true, code: room.code, token: res.token });
+  });
+
+  onSocketRequest(socket, 'room_info', (payload, reply) => {
+    const data=requireObjectPayload(payload,reply,['code']);if(!data)return;
+    if(typeof data.code!=='string'||!data.code.trim()||data.code.length>64||Object.keys(data).some(k=>k!=='code'))return reply({ok:false,err:'邀请码格式错误'});
+    if(!allowRequestRate(guards.join,clientKey,reply,'查询/加入房间过于频繁，请稍后再试'))return;
+    const room=rooms.get(data.code.trim().toUpperCase());
+    if(!room){
+      if(!allowRequestRate(guards.missingRoom,clientKey,reply,'尝试过于频繁，请稍后再试'))return;
+      return reply({ok:false,err:'房间不存在，请核对邀请码'});
+    }
+    if(room.settings.locked)return reply({ok:false,err:'房主已锁定房间，暂不接受新玩家'});
+    if(!['waiting','handover'].includes(room.stage))return reply({ok:false,err:'本局进行中，请稍等局结束后加入'});
+    const count=room.players.filter(p=>p&&!p.left).length;
+    if(count>=MAX_PLAYERS)return reply({ok:false,err:'房间已满（最多6人）'});
+    const s=room.settings;
+    reply({ok:true,info:{code:room.code,mode:room.mode||'classic',settings:{startChips:s.startChips,smallBlind:s.smallBlind,bigBlind:s.bigBlind,actionTime:s.actionTime,nextHandDelay:s.nextHandDelay,rebuyAllowed:s.rebuyAllowed},squidPayment:room.mode==='squid'?squid.snapshot(room).payment:null}});
   });
 
   onSocketRequest(socket, 'join_room', (payload, reply) => {
@@ -1144,8 +1189,8 @@ io.on('connection', (socket) => {
     room.nextHandTimer = null;
     room.nextHandDeadline = 0;
     room.gameOver = false;
-    startHand(room);
-    reply({ ok: true });
+    const started = startHand(room);
+    reply(started || { ok: true });
   });
 
   onSocketRequest(socket, 'next_hand', (payload, reply) => {
@@ -1158,8 +1203,8 @@ io.on('connection', (socket) => {
     clearTimeout(room.nextHandTimer);
     room.nextHandTimer = null;
     room.nextHandDeadline = 0;
-    startHand(room);
-    reply({ ok: true });
+    const started = startHand(room);
+    reply(started || { ok: true });
   });
 
   onSocketRequest(socket, 'set_next_hand_paused', (payload, reply) => {
@@ -1176,6 +1221,38 @@ io.on('connection', (socket) => {
       broadcast(room);
     }
     reply({ ok: true });
+  });
+
+  // 创建后玩法固定，旧客户端也不能通过原切换接口改变玩法。
+  onSocketRequest(socket, 'set_squid', (payload, reply) => {
+    reply({ok:false,err:'玩法在创建时固定，请退出后重新创建房间'});
+  });
+
+  onSocketRequest(socket, 'set_squid_payment', (payload, reply) => {
+    const data=requireObjectPayload(payload,reply,['payment']);if(!data)return;
+    const err=paymentError(data.payment);
+    if(err||Object.keys(data).some(k=>k!=='payment'))return reply({ok:false,err:err||'支付参数无效'});
+    const room=findRoomBySocket(socket.id),p=room&&room.players.find(p=>p&&!p.left&&p.socketId===socket.id);
+    if(!p||p.name!==room.hostName)return reply({ok:false,err:'只有房主可以修改支付额'});
+    if(room.mode!=='squid')return reply({ok:false,err:'经典德州没有鱿鱼支付设置'});
+    if(!['waiting','handover'].includes(room.stage))return reply({ok:false,err:'只能在等待或局间修改下轮支付额'});
+    const s=squid.init(room);
+    if(s.payment===data.payment)return reply({ok:true});
+    s.payment=data.payment;
+    resumeNextHandIfReady(room);
+    broadcast(room);reply({ok:true});
+  });
+
+  onSocketRequest(socket, 'cancel_squid_round', (payload, reply) => {
+    if(!requireEmptyPayload(payload,reply))return;
+    const room=findRoomBySocket(socket.id),p=room&&room.players.find(p=>p&&!p.left&&p.socketId===socket.id);
+    if(!p||p.name!==room.hostName)return reply({ok:false,err:'只有房主可以取消本轮'});
+    if(room.mode!=='squid')return reply({ok:false,err:'经典德州没有鱿鱼轮次'});
+    if(!['waiting','handover'].includes(room.stage))return reply({ok:false,err:'请在局间取消本轮'});
+    squid.cancel(room,'房主取消本轮');
+    squid.check(room);
+    scheduleNextHandIfReady(room);
+    broadcast(room);reply({ok:true});
   });
 
   // 只公开服务器选定的真实赢家底牌子集，手数防止迟到请求跨局。
@@ -1243,9 +1320,9 @@ io.on('connection', (socket) => {
     if (!p) return reply({ ok: false, err: '已不在房间中，请刷新页面用邀请码重新加入' });
     if (!['waiting', 'handover'].includes(room.stage)) return reply({ ok: false, err: '只能在本局结束后重买' });
     if (room.settings.rebuyAllowed === false) return reply({ ok: false, err: '本房间已禁止重买' });
-    if (p.chips > 0) return reply({ ok: false, err: '你还有筹码，无需重买' });
+    if (p.chips > 0 && !squid.canRebuy(room,p)) return reply({ ok: false, err: '你还有筹码，无需重买' });
     const amount = room.settings.startChips;
-    p.chips = amount;
+    p.chips += amount;
     p.sittingOut = false;
     room.gameOver = false;
     room.economyTotal += amount;
@@ -1267,6 +1344,7 @@ io.on('connection', (socket) => {
       'startChips', 'smallBlind', 'bigBlind', 'actionTime', 'nextHandDelay', 'rebuyAllowed',
     ]);
     if (!data) return;
+    if(Object.keys(data).some(k=>!['startChips','smallBlind','bigBlind','actionTime','nextHandDelay','rebuyAllowed','locked'].includes(k)))return reply({ok:false,err:'设置字段无效，玩法在创建时固定'});
     const { startChips, smallBlind, bigBlind, actionTime, nextHandDelay, rebuyAllowed } = data;
     if (typeof rebuyAllowed !== 'boolean') return reply({ ok: false, err: '重买设置格式错误' });
     if (data.locked !== undefined && typeof data.locked !== 'boolean') {
@@ -1276,7 +1354,7 @@ io.on('connection', (socket) => {
     const p = room && room.players.find((x) => x && x.socketId === socket.id);
     if (!room || !p) return reply({ ok: false, err: '不在房间中' });
     if (p.name !== room.hostName) return reply({ ok: false, err: '只有房主可以修改设置' });
-    if (room.stage !== 'waiting') return reply({ ok: false, err: '只能在对局开始前修改' });
+    if (room.stage !== 'waiting' || squid.init(room).current) return reply({ ok: false, err: '只能在等待且没有进行中的鱿鱼轮次时修改' });
 
     const sc = Math.round(Number(startChips));
     const sb = Math.round(Number(smallBlind));
@@ -1407,6 +1485,7 @@ io.on('connection', (socket) => {
     if (!p) return reply({ ok: false, err: '不在房间中' });
     p.sittingOut = false;
     addLog(room, `${p.name} 坐回`);
+    resumeNextHandIfReady(room);
     broadcast(room);
     reply({ ok: true });
   });
@@ -1426,6 +1505,7 @@ io.on('connection', (socket) => {
     addLog(room, `${target.name} 被房主移出房间`);
     const midHandKick = ['preflop', 'flop', 'turn', 'river'].includes(room.stage);
     const targetSocketId = target.socketId;
+    if (squid.init(room).current && room.squid.current.members.some(m=>m.name===target.name)) squid.cancel(room,'参与者被移出房间');
     target.left = true;
     target.connected = false;
     target.socketId = null;
@@ -1501,6 +1581,7 @@ function joinPlayer(room, socket, name, token) {
       room.preGrace = null;
     }
     resumeStuckTurn(room);
+    resumeNextHandIfReady(room);
     broadcast(room);
     return { token: existing.token };
   }
@@ -1533,6 +1614,7 @@ function joinPlayer(room, socket, name, token) {
   }
   ensureConnectedHost(room);
   addLog(room, `${name} 加入房间`);
+  resumeNextHandIfReady(room);
   broadcast(room);
   return { token: t };
 }
@@ -1568,7 +1650,7 @@ function bankSession(room, p) {
   const st = room.session.get(p.name);
   if (!st) return;
   room.sessionLeft.push({
-    name: p.name, buyIn: st.buyIn, pl: p.chips - st.buyIn, hands: st.hands, wins: st.wins,
+    name: p.name, buyIn: st.buyIn, pl: squid.estate(p) - st.buyIn, hands: st.hands, wins: st.wins,
   });
   room.session.delete(p.name);
 }
@@ -1623,6 +1705,7 @@ function handleLeave(socket, isDisconnect = false) {
     scheduleRetainedRoomCleanup(room);
     broadcast(room); return;
   }
+  if (!isDisconnect && squid.init(room).current && room.squid.current.members.some(m=>m.name===p.name)) squid.cancel(room,'参与者主动离场');
   const midHand = !['waiting', 'handover'].includes(room.stage);
   if (midHand) {
     const wasInHand = p.inHand && !p.folded;
