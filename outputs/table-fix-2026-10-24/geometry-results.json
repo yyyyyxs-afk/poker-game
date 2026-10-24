@@ -1,0 +1,57 @@
+[
+  {
+    "file": "verified-320-long-dom.json",
+    "betCount": 6,
+    "problems": []
+  },
+  {
+    "file": "verified-320-normal-dom.json",
+    "betCount": 5,
+    "problems": []
+  },
+  {
+    "file": "verified-375-flop-dom.json",
+    "betCount": 5,
+    "problems": []
+  },
+  {
+    "file": "verified-375-long-dom.json",
+    "betCount": 6,
+    "problems": []
+  },
+  {
+    "file": "verified-375-normal-dom.json",
+    "betCount": 5,
+    "problems": []
+  },
+  {
+    "file": "verified-568-flop-dom.json",
+    "betCount": 5,
+    "problems": []
+  },
+  {
+    "file": "verified-568-long-dom.json",
+    "betCount": 6,
+    "problems": []
+  },
+  {
+    "file": "verified-568-normal-dom.json",
+    "betCount": 5,
+    "problems": []
+  },
+  {
+    "file": "verified-broadcast-dom.json",
+    "betCount": 6,
+    "problems": []
+  },
+  {
+    "file": "verified-desktop-long-dom.json",
+    "betCount": 6,
+    "problems": []
+  },
+  {
+    "file": "verified-desktop-normal-dom.json",
+    "betCount": 5,
+    "problems": []
+  }
+]
