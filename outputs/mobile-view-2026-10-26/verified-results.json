@@ -1,0 +1,52 @@
+{
+  "nativeLowRects": [
+    {
+      "bottom": 242,
+      "height": 193,
+      "id": "table",
+      "left": 8,
+      "right": 656,
+      "top": 49,
+      "width": 648
+    },
+    {
+      "bottom": 97,
+      "height": 48,
+      "id": "hero-row",
+      "left": 669,
+      "right": 904,
+      "top": 49,
+      "width": 235
+    },
+    {
+      "bottom": 210,
+      "height": 90,
+      "id": "action-buttons",
+      "left": 669,
+      "right": 904,
+      "top": 120,
+      "width": 235
+    },
+    {
+      "bottom": 210,
+      "height": 42,
+      "id": "btn-allin",
+      "left": 789.5,
+      "right": 904,
+      "top": 168,
+      "width": 114.5
+    }
+  ],
+  "logWidthBefore": 648,
+  "logWidthAfter": 648,
+  "modeRoundTripPreserved": true,
+  "fullscreenRoundTripPreserved": true,
+  "bet333": {
+    "chips": 1647,
+    "roundBet": 333
+  },
+  "bet1000": {
+    "chips": 1100,
+    "roundBet": 1000
+  }
+}

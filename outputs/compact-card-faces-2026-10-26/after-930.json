@@ -1,0 +1,189 @@
+{
+  "cards": [
+    {
+      "area": "community",
+      "bottom": 259.59375,
+      "collisions": 0,
+      "height": 48,
+      "left": 245,
+      "parts": [
+        {
+          "bottom": 227.59375,
+          "height": 14,
+          "left": 249,
+          "right": 255.609375,
+          "text": "9",
+          "top": 213.59375,
+          "width": 6.609375
+        },
+        {
+          "bottom": 260.59375,
+          "height": 27,
+          "left": 256,
+          "right": 275,
+          "text": "♣",
+          "top": 233.59375,
+          "width": 19
+        }
+      ],
+      "right": 279,
+      "top": 211.59375,
+      "width": 34
+    },
+    {
+      "area": "community",
+      "bottom": 259.59375,
+      "collisions": 0,
+      "height": 48,
+      "left": 284,
+      "parts": [
+        {
+          "bottom": 227.59375,
+          "height": 14,
+          "left": 288,
+          "right": 294.609375,
+          "text": "A",
+          "top": 213.59375,
+          "width": 6.609375
+        },
+        {
+          "bottom": 260.59375,
+          "height": 27,
+          "left": 295,
+          "right": 314,
+          "text": "♣",
+          "top": 233.59375,
+          "width": 19
+        }
+      ],
+      "right": 318,
+      "top": 211.59375,
+      "width": 34
+    },
+    {
+      "area": "community",
+      "bottom": 259.59375,
+      "collisions": 0,
+      "height": 48,
+      "left": 323,
+      "parts": [
+        {
+          "bottom": 227.59375,
+          "height": 14,
+          "left": 327,
+          "right": 333.609375,
+          "text": "8",
+          "top": 213.59375,
+          "width": 6.609375
+        },
+        {
+          "bottom": 260.59375,
+          "height": 27,
+          "left": 334,
+          "right": 353,
+          "text": "♣",
+          "top": 233.59375,
+          "width": 19
+        }
+      ],
+      "right": 357,
+      "top": 211.59375,
+      "width": 34
+    },
+    {
+      "area": "community",
+      "bottom": 259.59375,
+      "collisions": 0,
+      "height": 48,
+      "left": 362,
+      "parts": [
+        {
+          "bottom": 227.59375,
+          "height": 14,
+          "left": 366,
+          "right": 372.609375,
+          "text": "4",
+          "top": 213.59375,
+          "width": 6.609375
+        },
+        {
+          "bottom": 260.59375,
+          "height": 27,
+          "left": 373,
+          "right": 392,
+          "text": "♣",
+          "top": 233.59375,
+          "width": 19
+        }
+      ],
+      "right": 396,
+      "top": 211.59375,
+      "width": 34
+    },
+    {
+      "area": "hand",
+      "bottom": 106,
+      "collisions": 0,
+      "height": 57,
+      "left": 812.5,
+      "parts": [
+        {
+          "bottom": 65,
+          "height": 14,
+          "left": 816.5,
+          "right": 823.109375,
+          "text": "8",
+          "top": 51,
+          "width": 6.609375
+        },
+        {
+          "bottom": 107,
+          "height": 27,
+          "left": 829.5,
+          "right": 848.5,
+          "text": "♦",
+          "top": 80,
+          "width": 19
+        }
+      ],
+      "right": 852.5,
+      "top": 49,
+      "width": 40
+    },
+    {
+      "area": "hand",
+      "bottom": 106,
+      "collisions": 0,
+      "height": 57,
+      "left": 860.5,
+      "parts": [
+        {
+          "bottom": 65,
+          "height": 14,
+          "left": 864.5,
+          "right": 871.109375,
+          "text": "Q",
+          "top": 51,
+          "width": 6.609375
+        },
+        {
+          "bottom": 107,
+          "height": 27,
+          "left": 877.5,
+          "right": 896.5,
+          "text": "♥",
+          "top": 80,
+          "width": 19
+        }
+      ],
+      "right": 900.5,
+      "top": 49,
+      "width": 40
+    }
+  ],
+  "totalCollisions": 0,
+  "viewport": {
+    "height": 360,
+    "width": 930
+  }
+}

@@ -38,6 +38,8 @@ assert.ok(html.indexOf('src="chat-delivery.js"') >= 0 && html.indexOf('src="chat
 assert.ok(html.indexOf('src="lobby-requests.js"') >= 0 && html.indexOf('src="lobby-requests.js"') < html.indexOf('src="client.js"'), '大厅生命周期必须先加载');
 assert.ok(html.indexOf('src="room-connection.js"') >= 0 && html.indexOf('src="room-connection.js"') < html.indexOf('src="client.js"'), '房间恢复组件必须先加载');
 assert.ok(html.indexOf('src="poker-explanations.js"') >= 0 && html.indexOf('src="poker-explanations.js"') < html.indexOf('src="client.js"'), '金额解释组件必须先加载');
+assert.ok(html.indexOf('src="mobile-view.js"') >= 0 && html.indexOf('src="mobile-view.js"') < html.indexOf('src="client.js"'), '手机显示组件必须先加载');
+assert.ok(html.indexOf('href="mobile-view.css"') > html.indexOf('href="style.css"'), '手机显示样式必须在基础样式之后加载');
 assert.ok(client.includes('p.seat === mySeat') && client.includes('0.82'), '自己的下注筹码缺少桌面下沿专用锚点');
 assert.ok(client.includes('me.raiseAllowed !== false') && client.includes('未重新开放加注权'),
   '客户端未按服务端加注权禁用操作');
