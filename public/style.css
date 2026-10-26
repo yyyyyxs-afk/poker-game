@@ -333,6 +333,10 @@ body {
 .card.mini .idx b { font-size: 10px; }
 .card.mini .idx i { font-size: 8px; }
 .card.mini .pip { font-size: 14px; }
+/* 复盘小牌只保留一组点数/花色，避免三套标记在同一张小牌里互压。 */
+.card.mini .idx { top:3px; left:4px; }
+.card.mini .idx i, .card.mini .idx.flip { display:none; }
+.card.mini .pip { inset:auto 4px 3px auto; line-height:1; }
 .card.hl { box-shadow: 0 0 0 2px var(--a1-action-strong), var(--a1-shadow-card); }
 
 /* ============ 席位 ============ */
@@ -1432,6 +1436,8 @@ body.modal-open { overflow: hidden; }
   #pot-display b { font-size:22px; }
   #community { gap:5px; }
   .card-slot, .card { width:34px; height:48px; }
+  .card .idx b { font-size:12px; }
+  .card .pip { font-size:19px; }
   .seat.top-seat .hole-cards.is-facedown { bottom:calc(100% - 21px); }
   #hero-dock { width:100%; height:100%; min-height:0; justify-content:flex-start; overflow-y:auto; overscroll-behavior:contain; padding:0 3px 8px; gap:5px; }
   #hero-dock > * { flex-shrink:0; }
@@ -1441,4 +1447,11 @@ body.modal-open { overflow: hidden; }
   #next-hand-status,#squid-summary { font-size:11px; line-height:1.35; }
   #log-panel { height:min(300px,calc(var(--visible-height,100dvh) - 12px)); }
   #hero-dock #room-setup,#hero-dock #squid-controls { font-size:11px; }
+}
+
+/* 手机竖屏及低高度横屏：保持牌张尺寸，点数在左上、单一花色在右下。 */
+@media (max-width:900px), (orientation:landscape) and (max-height:500px) {
+  .card .idx { top:3px; left:4px; }
+  .card .idx i, .card .idx.flip { display:none; }
+  .card .pip { inset:auto 4px 3px auto; line-height:1; }
 }

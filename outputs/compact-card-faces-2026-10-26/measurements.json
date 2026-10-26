@@ -1,0 +1,3087 @@
+[
+  {
+    "cards": [
+      {
+        "area": "community",
+        "bottom": 259.59375,
+        "collisions": 0,
+        "height": 48,
+        "left": 245,
+        "parts": [
+          {
+            "bottom": 227.59375,
+            "height": 14,
+            "left": 249,
+            "right": 255.609375,
+            "text": "9",
+            "top": 213.59375,
+            "width": 6.609375
+          },
+          {
+            "bottom": 260.59375,
+            "height": 27,
+            "left": 256,
+            "right": 275,
+            "text": "♣",
+            "top": 233.59375,
+            "width": 19
+          }
+        ],
+        "right": 279,
+        "top": 211.59375,
+        "width": 34
+      },
+      {
+        "area": "community",
+        "bottom": 259.59375,
+        "collisions": 0,
+        "height": 48,
+        "left": 284,
+        "parts": [
+          {
+            "bottom": 227.59375,
+            "height": 14,
+            "left": 288,
+            "right": 294.609375,
+            "text": "A",
+            "top": 213.59375,
+            "width": 6.609375
+          },
+          {
+            "bottom": 260.59375,
+            "height": 27,
+            "left": 295,
+            "right": 314,
+            "text": "♣",
+            "top": 233.59375,
+            "width": 19
+          }
+        ],
+        "right": 318,
+        "top": 211.59375,
+        "width": 34
+      },
+      {
+        "area": "community",
+        "bottom": 259.59375,
+        "collisions": 0,
+        "height": 48,
+        "left": 323,
+        "parts": [
+          {
+            "bottom": 227.59375,
+            "height": 14,
+            "left": 327,
+            "right": 333.609375,
+            "text": "8",
+            "top": 213.59375,
+            "width": 6.609375
+          },
+          {
+            "bottom": 260.59375,
+            "height": 27,
+            "left": 334,
+            "right": 353,
+            "text": "♣",
+            "top": 233.59375,
+            "width": 19
+          }
+        ],
+        "right": 357,
+        "top": 211.59375,
+        "width": 34
+      },
+      {
+        "area": "community",
+        "bottom": 259.59375,
+        "collisions": 0,
+        "height": 48,
+        "left": 362,
+        "parts": [
+          {
+            "bottom": 227.59375,
+            "height": 14,
+            "left": 366,
+            "right": 372.609375,
+            "text": "4",
+            "top": 213.59375,
+            "width": 6.609375
+          },
+          {
+            "bottom": 260.59375,
+            "height": 27,
+            "left": 373,
+            "right": 392,
+            "text": "♣",
+            "top": 233.59375,
+            "width": 19
+          }
+        ],
+        "right": 396,
+        "top": 211.59375,
+        "width": 34
+      },
+      {
+        "area": "hand",
+        "bottom": 106,
+        "collisions": 0,
+        "height": 57,
+        "left": 812.5,
+        "parts": [
+          {
+            "bottom": 65,
+            "height": 14,
+            "left": 816.5,
+            "right": 823.109375,
+            "text": "8",
+            "top": 51,
+            "width": 6.609375
+          },
+          {
+            "bottom": 107,
+            "height": 27,
+            "left": 829.5,
+            "right": 848.5,
+            "text": "♦",
+            "top": 80,
+            "width": 19
+          }
+        ],
+        "right": 852.5,
+        "top": 49,
+        "width": 40
+      },
+      {
+        "area": "hand",
+        "bottom": 106,
+        "collisions": 0,
+        "height": 57,
+        "left": 860.5,
+        "parts": [
+          {
+            "bottom": 65,
+            "height": 14,
+            "left": 864.5,
+            "right": 871.109375,
+            "text": "Q",
+            "top": 51,
+            "width": 6.609375
+          },
+          {
+            "bottom": 107,
+            "height": 27,
+            "left": 877.5,
+            "right": 896.5,
+            "text": "♥",
+            "top": 80,
+            "width": 19
+          }
+        ],
+        "right": 900.5,
+        "top": 49,
+        "width": 40
+      }
+    ],
+    "totalCollisions": 0,
+    "viewport": {
+      "height": 360,
+      "width": 930
+    }
+  },
+  {
+    "cards": [
+      {
+        "area": "community",
+        "bottom": 238.59375,
+        "collisions": 0,
+        "height": 48,
+        "left": 81,
+        "parts": [
+          {
+            "bottom": 206.59375,
+            "height": 14,
+            "left": 85,
+            "right": 91.609375,
+            "text": "9",
+            "top": 192.59375,
+            "width": 6.609375
+          },
+          {
+            "bottom": 239.59375,
+            "height": 27,
+            "left": 92,
+            "right": 111,
+            "text": "♣",
+            "top": 212.59375,
+            "width": 19
+          }
+        ],
+        "right": 115,
+        "top": 190.59375,
+        "width": 34
+      },
+      {
+        "area": "community",
+        "bottom": 238.59375,
+        "collisions": 0,
+        "height": 48,
+        "left": 120,
+        "parts": [
+          {
+            "bottom": 206.59375,
+            "height": 14,
+            "left": 124,
+            "right": 130.609375,
+            "text": "A",
+            "top": 192.59375,
+            "width": 6.609375
+          },
+          {
+            "bottom": 239.59375,
+            "height": 27,
+            "left": 131,
+            "right": 150,
+            "text": "♣",
+            "top": 212.59375,
+            "width": 19
+          }
+        ],
+        "right": 154,
+        "top": 190.59375,
+        "width": 34
+      },
+      {
+        "area": "community",
+        "bottom": 238.59375,
+        "collisions": 0,
+        "height": 48,
+        "left": 159,
+        "parts": [
+          {
+            "bottom": 206.59375,
+            "height": 14,
+            "left": 163,
+            "right": 169.609375,
+            "text": "8",
+            "top": 192.59375,
+            "width": 6.609375
+          },
+          {
+            "bottom": 239.59375,
+            "height": 27,
+            "left": 170,
+            "right": 189,
+            "text": "♣",
+            "top": 212.59375,
+            "width": 19
+          }
+        ],
+        "right": 193,
+        "top": 190.59375,
+        "width": 34
+      },
+      {
+        "area": "community",
+        "bottom": 238.59375,
+        "collisions": 0,
+        "height": 48,
+        "left": 198,
+        "parts": [
+          {
+            "bottom": 206.59375,
+            "height": 14,
+            "left": 202,
+            "right": 208.609375,
+            "text": "4",
+            "top": 192.59375,
+            "width": 6.609375
+          },
+          {
+            "bottom": 239.59375,
+            "height": 27,
+            "left": 209,
+            "right": 228,
+            "text": "♣",
+            "top": 212.59375,
+            "width": 19
+          }
+        ],
+        "right": 232,
+        "top": 190.59375,
+        "width": 34
+      },
+      {
+        "area": "hand",
+        "bottom": 106,
+        "collisions": 0,
+        "height": 57,
+        "left": 465,
+        "parts": [
+          {
+            "bottom": 65,
+            "height": 14,
+            "left": 469,
+            "right": 475.609375,
+            "text": "8",
+            "top": 51,
+            "width": 6.609375
+          },
+          {
+            "bottom": 107,
+            "height": 27,
+            "left": 482,
+            "right": 501,
+            "text": "♦",
+            "top": 80,
+            "width": 19
+          }
+        ],
+        "right": 505,
+        "top": 49,
+        "width": 40
+      },
+      {
+        "area": "hand",
+        "bottom": 106,
+        "collisions": 0,
+        "height": 57,
+        "left": 511,
+        "parts": [
+          {
+            "bottom": 65,
+            "height": 14,
+            "left": 515,
+            "right": 521.609375,
+            "text": "Q",
+            "top": 51,
+            "width": 6.609375
+          },
+          {
+            "bottom": 107,
+            "height": 27,
+            "left": 528,
+            "right": 547,
+            "text": "♥",
+            "top": 80,
+            "width": 19
+          }
+        ],
+        "right": 551,
+        "top": 49,
+        "width": 40
+      }
+    ],
+    "totalCollisions": 0,
+    "viewport": {
+      "height": 320,
+      "width": 568
+    }
+  },
+  {
+    "cards": [
+      {
+        "area": "community",
+        "bottom": 327.890625,
+        "collisions": 0,
+        "height": 48,
+        "left": 92.5,
+        "parts": [
+          {
+            "bottom": 295.890625,
+            "height": 14,
+            "left": 96.5,
+            "right": 103.109375,
+            "text": "9",
+            "top": 281.890625,
+            "width": 6.609375
+          },
+          {
+            "bottom": 328.890625,
+            "height": 27,
+            "left": 103.5,
+            "right": 122.5,
+            "text": "♣",
+            "top": 301.890625,
+            "width": 19
+          }
+        ],
+        "right": 126.5,
+        "top": 279.890625,
+        "width": 34
+      },
+      {
+        "area": "community",
+        "bottom": 327.890625,
+        "collisions": 0,
+        "height": 48,
+        "left": 131.5,
+        "parts": [
+          {
+            "bottom": 295.890625,
+            "height": 14,
+            "left": 135.5,
+            "right": 142.109375,
+            "text": "A",
+            "top": 281.890625,
+            "width": 6.609375
+          },
+          {
+            "bottom": 328.890625,
+            "height": 27,
+            "left": 142.5,
+            "right": 161.5,
+            "text": "♣",
+            "top": 301.890625,
+            "width": 19
+          }
+        ],
+        "right": 165.5,
+        "top": 279.890625,
+        "width": 34
+      },
+      {
+        "area": "community",
+        "bottom": 327.890625,
+        "collisions": 0,
+        "height": 48,
+        "left": 170.5,
+        "parts": [
+          {
+            "bottom": 295.890625,
+            "height": 14,
+            "left": 174.5,
+            "right": 181.109375,
+            "text": "8",
+            "top": 281.890625,
+            "width": 6.609375
+          },
+          {
+            "bottom": 328.890625,
+            "height": 27,
+            "left": 181.5,
+            "right": 200.5,
+            "text": "♣",
+            "top": 301.890625,
+            "width": 19
+          }
+        ],
+        "right": 204.5,
+        "top": 279.890625,
+        "width": 34
+      },
+      {
+        "area": "community",
+        "bottom": 327.890625,
+        "collisions": 0,
+        "height": 48,
+        "left": 209.5,
+        "parts": [
+          {
+            "bottom": 295.890625,
+            "height": 14,
+            "left": 213.5,
+            "right": 220.109375,
+            "text": "4",
+            "top": 281.890625,
+            "width": 6.609375
+          },
+          {
+            "bottom": 328.890625,
+            "height": 27,
+            "left": 220.5,
+            "right": 239.5,
+            "text": "♣",
+            "top": 301.890625,
+            "width": 19
+          }
+        ],
+        "right": 243.5,
+        "top": 279.890625,
+        "width": 34
+      },
+      {
+        "area": "hand",
+        "bottom": 699.40625,
+        "collisions": 0,
+        "height": 70,
+        "left": 186,
+        "parts": [
+          {
+            "bottom": 647.40625,
+            "height": 17,
+            "left": 190,
+            "right": 197.703125,
+            "text": "8",
+            "top": 630.40625,
+            "width": 7.703125
+          },
+          {
+            "bottom": 701.40625,
+            "height": 36,
+            "left": 207,
+            "right": 232,
+            "text": "♦",
+            "top": 665.40625,
+            "width": 25
+          }
+        ],
+        "right": 236,
+        "top": 629.40625,
+        "width": 50
+      },
+      {
+        "area": "hand",
+        "bottom": 699.40625,
+        "collisions": 0,
+        "height": 70,
+        "left": 242,
+        "parts": [
+          {
+            "bottom": 647.40625,
+            "height": 17,
+            "left": 246,
+            "right": 253.703125,
+            "text": "Q",
+            "top": 630.40625,
+            "width": 7.703125
+          },
+          {
+            "bottom": 701.40625,
+            "height": 36,
+            "left": 263,
+            "right": 288,
+            "text": "♥",
+            "top": 665.40625,
+            "width": 25
+          }
+        ],
+        "right": 292,
+        "top": 629.40625,
+        "width": 50
+      }
+    ],
+    "totalCollisions": 0,
+    "viewport": {
+      "height": 812,
+      "width": 375
+    }
+  },
+  {
+    "cards": [
+      {
+        "area": "community",
+        "bottom": 231.09375,
+        "collisions": 0,
+        "height": 48,
+        "left": 65,
+        "parts": [
+          {
+            "bottom": 199.09375,
+            "height": 14,
+            "left": 69,
+            "right": 75.609375,
+            "text": "9",
+            "top": 185.09375,
+            "width": 6.609375
+          },
+          {
+            "bottom": 232.09375,
+            "height": 27,
+            "left": 76,
+            "right": 95,
+            "text": "♣",
+            "top": 205.09375,
+            "width": 19
+          }
+        ],
+        "right": 99,
+        "top": 183.09375,
+        "width": 34
+      },
+      {
+        "area": "community",
+        "bottom": 231.09375,
+        "collisions": 0,
+        "height": 48,
+        "left": 104,
+        "parts": [
+          {
+            "bottom": 199.09375,
+            "height": 14,
+            "left": 108,
+            "right": 114.609375,
+            "text": "A",
+            "top": 185.09375,
+            "width": 6.609375
+          },
+          {
+            "bottom": 232.09375,
+            "height": 27,
+            "left": 115,
+            "right": 134,
+            "text": "♣",
+            "top": 205.09375,
+            "width": 19
+          }
+        ],
+        "right": 138,
+        "top": 183.09375,
+        "width": 34
+      },
+      {
+        "area": "community",
+        "bottom": 231.09375,
+        "collisions": 0,
+        "height": 48,
+        "left": 143,
+        "parts": [
+          {
+            "bottom": 199.09375,
+            "height": 14,
+            "left": 147,
+            "right": 153.609375,
+            "text": "8",
+            "top": 185.09375,
+            "width": 6.609375
+          },
+          {
+            "bottom": 232.09375,
+            "height": 27,
+            "left": 154,
+            "right": 173,
+            "text": "♣",
+            "top": 205.09375,
+            "width": 19
+          }
+        ],
+        "right": 177,
+        "top": 183.09375,
+        "width": 34
+      },
+      {
+        "area": "community",
+        "bottom": 231.09375,
+        "collisions": 0,
+        "height": 48,
+        "left": 182,
+        "parts": [
+          {
+            "bottom": 199.09375,
+            "height": 14,
+            "left": 186,
+            "right": 192.609375,
+            "text": "4",
+            "top": 185.09375,
+            "width": 6.609375
+          },
+          {
+            "bottom": 232.09375,
+            "height": 27,
+            "left": 193,
+            "right": 212,
+            "text": "♣",
+            "top": 205.09375,
+            "width": 19
+          }
+        ],
+        "right": 216,
+        "top": 183.09375,
+        "width": 34
+      },
+      {
+        "area": "hand",
+        "bottom": 474.40625,
+        "collisions": 0,
+        "height": 56,
+        "left": 166.5,
+        "parts": [
+          {
+            "bottom": 436.40625,
+            "height": 17,
+            "left": 170.5,
+            "right": 178.203125,
+            "text": "8",
+            "top": 419.40625,
+            "width": 7.703125
+          },
+          {
+            "bottom": 475.40625,
+            "height": 27,
+            "left": 183.5,
+            "right": 202.5,
+            "text": "♦",
+            "top": 448.40625,
+            "width": 19
+          }
+        ],
+        "right": 206.5,
+        "top": 418.40625,
+        "width": 40
+      },
+      {
+        "area": "hand",
+        "bottom": 474.40625,
+        "collisions": 0,
+        "height": 56,
+        "left": 212.5,
+        "parts": [
+          {
+            "bottom": 436.40625,
+            "height": 17,
+            "left": 216.5,
+            "right": 224.203125,
+            "text": "Q",
+            "top": 419.40625,
+            "width": 7.703125
+          },
+          {
+            "bottom": 475.40625,
+            "height": 27,
+            "left": 229.5,
+            "right": 248.5,
+            "text": "♥",
+            "top": 448.40625,
+            "width": 19
+          }
+        ],
+        "right": 252.5,
+        "top": 418.40625,
+        "width": 40
+      }
+    ],
+    "totalCollisions": 0,
+    "viewport": {
+      "height": 568,
+      "width": 320
+    }
+  },
+  {
+    "cards": [
+      {
+        "area": "community",
+        "bottom": 231.09375,
+        "collisions": 0,
+        "height": 48,
+        "left": 65,
+        "parts": [
+          {
+            "bottom": 199.09375,
+            "height": 14,
+            "left": 69,
+            "right": 75.609375,
+            "text": "2",
+            "top": 185.09375,
+            "width": 6.609375
+          },
+          {
+            "bottom": 232.09375,
+            "height": 27,
+            "left": 76,
+            "right": 95,
+            "text": "♣",
+            "top": 205.09375,
+            "width": 19
+          }
+        ],
+        "right": 99,
+        "top": 183.09375,
+        "width": 34
+      },
+      {
+        "area": "community",
+        "bottom": 231.09375,
+        "collisions": 0,
+        "height": 48,
+        "left": 104,
+        "parts": [
+          {
+            "bottom": 199.09375,
+            "height": 14,
+            "left": 108,
+            "right": 114.609375,
+            "text": "7",
+            "top": 185.09375,
+            "width": 6.609375
+          },
+          {
+            "bottom": 232.09375,
+            "height": 27,
+            "left": 115,
+            "right": 134,
+            "text": "♦",
+            "top": 205.09375,
+            "width": 19
+          }
+        ],
+        "right": 138,
+        "top": 183.09375,
+        "width": 34
+      },
+      {
+        "area": "community",
+        "bottom": 231.09375,
+        "collisions": 0,
+        "height": 48,
+        "left": 143,
+        "parts": [
+          {
+            "bottom": 199.09375,
+            "height": 14,
+            "left": 147,
+            "right": 153.609375,
+            "text": "9",
+            "top": 185.09375,
+            "width": 6.609375
+          },
+          {
+            "bottom": 232.09375,
+            "height": 27,
+            "left": 154,
+            "right": 173,
+            "text": "♥",
+            "top": 205.09375,
+            "width": 19
+          }
+        ],
+        "right": 177,
+        "top": 183.09375,
+        "width": 34
+      },
+      {
+        "area": "community",
+        "bottom": 231.09375,
+        "collisions": 0,
+        "height": 48,
+        "left": 182,
+        "parts": [
+          {
+            "bottom": 199.09375,
+            "height": 14,
+            "left": 186,
+            "right": 192.609375,
+            "text": "J",
+            "top": 185.09375,
+            "width": 6.609375
+          },
+          {
+            "bottom": 232.09375,
+            "height": 27,
+            "left": 193,
+            "right": 212,
+            "text": "♠",
+            "top": 205.09375,
+            "width": 19
+          }
+        ],
+        "right": 216,
+        "top": 183.09375,
+        "width": 34
+      },
+      {
+        "area": "community",
+        "bottom": 231.09375,
+        "collisions": 0,
+        "height": 48,
+        "left": 221,
+        "parts": [
+          {
+            "bottom": 199.09375,
+            "height": 14,
+            "left": 225,
+            "right": 231.609375,
+            "text": "Q",
+            "top": 185.09375,
+            "width": 6.609375
+          },
+          {
+            "bottom": 232.09375,
+            "height": 27,
+            "left": 232,
+            "right": 251,
+            "text": "♣",
+            "top": 205.09375,
+            "width": 19
+          }
+        ],
+        "right": 255,
+        "top": 183.09375,
+        "width": 34
+      },
+      {
+        "area": "review",
+        "bottom": 86.15625,
+        "collisions": 0,
+        "height": 48,
+        "left": 20.3125,
+        "parts": [
+          {
+            "bottom": 54.15625,
+            "height": 14,
+            "left": 24.3125,
+            "right": 30.921875,
+            "text": "K",
+            "top": 40.15625,
+            "width": 6.609375
+          },
+          {
+            "bottom": 87.15625,
+            "height": 27,
+            "left": 31.3125,
+            "right": 50.3125,
+            "text": "♦",
+            "top": 60.15625,
+            "width": 19
+          }
+        ],
+        "right": 54.3125,
+        "top": 38.15625,
+        "width": 34
+      },
+      {
+        "area": "review",
+        "bottom": 86.15625,
+        "collisions": 0,
+        "height": 48,
+        "left": 58.3125,
+        "parts": [
+          {
+            "bottom": 54.15625,
+            "height": 14,
+            "left": 62.3125,
+            "right": 68.921875,
+            "text": "K",
+            "top": 40.15625,
+            "width": 6.609375
+          },
+          {
+            "bottom": 87.15625,
+            "height": 27,
+            "left": 69.3125,
+            "right": 88.3125,
+            "text": "♥",
+            "top": 60.15625,
+            "width": 19
+          }
+        ],
+        "right": 92.3125,
+        "top": 38.15625,
+        "width": 34
+      },
+      {
+        "area": "review",
+        "bottom": 86.15625,
+        "collisions": 0,
+        "height": 48,
+        "left": 227.671875,
+        "parts": [
+          {
+            "bottom": 54.15625,
+            "height": 14,
+            "left": 231.671875,
+            "right": 244.875,
+            "text": "10",
+            "top": 40.15625,
+            "width": 13.203125
+          },
+          {
+            "bottom": 87.15625,
+            "height": 27,
+            "left": 238.671875,
+            "right": 257.671875,
+            "text": "♦",
+            "top": 60.15625,
+            "width": 19
+          }
+        ],
+        "right": 261.671875,
+        "top": 38.15625,
+        "width": 34
+      },
+      {
+        "area": "review",
+        "bottom": 86.15625,
+        "collisions": 0,
+        "height": 48,
+        "left": 265.671875,
+        "parts": [
+          {
+            "bottom": 54.15625,
+            "height": 14,
+            "left": 269.671875,
+            "right": 282.875,
+            "text": "10",
+            "top": 40.15625,
+            "width": 13.203125
+          },
+          {
+            "bottom": 87.15625,
+            "height": 27,
+            "left": 276.671875,
+            "right": 295.671875,
+            "text": "♥",
+            "top": 60.15625,
+            "width": 19
+          }
+        ],
+        "right": 299.671875,
+        "top": 38.15625,
+        "width": 34
+      },
+      {
+        "area": "hand",
+        "bottom": 474.40625,
+        "collisions": 0,
+        "height": 56,
+        "left": 166.5,
+        "parts": [
+          {
+            "bottom": 436.40625,
+            "height": 17,
+            "left": 170.5,
+            "right": 178.203125,
+            "text": "A",
+            "top": 419.40625,
+            "width": 7.703125
+          },
+          {
+            "bottom": 475.40625,
+            "height": 27,
+            "left": 183.5,
+            "right": 202.5,
+            "text": "♦",
+            "top": 448.40625,
+            "width": 19
+          }
+        ],
+        "right": 206.5,
+        "top": 418.40625,
+        "width": 40
+      },
+      {
+        "area": "hand",
+        "bottom": 474.40625,
+        "collisions": 0,
+        "height": 56,
+        "left": 212.5,
+        "parts": [
+          {
+            "bottom": 436.40625,
+            "height": 17,
+            "left": 216.5,
+            "right": 224.203125,
+            "text": "A",
+            "top": 419.40625,
+            "width": 7.703125
+          },
+          {
+            "bottom": 475.40625,
+            "height": 27,
+            "left": 229.5,
+            "right": 248.5,
+            "text": "♥",
+            "top": 448.40625,
+            "width": 19
+          }
+        ],
+        "right": 252.5,
+        "top": 418.40625,
+        "width": 40
+      },
+      {
+        "area": "review",
+        "bottom": 473.953125,
+        "collisions": 0,
+        "height": 37,
+        "left": 102.796875,
+        "parts": [
+          {
+            "bottom": 450.953125,
+            "height": 12,
+            "left": 106.796875,
+            "right": 112.296875,
+            "text": "A",
+            "top": 438.953125,
+            "width": 5.5
+          },
+          {
+            "bottom": 473.953125,
+            "height": 20,
+            "left": 110.796875,
+            "right": 124.796875,
+            "text": "♦",
+            "top": 453.953125,
+            "width": 14
+          }
+        ],
+        "right": 128.796875,
+        "top": 436.953125,
+        "width": 26
+      },
+      {
+        "area": "review",
+        "bottom": 473.953125,
+        "collisions": 0,
+        "height": 37,
+        "left": 132.796875,
+        "parts": [
+          {
+            "bottom": 450.953125,
+            "height": 12,
+            "left": 136.796875,
+            "right": 142.296875,
+            "text": "A",
+            "top": 438.953125,
+            "width": 5.5
+          },
+          {
+            "bottom": 473.953125,
+            "height": 20,
+            "left": 140.796875,
+            "right": 154.796875,
+            "text": "♥",
+            "top": 453.953125,
+            "width": 14
+          }
+        ],
+        "right": 158.796875,
+        "top": 436.953125,
+        "width": 26
+      },
+      {
+        "area": "review",
+        "bottom": 473.953125,
+        "collisions": 0,
+        "height": 37,
+        "left": 162.796875,
+        "parts": [
+          {
+            "bottom": 450.953125,
+            "height": 12,
+            "left": 166.796875,
+            "right": 172.296875,
+            "text": "2",
+            "top": 438.953125,
+            "width": 5.5
+          },
+          {
+            "bottom": 473.953125,
+            "height": 20,
+            "left": 170.796875,
+            "right": 184.796875,
+            "text": "♣",
+            "top": 453.953125,
+            "width": 14
+          }
+        ],
+        "right": 188.796875,
+        "top": 436.953125,
+        "width": 26
+      },
+      {
+        "area": "review",
+        "bottom": 473.953125,
+        "collisions": 0,
+        "height": 37,
+        "left": 192.796875,
+        "parts": [
+          {
+            "bottom": 450.953125,
+            "height": 12,
+            "left": 196.796875,
+            "right": 202.296875,
+            "text": "7",
+            "top": 438.953125,
+            "width": 5.5
+          },
+          {
+            "bottom": 473.953125,
+            "height": 20,
+            "left": 200.796875,
+            "right": 214.796875,
+            "text": "♦",
+            "top": 453.953125,
+            "width": 14
+          }
+        ],
+        "right": 218.796875,
+        "top": 436.953125,
+        "width": 26
+      },
+      {
+        "area": "review",
+        "bottom": 473.953125,
+        "collisions": 0,
+        "height": 37,
+        "left": 222.796875,
+        "parts": [
+          {
+            "bottom": 450.953125,
+            "height": 12,
+            "left": 226.796875,
+            "right": 232.296875,
+            "text": "9",
+            "top": 438.953125,
+            "width": 5.5
+          },
+          {
+            "bottom": 473.953125,
+            "height": 20,
+            "left": 230.796875,
+            "right": 244.796875,
+            "text": "♥",
+            "top": 453.953125,
+            "width": 14
+          }
+        ],
+        "right": 248.796875,
+        "top": 436.953125,
+        "width": 26
+      },
+      {
+        "area": "review",
+        "bottom": 514.953125,
+        "collisions": 0,
+        "height": 37,
+        "left": 102.796875,
+        "parts": [
+          {
+            "bottom": 491.953125,
+            "height": 12,
+            "left": 106.796875,
+            "right": 112.296875,
+            "text": "J",
+            "top": 479.953125,
+            "width": 5.5
+          },
+          {
+            "bottom": 514.953125,
+            "height": 20,
+            "left": 110.796875,
+            "right": 124.796875,
+            "text": "♠",
+            "top": 494.953125,
+            "width": 14
+          }
+        ],
+        "right": 128.796875,
+        "top": 477.953125,
+        "width": 26
+      },
+      {
+        "area": "review",
+        "bottom": 514.953125,
+        "collisions": 0,
+        "height": 37,
+        "left": 132.796875,
+        "parts": [
+          {
+            "bottom": 491.953125,
+            "height": 12,
+            "left": 136.796875,
+            "right": 142.296875,
+            "text": "Q",
+            "top": 479.953125,
+            "width": 5.5
+          },
+          {
+            "bottom": 514.953125,
+            "height": 20,
+            "left": 140.796875,
+            "right": 154.796875,
+            "text": "♣",
+            "top": 494.953125,
+            "width": 14
+          }
+        ],
+        "right": 158.796875,
+        "top": 477.953125,
+        "width": 26
+      },
+      {
+        "area": "review",
+        "bottom": 721.140625,
+        "collisions": 0,
+        "height": 37,
+        "left": 102.796875,
+        "parts": [
+          {
+            "bottom": 698.140625,
+            "height": 12,
+            "left": 106.796875,
+            "right": 112.296875,
+            "text": "K",
+            "top": 686.140625,
+            "width": 5.5
+          },
+          {
+            "bottom": 721.140625,
+            "height": 20,
+            "left": 110.796875,
+            "right": 124.796875,
+            "text": "♦",
+            "top": 701.140625,
+            "width": 14
+          }
+        ],
+        "right": 128.796875,
+        "top": 684.140625,
+        "width": 26
+      },
+      {
+        "area": "review",
+        "bottom": 721.140625,
+        "collisions": 0,
+        "height": 37,
+        "left": 132.796875,
+        "parts": [
+          {
+            "bottom": 698.140625,
+            "height": 12,
+            "left": 136.796875,
+            "right": 142.296875,
+            "text": "K",
+            "top": 686.140625,
+            "width": 5.5
+          },
+          {
+            "bottom": 721.140625,
+            "height": 20,
+            "left": 140.796875,
+            "right": 154.796875,
+            "text": "♥",
+            "top": 701.140625,
+            "width": 14
+          }
+        ],
+        "right": 158.796875,
+        "top": 684.140625,
+        "width": 26
+      },
+      {
+        "area": "review",
+        "bottom": 721.140625,
+        "collisions": 0,
+        "height": 37,
+        "left": 162.796875,
+        "parts": [
+          {
+            "bottom": 698.140625,
+            "height": 12,
+            "left": 166.796875,
+            "right": 172.296875,
+            "text": "2",
+            "top": 686.140625,
+            "width": 5.5
+          },
+          {
+            "bottom": 721.140625,
+            "height": 20,
+            "left": 170.796875,
+            "right": 184.796875,
+            "text": "♣",
+            "top": 701.140625,
+            "width": 14
+          }
+        ],
+        "right": 188.796875,
+        "top": 684.140625,
+        "width": 26
+      },
+      {
+        "area": "review",
+        "bottom": 721.140625,
+        "collisions": 0,
+        "height": 37,
+        "left": 192.796875,
+        "parts": [
+          {
+            "bottom": 698.140625,
+            "height": 12,
+            "left": 196.796875,
+            "right": 202.296875,
+            "text": "7",
+            "top": 686.140625,
+            "width": 5.5
+          },
+          {
+            "bottom": 721.140625,
+            "height": 20,
+            "left": 200.796875,
+            "right": 214.796875,
+            "text": "♦",
+            "top": 701.140625,
+            "width": 14
+          }
+        ],
+        "right": 218.796875,
+        "top": 684.140625,
+        "width": 26
+      },
+      {
+        "area": "review",
+        "bottom": 721.140625,
+        "collisions": 0,
+        "height": 37,
+        "left": 222.796875,
+        "parts": [
+          {
+            "bottom": 698.140625,
+            "height": 12,
+            "left": 226.796875,
+            "right": 232.296875,
+            "text": "9",
+            "top": 686.140625,
+            "width": 5.5
+          },
+          {
+            "bottom": 721.140625,
+            "height": 20,
+            "left": 230.796875,
+            "right": 244.796875,
+            "text": "♥",
+            "top": 701.140625,
+            "width": 14
+          }
+        ],
+        "right": 248.796875,
+        "top": 684.140625,
+        "width": 26
+      },
+      {
+        "area": "review",
+        "bottom": 762.140625,
+        "collisions": 0,
+        "height": 37,
+        "left": 102.796875,
+        "parts": [
+          {
+            "bottom": 739.140625,
+            "height": 12,
+            "left": 106.796875,
+            "right": 112.296875,
+            "text": "J",
+            "top": 727.140625,
+            "width": 5.5
+          },
+          {
+            "bottom": 762.140625,
+            "height": 20,
+            "left": 110.796875,
+            "right": 124.796875,
+            "text": "♠",
+            "top": 742.140625,
+            "width": 14
+          }
+        ],
+        "right": 128.796875,
+        "top": 725.140625,
+        "width": 26
+      },
+      {
+        "area": "review",
+        "bottom": 762.140625,
+        "collisions": 0,
+        "height": 37,
+        "left": 132.796875,
+        "parts": [
+          {
+            "bottom": 739.140625,
+            "height": 12,
+            "left": 136.796875,
+            "right": 142.296875,
+            "text": "Q",
+            "top": 727.140625,
+            "width": 5.5
+          },
+          {
+            "bottom": 762.140625,
+            "height": 20,
+            "left": 140.796875,
+            "right": 154.796875,
+            "text": "♣",
+            "top": 742.140625,
+            "width": 14
+          }
+        ],
+        "right": 158.796875,
+        "top": 725.140625,
+        "width": 26
+      },
+      {
+        "area": "review",
+        "bottom": 920.140625,
+        "collisions": 0,
+        "height": 34,
+        "left": 42.796875,
+        "parts": [
+          {
+            "bottom": 900.140625,
+            "height": 12,
+            "left": 46.796875,
+            "right": 52.296875,
+            "text": "A",
+            "top": 888.140625,
+            "width": 5.5
+          },
+          {
+            "bottom": 920.140625,
+            "height": 20,
+            "left": 48.796875,
+            "right": 62.796875,
+            "text": "♦",
+            "top": 900.140625,
+            "width": 14
+          }
+        ],
+        "right": 66.796875,
+        "top": 886.140625,
+        "width": 24
+      },
+      {
+        "area": "review",
+        "bottom": 920.140625,
+        "collisions": 0,
+        "height": 34,
+        "left": 70.796875,
+        "parts": [
+          {
+            "bottom": 900.140625,
+            "height": 12,
+            "left": 74.796875,
+            "right": 80.296875,
+            "text": "A",
+            "top": 888.140625,
+            "width": 5.5
+          },
+          {
+            "bottom": 920.140625,
+            "height": 20,
+            "left": 76.796875,
+            "right": 90.796875,
+            "text": "♥",
+            "top": 900.140625,
+            "width": 14
+          }
+        ],
+        "right": 94.796875,
+        "top": 886.140625,
+        "width": 24
+      },
+      {
+        "area": "review",
+        "bottom": 920.140625,
+        "collisions": 0,
+        "height": 34,
+        "left": 98.796875,
+        "parts": [
+          {
+            "bottom": 900.140625,
+            "height": 12,
+            "left": 102.796875,
+            "right": 108.296875,
+            "text": "9",
+            "top": 888.140625,
+            "width": 5.5
+          },
+          {
+            "bottom": 920.140625,
+            "height": 20,
+            "left": 104.796875,
+            "right": 118.796875,
+            "text": "♥",
+            "top": 900.140625,
+            "width": 14
+          }
+        ],
+        "right": 122.796875,
+        "top": 886.140625,
+        "width": 24
+      },
+      {
+        "area": "review",
+        "bottom": 920.140625,
+        "collisions": 0,
+        "height": 34,
+        "left": 126.796875,
+        "parts": [
+          {
+            "bottom": 900.140625,
+            "height": 12,
+            "left": 130.796875,
+            "right": 136.296875,
+            "text": "J",
+            "top": 888.140625,
+            "width": 5.5
+          },
+          {
+            "bottom": 920.140625,
+            "height": 20,
+            "left": 132.796875,
+            "right": 146.796875,
+            "text": "♠",
+            "top": 900.140625,
+            "width": 14
+          }
+        ],
+        "right": 150.796875,
+        "top": 886.140625,
+        "width": 24
+      },
+      {
+        "area": "review",
+        "bottom": 920.140625,
+        "collisions": 0,
+        "height": 34,
+        "left": 154.796875,
+        "parts": [
+          {
+            "bottom": 900.140625,
+            "height": 12,
+            "left": 158.796875,
+            "right": 164.296875,
+            "text": "Q",
+            "top": 888.140625,
+            "width": 5.5
+          },
+          {
+            "bottom": 920.140625,
+            "height": 20,
+            "left": 160.796875,
+            "right": 174.796875,
+            "text": "♣",
+            "top": 900.140625,
+            "width": 14
+          }
+        ],
+        "right": 178.796875,
+        "top": 886.140625,
+        "width": 24
+      },
+      {
+        "area": "review",
+        "bottom": 1035.140625,
+        "collisions": 0,
+        "height": 34,
+        "left": 42.796875,
+        "parts": [
+          {
+            "bottom": 1015.140625,
+            "height": 12,
+            "left": 46.796875,
+            "right": 52.296875,
+            "text": "K",
+            "top": 1003.140625,
+            "width": 5.5
+          },
+          {
+            "bottom": 1035.140625,
+            "height": 20,
+            "left": 48.796875,
+            "right": 62.796875,
+            "text": "♦",
+            "top": 1015.140625,
+            "width": 14
+          }
+        ],
+        "right": 66.796875,
+        "top": 1001.140625,
+        "width": 24
+      },
+      {
+        "area": "review",
+        "bottom": 1035.140625,
+        "collisions": 0,
+        "height": 34,
+        "left": 70.796875,
+        "parts": [
+          {
+            "bottom": 1015.140625,
+            "height": 12,
+            "left": 74.796875,
+            "right": 80.296875,
+            "text": "K",
+            "top": 1003.140625,
+            "width": 5.5
+          },
+          {
+            "bottom": 1035.140625,
+            "height": 20,
+            "left": 76.796875,
+            "right": 90.796875,
+            "text": "♥",
+            "top": 1015.140625,
+            "width": 14
+          }
+        ],
+        "right": 94.796875,
+        "top": 1001.140625,
+        "width": 24
+      },
+      {
+        "area": "review",
+        "bottom": 1035.140625,
+        "collisions": 0,
+        "height": 34,
+        "left": 98.796875,
+        "parts": [
+          {
+            "bottom": 1015.140625,
+            "height": 12,
+            "left": 102.796875,
+            "right": 108.296875,
+            "text": "9",
+            "top": 1003.140625,
+            "width": 5.5
+          },
+          {
+            "bottom": 1035.140625,
+            "height": 20,
+            "left": 104.796875,
+            "right": 118.796875,
+            "text": "♥",
+            "top": 1015.140625,
+            "width": 14
+          }
+        ],
+        "right": 122.796875,
+        "top": 1001.140625,
+        "width": 24
+      },
+      {
+        "area": "review",
+        "bottom": 1035.140625,
+        "collisions": 0,
+        "height": 34,
+        "left": 126.796875,
+        "parts": [
+          {
+            "bottom": 1015.140625,
+            "height": 12,
+            "left": 130.796875,
+            "right": 136.296875,
+            "text": "J",
+            "top": 1003.140625,
+            "width": 5.5
+          },
+          {
+            "bottom": 1035.140625,
+            "height": 20,
+            "left": 132.796875,
+            "right": 146.796875,
+            "text": "♠",
+            "top": 1015.140625,
+            "width": 14
+          }
+        ],
+        "right": 150.796875,
+        "top": 1001.140625,
+        "width": 24
+      },
+      {
+        "area": "review",
+        "bottom": 1035.140625,
+        "collisions": 0,
+        "height": 34,
+        "left": 154.796875,
+        "parts": [
+          {
+            "bottom": 1015.140625,
+            "height": 12,
+            "left": 158.796875,
+            "right": 164.296875,
+            "text": "Q",
+            "top": 1003.140625,
+            "width": 5.5
+          },
+          {
+            "bottom": 1035.140625,
+            "height": 20,
+            "left": 160.796875,
+            "right": 174.796875,
+            "text": "♣",
+            "top": 1015.140625,
+            "width": 14
+          }
+        ],
+        "right": 178.796875,
+        "top": 1001.140625,
+        "width": 24
+      },
+      {
+        "area": "review",
+        "bottom": 1150.140625,
+        "collisions": 0,
+        "height": 34,
+        "left": 42.796875,
+        "parts": [
+          {
+            "bottom": 1130.140625,
+            "height": 12,
+            "left": 46.796875,
+            "right": 57.796875,
+            "text": "10",
+            "top": 1118.140625,
+            "width": 11
+          },
+          {
+            "bottom": 1150.140625,
+            "height": 20,
+            "left": 48.796875,
+            "right": 62.796875,
+            "text": "♦",
+            "top": 1130.140625,
+            "width": 14
+          }
+        ],
+        "right": 66.796875,
+        "top": 1116.140625,
+        "width": 24
+      },
+      {
+        "area": "review",
+        "bottom": 1150.140625,
+        "collisions": 0,
+        "height": 34,
+        "left": 70.796875,
+        "parts": [
+          {
+            "bottom": 1130.140625,
+            "height": 12,
+            "left": 74.796875,
+            "right": 85.796875,
+            "text": "10",
+            "top": 1118.140625,
+            "width": 11
+          },
+          {
+            "bottom": 1150.140625,
+            "height": 20,
+            "left": 76.796875,
+            "right": 90.796875,
+            "text": "♥",
+            "top": 1130.140625,
+            "width": 14
+          }
+        ],
+        "right": 94.796875,
+        "top": 1116.140625,
+        "width": 24
+      },
+      {
+        "area": "review",
+        "bottom": 1150.140625,
+        "collisions": 0,
+        "height": 34,
+        "left": 98.796875,
+        "parts": [
+          {
+            "bottom": 1130.140625,
+            "height": 12,
+            "left": 102.796875,
+            "right": 108.296875,
+            "text": "9",
+            "top": 1118.140625,
+            "width": 5.5
+          },
+          {
+            "bottom": 1150.140625,
+            "height": 20,
+            "left": 104.796875,
+            "right": 118.796875,
+            "text": "♥",
+            "top": 1130.140625,
+            "width": 14
+          }
+        ],
+        "right": 122.796875,
+        "top": 1116.140625,
+        "width": 24
+      },
+      {
+        "area": "review",
+        "bottom": 1150.140625,
+        "collisions": 0,
+        "height": 34,
+        "left": 126.796875,
+        "parts": [
+          {
+            "bottom": 1130.140625,
+            "height": 12,
+            "left": 130.796875,
+            "right": 136.296875,
+            "text": "J",
+            "top": 1118.140625,
+            "width": 5.5
+          },
+          {
+            "bottom": 1150.140625,
+            "height": 20,
+            "left": 132.796875,
+            "right": 146.796875,
+            "text": "♠",
+            "top": 1130.140625,
+            "width": 14
+          }
+        ],
+        "right": 150.796875,
+        "top": 1116.140625,
+        "width": 24
+      },
+      {
+        "area": "review",
+        "bottom": 1150.140625,
+        "collisions": 0,
+        "height": 34,
+        "left": 154.796875,
+        "parts": [
+          {
+            "bottom": 1130.140625,
+            "height": 12,
+            "left": 158.796875,
+            "right": 164.296875,
+            "text": "Q",
+            "top": 1118.140625,
+            "width": 5.5
+          },
+          {
+            "bottom": 1150.140625,
+            "height": 20,
+            "left": 160.796875,
+            "right": 174.796875,
+            "text": "♣",
+            "top": 1130.140625,
+            "width": 14
+          }
+        ],
+        "right": 178.796875,
+        "top": 1116.140625,
+        "width": 24
+      },
+      {
+        "area": "review",
+        "bottom": 1424.140625,
+        "collisions": 0,
+        "height": 34,
+        "left": 86.796875,
+        "parts": [
+          {
+            "bottom": 1404.140625,
+            "height": 12,
+            "left": 90.796875,
+            "right": 96.296875,
+            "text": "9",
+            "top": 1392.140625,
+            "width": 5.5
+          },
+          {
+            "bottom": 1424.140625,
+            "height": 20,
+            "left": 92.796875,
+            "right": 106.796875,
+            "text": "♣",
+            "top": 1404.140625,
+            "width": 14
+          }
+        ],
+        "right": 110.796875,
+        "top": 1390.140625,
+        "width": 24
+      },
+      {
+        "area": "review",
+        "bottom": 1424.140625,
+        "collisions": 0,
+        "height": 34,
+        "left": 114.796875,
+        "parts": [
+          {
+            "bottom": 1404.140625,
+            "height": 12,
+            "left": 118.796875,
+            "right": 124.296875,
+            "text": "A",
+            "top": 1392.140625,
+            "width": 5.5
+          },
+          {
+            "bottom": 1424.140625,
+            "height": 20,
+            "left": 120.796875,
+            "right": 134.796875,
+            "text": "♣",
+            "top": 1404.140625,
+            "width": 14
+          }
+        ],
+        "right": 138.796875,
+        "top": 1390.140625,
+        "width": 24
+      },
+      {
+        "area": "review",
+        "bottom": 1424.140625,
+        "collisions": 0,
+        "height": 34,
+        "left": 142.796875,
+        "parts": [
+          {
+            "bottom": 1404.140625,
+            "height": 12,
+            "left": 146.796875,
+            "right": 152.296875,
+            "text": "8",
+            "top": 1392.140625,
+            "width": 5.5
+          },
+          {
+            "bottom": 1424.140625,
+            "height": 20,
+            "left": 148.796875,
+            "right": 162.796875,
+            "text": "♣",
+            "top": 1404.140625,
+            "width": 14
+          }
+        ],
+        "right": 166.796875,
+        "top": 1390.140625,
+        "width": 24
+      },
+      {
+        "area": "review",
+        "bottom": 1558.140625,
+        "collisions": 0,
+        "height": 34,
+        "left": 86.796875,
+        "parts": [
+          {
+            "bottom": 1538.140625,
+            "height": 12,
+            "left": 90.796875,
+            "right": 96.296875,
+            "text": "4",
+            "top": 1526.140625,
+            "width": 5.5
+          },
+          {
+            "bottom": 1558.140625,
+            "height": 20,
+            "left": 92.796875,
+            "right": 106.796875,
+            "text": "♣",
+            "top": 1538.140625,
+            "width": 14
+          }
+        ],
+        "right": 110.796875,
+        "top": 1524.140625,
+        "width": 24
+      }
+    ],
+    "totalCollisions": 0,
+    "viewport": {
+      "height": 568,
+      "width": 320
+    }
+  },
+  {
+    "cards": [
+      {
+        "area": "review",
+        "bottom": 420.375,
+        "collisions": 0,
+        "height": 45,
+        "left": 475,
+        "parts": [
+          {
+            "bottom": 389.375,
+            "height": 12,
+            "left": 479,
+            "right": 484.5,
+            "text": "A",
+            "top": 377.375,
+            "width": 5.5
+          },
+          {
+            "bottom": 420.375,
+            "height": 20,
+            "left": 489,
+            "right": 503,
+            "text": "♦",
+            "top": 400.375,
+            "width": 14
+          }
+        ],
+        "right": 507,
+        "top": 375.375,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 420.375,
+        "collisions": 0,
+        "height": 45,
+        "left": 511,
+        "parts": [
+          {
+            "bottom": 389.375,
+            "height": 12,
+            "left": 515,
+            "right": 520.5,
+            "text": "A",
+            "top": 377.375,
+            "width": 5.5
+          },
+          {
+            "bottom": 420.375,
+            "height": 20,
+            "left": 525,
+            "right": 539,
+            "text": "♥",
+            "top": 400.375,
+            "width": 14
+          }
+        ],
+        "right": 543,
+        "top": 375.375,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 420.375,
+        "collisions": 0,
+        "height": 45,
+        "left": 547,
+        "parts": [
+          {
+            "bottom": 389.375,
+            "height": 12,
+            "left": 551,
+            "right": 556.5,
+            "text": "2",
+            "top": 377.375,
+            "width": 5.5
+          },
+          {
+            "bottom": 420.375,
+            "height": 20,
+            "left": 561,
+            "right": 575,
+            "text": "♣",
+            "top": 400.375,
+            "width": 14
+          }
+        ],
+        "right": 579,
+        "top": 375.375,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 420.375,
+        "collisions": 0,
+        "height": 45,
+        "left": 583,
+        "parts": [
+          {
+            "bottom": 389.375,
+            "height": 12,
+            "left": 587,
+            "right": 592.5,
+            "text": "7",
+            "top": 377.375,
+            "width": 5.5
+          },
+          {
+            "bottom": 420.375,
+            "height": 20,
+            "left": 597,
+            "right": 611,
+            "text": "♦",
+            "top": 400.375,
+            "width": 14
+          }
+        ],
+        "right": 615,
+        "top": 375.375,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 420.375,
+        "collisions": 0,
+        "height": 45,
+        "left": 619,
+        "parts": [
+          {
+            "bottom": 389.375,
+            "height": 12,
+            "left": 623,
+            "right": 628.5,
+            "text": "9",
+            "top": 377.375,
+            "width": 5.5
+          },
+          {
+            "bottom": 420.375,
+            "height": 20,
+            "left": 633,
+            "right": 647,
+            "text": "♥",
+            "top": 400.375,
+            "width": 14
+          }
+        ],
+        "right": 651,
+        "top": 375.375,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 420.375,
+        "collisions": 0,
+        "height": 45,
+        "left": 655,
+        "parts": [
+          {
+            "bottom": 389.375,
+            "height": 12,
+            "left": 659,
+            "right": 664.5,
+            "text": "J",
+            "top": 377.375,
+            "width": 5.5
+          },
+          {
+            "bottom": 420.375,
+            "height": 20,
+            "left": 669,
+            "right": 683,
+            "text": "♠",
+            "top": 400.375,
+            "width": 14
+          }
+        ],
+        "right": 687,
+        "top": 375.375,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 420.375,
+        "collisions": 0,
+        "height": 45,
+        "left": 691,
+        "parts": [
+          {
+            "bottom": 389.375,
+            "height": 12,
+            "left": 695,
+            "right": 700.5,
+            "text": "Q",
+            "top": 377.375,
+            "width": 5.5
+          },
+          {
+            "bottom": 420.375,
+            "height": 20,
+            "left": 705,
+            "right": 719,
+            "text": "♣",
+            "top": 400.375,
+            "width": 14
+          }
+        ],
+        "right": 723,
+        "top": 375.375,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 620.96875,
+        "collisions": 0,
+        "height": 45,
+        "left": 475,
+        "parts": [
+          {
+            "bottom": 589.96875,
+            "height": 12,
+            "left": 479,
+            "right": 484.5,
+            "text": "K",
+            "top": 577.96875,
+            "width": 5.5
+          },
+          {
+            "bottom": 620.96875,
+            "height": 20,
+            "left": 489,
+            "right": 503,
+            "text": "♦",
+            "top": 600.96875,
+            "width": 14
+          }
+        ],
+        "right": 507,
+        "top": 575.96875,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 620.96875,
+        "collisions": 0,
+        "height": 45,
+        "left": 511,
+        "parts": [
+          {
+            "bottom": 589.96875,
+            "height": 12,
+            "left": 515,
+            "right": 520.5,
+            "text": "K",
+            "top": 577.96875,
+            "width": 5.5
+          },
+          {
+            "bottom": 620.96875,
+            "height": 20,
+            "left": 525,
+            "right": 539,
+            "text": "♥",
+            "top": 600.96875,
+            "width": 14
+          }
+        ],
+        "right": 543,
+        "top": 575.96875,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 620.96875,
+        "collisions": 0,
+        "height": 45,
+        "left": 547,
+        "parts": [
+          {
+            "bottom": 589.96875,
+            "height": 12,
+            "left": 551,
+            "right": 556.5,
+            "text": "2",
+            "top": 577.96875,
+            "width": 5.5
+          },
+          {
+            "bottom": 620.96875,
+            "height": 20,
+            "left": 561,
+            "right": 575,
+            "text": "♣",
+            "top": 600.96875,
+            "width": 14
+          }
+        ],
+        "right": 579,
+        "top": 575.96875,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 620.96875,
+        "collisions": 0,
+        "height": 45,
+        "left": 583,
+        "parts": [
+          {
+            "bottom": 589.96875,
+            "height": 12,
+            "left": 587,
+            "right": 592.5,
+            "text": "7",
+            "top": 577.96875,
+            "width": 5.5
+          },
+          {
+            "bottom": 620.96875,
+            "height": 20,
+            "left": 597,
+            "right": 611,
+            "text": "♦",
+            "top": 600.96875,
+            "width": 14
+          }
+        ],
+        "right": 615,
+        "top": 575.96875,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 620.96875,
+        "collisions": 0,
+        "height": 45,
+        "left": 619,
+        "parts": [
+          {
+            "bottom": 589.96875,
+            "height": 12,
+            "left": 623,
+            "right": 628.5,
+            "text": "9",
+            "top": 577.96875,
+            "width": 5.5
+          },
+          {
+            "bottom": 620.96875,
+            "height": 20,
+            "left": 633,
+            "right": 647,
+            "text": "♥",
+            "top": 600.96875,
+            "width": 14
+          }
+        ],
+        "right": 651,
+        "top": 575.96875,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 620.96875,
+        "collisions": 0,
+        "height": 45,
+        "left": 655,
+        "parts": [
+          {
+            "bottom": 589.96875,
+            "height": 12,
+            "left": 659,
+            "right": 664.5,
+            "text": "J",
+            "top": 577.96875,
+            "width": 5.5
+          },
+          {
+            "bottom": 620.96875,
+            "height": 20,
+            "left": 669,
+            "right": 683,
+            "text": "♠",
+            "top": 600.96875,
+            "width": 14
+          }
+        ],
+        "right": 687,
+        "top": 575.96875,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 620.96875,
+        "collisions": 0,
+        "height": 45,
+        "left": 691,
+        "parts": [
+          {
+            "bottom": 589.96875,
+            "height": 12,
+            "left": 695,
+            "right": 700.5,
+            "text": "Q",
+            "top": 577.96875,
+            "width": 5.5
+          },
+          {
+            "bottom": 620.96875,
+            "height": 20,
+            "left": 705,
+            "right": 719,
+            "text": "♣",
+            "top": 600.96875,
+            "width": 14
+          }
+        ],
+        "right": 723,
+        "top": 575.96875,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 740.96875,
+        "collisions": 0,
+        "height": 45,
+        "left": 677,
+        "parts": [
+          {
+            "bottom": 709.96875,
+            "height": 12,
+            "left": 681,
+            "right": 686.5,
+            "text": "A",
+            "top": 697.96875,
+            "width": 5.5
+          },
+          {
+            "bottom": 740.96875,
+            "height": 20,
+            "left": 691,
+            "right": 705,
+            "text": "♦",
+            "top": 720.96875,
+            "width": 14
+          }
+        ],
+        "right": 709,
+        "top": 695.96875,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 740.96875,
+        "collisions": 0,
+        "height": 45,
+        "left": 713,
+        "parts": [
+          {
+            "bottom": 709.96875,
+            "height": 12,
+            "left": 717,
+            "right": 722.5,
+            "text": "A",
+            "top": 697.96875,
+            "width": 5.5
+          },
+          {
+            "bottom": 740.96875,
+            "height": 20,
+            "left": 727,
+            "right": 741,
+            "text": "♥",
+            "top": 720.96875,
+            "width": 14
+          }
+        ],
+        "right": 745,
+        "top": 695.96875,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 740.96875,
+        "collisions": 0,
+        "height": 45,
+        "left": 749,
+        "parts": [
+          {
+            "bottom": 709.96875,
+            "height": 12,
+            "left": 753,
+            "right": 758.5,
+            "text": "9",
+            "top": 697.96875,
+            "width": 5.5
+          },
+          {
+            "bottom": 740.96875,
+            "height": 20,
+            "left": 763,
+            "right": 777,
+            "text": "♥",
+            "top": 720.96875,
+            "width": 14
+          }
+        ],
+        "right": 781,
+        "top": 695.96875,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 740.96875,
+        "collisions": 0,
+        "height": 45,
+        "left": 785,
+        "parts": [
+          {
+            "bottom": 709.96875,
+            "height": 12,
+            "left": 789,
+            "right": 794.5,
+            "text": "J",
+            "top": 697.96875,
+            "width": 5.5
+          },
+          {
+            "bottom": 740.96875,
+            "height": 20,
+            "left": 799,
+            "right": 813,
+            "text": "♠",
+            "top": 720.96875,
+            "width": 14
+          }
+        ],
+        "right": 817,
+        "top": 695.96875,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 740.96875,
+        "collisions": 0,
+        "height": 45,
+        "left": 821,
+        "parts": [
+          {
+            "bottom": 709.96875,
+            "height": 12,
+            "left": 825,
+            "right": 830.5,
+            "text": "Q",
+            "top": 697.96875,
+            "width": 5.5
+          },
+          {
+            "bottom": 740.96875,
+            "height": 20,
+            "left": 835,
+            "right": 849,
+            "text": "♣",
+            "top": 720.96875,
+            "width": 14
+          }
+        ],
+        "right": 853,
+        "top": 695.96875,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 815.96875,
+        "collisions": 0,
+        "height": 45,
+        "left": 677,
+        "parts": [
+          {
+            "bottom": 784.96875,
+            "height": 12,
+            "left": 681,
+            "right": 686.5,
+            "text": "K",
+            "top": 772.96875,
+            "width": 5.5
+          },
+          {
+            "bottom": 815.96875,
+            "height": 20,
+            "left": 691,
+            "right": 705,
+            "text": "♦",
+            "top": 795.96875,
+            "width": 14
+          }
+        ],
+        "right": 709,
+        "top": 770.96875,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 815.96875,
+        "collisions": 0,
+        "height": 45,
+        "left": 713,
+        "parts": [
+          {
+            "bottom": 784.96875,
+            "height": 12,
+            "left": 717,
+            "right": 722.5,
+            "text": "K",
+            "top": 772.96875,
+            "width": 5.5
+          },
+          {
+            "bottom": 815.96875,
+            "height": 20,
+            "left": 727,
+            "right": 741,
+            "text": "♥",
+            "top": 795.96875,
+            "width": 14
+          }
+        ],
+        "right": 745,
+        "top": 770.96875,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 815.96875,
+        "collisions": 0,
+        "height": 45,
+        "left": 749,
+        "parts": [
+          {
+            "bottom": 784.96875,
+            "height": 12,
+            "left": 753,
+            "right": 758.5,
+            "text": "9",
+            "top": 772.96875,
+            "width": 5.5
+          },
+          {
+            "bottom": 815.96875,
+            "height": 20,
+            "left": 763,
+            "right": 777,
+            "text": "♥",
+            "top": 795.96875,
+            "width": 14
+          }
+        ],
+        "right": 781,
+        "top": 770.96875,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 815.96875,
+        "collisions": 0,
+        "height": 45,
+        "left": 785,
+        "parts": [
+          {
+            "bottom": 784.96875,
+            "height": 12,
+            "left": 789,
+            "right": 794.5,
+            "text": "J",
+            "top": 772.96875,
+            "width": 5.5
+          },
+          {
+            "bottom": 815.96875,
+            "height": 20,
+            "left": 799,
+            "right": 813,
+            "text": "♠",
+            "top": 795.96875,
+            "width": 14
+          }
+        ],
+        "right": 817,
+        "top": 770.96875,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 815.96875,
+        "collisions": 0,
+        "height": 45,
+        "left": 821,
+        "parts": [
+          {
+            "bottom": 784.96875,
+            "height": 12,
+            "left": 825,
+            "right": 830.5,
+            "text": "Q",
+            "top": 772.96875,
+            "width": 5.5
+          },
+          {
+            "bottom": 815.96875,
+            "height": 20,
+            "left": 835,
+            "right": 849,
+            "text": "♣",
+            "top": 795.96875,
+            "width": 14
+          }
+        ],
+        "right": 853,
+        "top": 770.96875,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 890.96875,
+        "collisions": 0,
+        "height": 45,
+        "left": 677,
+        "parts": [
+          {
+            "bottom": 859.96875,
+            "height": 12,
+            "left": 681,
+            "right": 692,
+            "text": "10",
+            "top": 847.96875,
+            "width": 11
+          },
+          {
+            "bottom": 890.96875,
+            "height": 20,
+            "left": 691,
+            "right": 705,
+            "text": "♦",
+            "top": 870.96875,
+            "width": 14
+          }
+        ],
+        "right": 709,
+        "top": 845.96875,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 890.96875,
+        "collisions": 0,
+        "height": 45,
+        "left": 713,
+        "parts": [
+          {
+            "bottom": 859.96875,
+            "height": 12,
+            "left": 717,
+            "right": 728,
+            "text": "10",
+            "top": 847.96875,
+            "width": 11
+          },
+          {
+            "bottom": 890.96875,
+            "height": 20,
+            "left": 727,
+            "right": 741,
+            "text": "♥",
+            "top": 870.96875,
+            "width": 14
+          }
+        ],
+        "right": 745,
+        "top": 845.96875,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 890.96875,
+        "collisions": 0,
+        "height": 45,
+        "left": 749,
+        "parts": [
+          {
+            "bottom": 859.96875,
+            "height": 12,
+            "left": 753,
+            "right": 758.5,
+            "text": "9",
+            "top": 847.96875,
+            "width": 5.5
+          },
+          {
+            "bottom": 890.96875,
+            "height": 20,
+            "left": 763,
+            "right": 777,
+            "text": "♥",
+            "top": 870.96875,
+            "width": 14
+          }
+        ],
+        "right": 781,
+        "top": 845.96875,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 890.96875,
+        "collisions": 0,
+        "height": 45,
+        "left": 785,
+        "parts": [
+          {
+            "bottom": 859.96875,
+            "height": 12,
+            "left": 789,
+            "right": 794.5,
+            "text": "J",
+            "top": 847.96875,
+            "width": 5.5
+          },
+          {
+            "bottom": 890.96875,
+            "height": 20,
+            "left": 799,
+            "right": 813,
+            "text": "♠",
+            "top": 870.96875,
+            "width": 14
+          }
+        ],
+        "right": 817,
+        "top": 845.96875,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 890.96875,
+        "collisions": 0,
+        "height": 45,
+        "left": 821,
+        "parts": [
+          {
+            "bottom": 859.96875,
+            "height": 12,
+            "left": 825,
+            "right": 830.5,
+            "text": "Q",
+            "top": 847.96875,
+            "width": 5.5
+          },
+          {
+            "bottom": 890.96875,
+            "height": 20,
+            "left": 835,
+            "right": 849,
+            "text": "♣",
+            "top": 870.96875,
+            "width": 14
+          }
+        ],
+        "right": 853,
+        "top": 845.96875,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 1175.96875,
+        "collisions": 0,
+        "height": 45,
+        "left": 456,
+        "parts": [
+          {
+            "bottom": 1144.96875,
+            "height": 12,
+            "left": 460,
+            "right": 465.5,
+            "text": "9",
+            "top": 1132.96875,
+            "width": 5.5
+          },
+          {
+            "bottom": 1175.96875,
+            "height": 20,
+            "left": 470,
+            "right": 484,
+            "text": "♣",
+            "top": 1155.96875,
+            "width": 14
+          }
+        ],
+        "right": 488,
+        "top": 1130.96875,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 1175.96875,
+        "collisions": 0,
+        "height": 45,
+        "left": 492,
+        "parts": [
+          {
+            "bottom": 1144.96875,
+            "height": 12,
+            "left": 496,
+            "right": 501.5,
+            "text": "A",
+            "top": 1132.96875,
+            "width": 5.5
+          },
+          {
+            "bottom": 1175.96875,
+            "height": 20,
+            "left": 506,
+            "right": 520,
+            "text": "♣",
+            "top": 1155.96875,
+            "width": 14
+          }
+        ],
+        "right": 524,
+        "top": 1130.96875,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 1175.96875,
+        "collisions": 0,
+        "height": 45,
+        "left": 528,
+        "parts": [
+          {
+            "bottom": 1144.96875,
+            "height": 12,
+            "left": 532,
+            "right": 537.5,
+            "text": "8",
+            "top": 1132.96875,
+            "width": 5.5
+          },
+          {
+            "bottom": 1175.96875,
+            "height": 20,
+            "left": 542,
+            "right": 556,
+            "text": "♣",
+            "top": 1155.96875,
+            "width": 14
+          }
+        ],
+        "right": 560,
+        "top": 1130.96875,
+        "width": 32
+      },
+      {
+        "area": "review",
+        "bottom": 1320.96875,
+        "collisions": 0,
+        "height": 45,
+        "left": 456,
+        "parts": [
+          {
+            "bottom": 1289.96875,
+            "height": 12,
+            "left": 460,
+            "right": 465.5,
+            "text": "4",
+            "top": 1277.96875,
+            "width": 5.5
+          },
+          {
+            "bottom": 1320.96875,
+            "height": 20,
+            "left": 470,
+            "right": 484,
+            "text": "♣",
+            "top": 1300.96875,
+            "width": 14
+          }
+        ],
+        "right": 488,
+        "top": 1275.96875,
+        "width": 32
+      }
+    ],
+    "totalCollisions": 0,
+    "viewport": {
+      "height": 800,
+      "width": 1280
+    },
+    "scene": "desktop mini only"
+  }
+]
