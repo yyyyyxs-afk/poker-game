@@ -8,6 +8,7 @@ let state = null;
 let raiseOpen = false;
 let raiseContext = '';
 let activeRoomCode = '';
+let roomConnectionReady = false;
 
 // ---------------- 音效（Web Audio 合成，无外部资源） ----------------
 let audioCtx = null;
@@ -478,6 +479,7 @@ function enterRoom(code) {
   const normalizedCode = String(code || '').trim().toUpperCase();
   if (!normalizedCode) return;
   activeRoomCode = normalizedCode;
+  roomConnectionReady = socket.connected;
   hideRaisePanel();
   const name = document.getElementById('nickname').value.trim();
   if (name) localStorage.setItem('poker-nickname', name);
@@ -490,7 +492,7 @@ function enterRoom(code) {
 
 // ---------------- 断线自动重连（token 恢复座位，客户端行为） ----------------
 // 服务端断线保护窗口与座位语义不变；这里只做：断线后 socket 重连成功时，
-// 用本地保存的房号/昵称/token 自动 join_room 恢复座位，重试数次后给手动入口。
+// 用本地保存的房号/昵称/token 恢复座位；等待有时限，拿到本人状态后再允许行动。
 const LAST_ROOM_KEY = 'poker-last-room';
 function saveLastRoom(code, name) {
   if (!code || !name) return;
@@ -506,38 +508,43 @@ const connOverlay = document.getElementById('conn-overlay');
 const connMsg = document.getElementById('conn-msg');
 const connSub = document.getElementById('conn-sub');
 const connActions = document.getElementById('conn-actions');
-let reconnectAttempts = 0;
 function setConnState(msg, sub, showActions) {
   connMsg.textContent = msg;
   connSub.textContent = sub || '';
   connActions.classList.toggle('hidden', !showActions);
 }
-function tryRejoin() {
-  const last = getLastRoom();
-  if (!last || !last.code) { connOverlay.classList.add('hidden'); return; }
-  setConnState('正在恢复牌局…', `${last.code} · ${last.name}`);
-  socket.emit('join_room', {
-    code: last.code,
-    name: last.name,
-    token: storedToken()[`${last.code}_${last.name}`],
-  }, (res) => {
-    if (res && res.ok) {
-      reconnectAttempts = 0;
-      enterRoom(last.code);
-      connOverlay.classList.add('hidden');
-      flashTip('已重新连接，回到牌局');
-    } else if (reconnectAttempts < 3) {
-      reconnectAttempts++;
-      setTimeout(tryRejoin, 1500);
-    } else {
-      setConnState('重新连接失败', (res && res.err) || '请稍后手动重试', true);
-    }
-  });
-}
+const roomRecovery = createRoomRecovery({
+  socket,
+  getTarget: () => {
+    const last = getLastRoom();
+    if (!activeRoomCode || last?.code !== activeRoomCode) return null;
+    return { code: last.code, name: last.name, token: storedToken()[`${last.code}_${last.name}`] };
+  },
+  onChange: (status, detail) => {
+    roomConnectionReady = false;
+    connOverlay.classList.remove('hidden');
+    setConnState(status === 'restoring' ? '正在恢复牌局…' : status === 'offline' ? '连接断开，正在重连…' : '暂时无法恢复牌局', detail, status !== 'restoring');
+  },
+  onRestored: target => {
+    enterRoom(target.code);
+    connOverlay.classList.add('hidden');
+    flashTip('已重新连接，回到牌局');
+  },
+});
+const actionDelivery = createActionDelivery({
+  socket,
+  isReady: () => roomConnectionReady && !!state && state.code === activeRoomCode && state.turnSeat === mySeat,
+  onWaiting: waiting => {
+    const buttons = document.getElementById('action-buttons');
+    buttons.classList.toggle('is-waiting', waiting);
+    if (waiting) buttons.setAttribute('aria-busy', 'true');
+    else buttons.removeAttribute('aria-busy');
+  },
+  onError: flashTip,
+  onSuccess: () => sfx.bet(),
+});
 document.getElementById('btn-reconnect').addEventListener('click', () => {
-  reconnectAttempts = 0;
-  setConnState('正在恢复牌局…', '');
-  tryRejoin();
+  roomRecovery.start();
 });
 document.getElementById('btn-conn-lobby').addEventListener('click', () => {
   clearLastRoom();
@@ -595,6 +602,9 @@ leaveBtn.onclick = () => {
   leaveBtn.textContent = '退出中…';
   closeMenu();
   clearLastRoom(); // 先断开自动恢复资格，退出期间即使 socket 抖动也不会回座
+  roomRecovery.cancel();
+  actionDelivery.cancel();
+  roomConnectionReady = false;
   activeRoomCode = '';
   hideRaisePanel();
   connOverlay.classList.add('hidden');
@@ -697,8 +707,8 @@ socket.on('state', (s) => {
   if (state && state.stage === 'handover' && s.stage !== 'handover') resultDetailOpen = false;
   state = s;
   mySeat = s.youSeat;
-  document.getElementById('conn-overlay').classList.add('hidden');
   render();
+  roomRecovery.acceptState(s);
   if (autoClosedResult) {
     const returnFocus = resultReturnFocus;
     resultReturnFocus = null;
@@ -715,18 +725,28 @@ socket.on('connect', () => {
     connOverlay.classList.add('hidden');
     return;
   }
-  reconnectAttempts = 0;
   connOverlay.classList.remove('hidden');
   setConnState('连接恢复，正在回到牌局…', '');
-  tryRejoin();
+  roomRecovery.start();
 });
 socket.on('disconnect', () => {
+  roomConnectionReady = false;
+  roomRecovery.cancel();
+  actionDelivery.cancel();
   if (!activeRoomCode || document.getElementById('game').classList.contains('hidden')) {
     return;
   }
   hideRaisePanel();
+  resetFoldBtn();
   connOverlay.classList.remove('hidden');
-  setConnState('连接断开，正在重连…', '断线期间轮到你时，牌局会保留一段时间');
+  setConnState('连接断开，正在重连…', '座位会暂时保留；超过保护时间可能自动过牌或弃牌。', true);
+});
+socket.on('connect_error', () => {
+  if (!activeRoomCode) return;
+  roomConnectionReady = false;
+  roomRecovery.cancel();
+  setConnState('暂时连接不上服务器', '正在自动重试，你也可以立即重连或返回大厅。', true);
+  connOverlay.classList.remove('hidden');
 });
 
 function render() {
@@ -1534,20 +1554,7 @@ function confirmRaise() {
 }
 
 function sendAction(type, amount) {
-  const buttons = document.getElementById('action-buttons');
-  buttons.classList.add('is-waiting');
-  buttons.setAttribute('aria-busy', 'true');
-  const clearWaiting = () => {
-    buttons.classList.remove('is-waiting');
-    buttons.removeAttribute('aria-busy');
-  };
-  // 兜底：网络异常收不到回执时 3 秒后自动解除等待态
-  setTimeout(clearWaiting, 3000);
-  socket.emit('action', { type, amount }, (res) => {
-    clearWaiting();
-    if (res.ok) sfx.bet();
-    else flashTip(res.err);
-  });
+  actionDelivery.send({ type, amount });
 }
 function flashTip(msg) {
   const tip = document.getElementById('waiting-tip');

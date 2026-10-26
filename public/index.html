@@ -365,7 +365,7 @@
   <!-- 断线提示遮罩：自动重连（token 恢复座位），失败给出手动入口 -->
   <div id="conn-overlay" class="overlay hidden">
     <div class="conn-card">
-      <div id="conn-msg">连接断开，正在重连…</div>
+      <div id="conn-msg" role="status" aria-live="polite">连接断开，正在重连…</div>
       <span id="conn-sub">恢复后会自动回到牌局</span>
       <div id="conn-actions" class="hidden">
         <button id="btn-reconnect" class="btn btn-primary btn-small">立即重连</button>
@@ -377,6 +377,7 @@
   <script src="/socket.io/socket.io.js"></script>
   <script src="chat-delivery.js"></script>
   <script src="lobby-requests.js"></script>
+  <script src="room-connection.js"></script>
   <script src="client.js"></script>
 </body>
 </html>
