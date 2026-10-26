@@ -1,0 +1,102 @@
+{
+  "manualLayout320": {
+    "layout": [
+      {
+        "id": "table",
+        "rect": {
+          "height": 263,
+          "left": 8,
+          "top": 49,
+          "width": 318
+        }
+      },
+      {
+        "id": "community",
+        "rect": {
+          "height": 48,
+          "left": 72,
+          "top": 190.59375,
+          "width": 190
+        }
+      },
+      {
+        "id": "333",
+        "rect": {
+          "height": 18,
+          "left": 143.5,
+          "top": 255.65625,
+          "width": 46.796875
+        }
+      },
+      {
+        "id": "hero-row",
+        "rect": {
+          "height": 57,
+          "left": 339,
+          "top": 49,
+          "width": 218
+        }
+      },
+      {
+        "id": "action-buttons",
+        "rect": {
+          "height": 0,
+          "left": 0,
+          "top": 320,
+          "width": 0
+        }
+      }
+    ],
+    "rotated": true
+  },
+  "nativeLayout568": {
+    "layout": [
+      {
+        "id": "table",
+        "rect": {
+          "height": 263,
+          "left": 8,
+          "top": 49,
+          "width": 318
+        }
+      },
+      {
+        "id": "community",
+        "rect": {
+          "height": 48,
+          "left": 72,
+          "top": 190.59375,
+          "width": 190
+        }
+      },
+      {
+        "id": "333",
+        "rect": {
+          "height": 18,
+          "left": 143.5,
+          "top": 255.65625,
+          "width": 46.796875
+        }
+      },
+      {
+        "id": "hero-row",
+        "rect": {
+          "height": 57,
+          "left": 339,
+          "top": 49,
+          "width": 218
+        }
+      },
+      {
+        "id": "action-buttons",
+        "rect": {
+          "height": 0,
+          "left": 0,
+          "top": 0,
+          "width": 0
+        }
+      }
+    ],
+    "rotated": false
+  }
+}

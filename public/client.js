@@ -489,6 +489,7 @@ function enterRoom(code) {
   document.getElementById('game').classList.remove('hidden');
   document.getElementById('room-code-display').textContent = normalizedCode;
   chatDelivery.refresh();
+  mobileView.refresh();
 }
 
 // ---------------- 断线自动重连（token 恢复座位，客户端行为） ----------------
@@ -909,8 +910,9 @@ function avatarPng(seat) {
 function seatPosition(index, total) {
   const angleDeg = 90 + (index / total) * 360;
   const rad = (angleDeg * Math.PI) / 180;
-  const w = typeof window !== 'undefined' ? window.innerWidth : 1280;
-  const h = typeof window !== 'undefined' ? window.innerHeight : 800;
+  const view = typeof mobileView !== 'undefined' ? mobileView.size() : null;
+  const w = view ? view.width : typeof window !== 'undefined' ? window.innerWidth : 1280;
+  const h = view ? view.height : typeof window !== 'undefined' ? window.innerHeight : 800;
   const narrow = w <= 900;
   const veryNarrow = narrow && w <= 420;
   const landscape = w > h;
@@ -1080,22 +1082,23 @@ function renderBets() {
   wrap.innerHTML = '';
   if (state.stage === 'waiting') return;
   const tableEl = document.getElementById('table');
-  const tableRect = tableEl.getBoundingClientRect();
-  const wrapRect = wrap.getBoundingClientRect();
+  const readRect = el => typeof mobileView !== 'undefined' ? mobileView.rect(el) : el.getBoundingClientRect();
+  const tableRect = readRect(tableEl);
+  const wrapRect = readRect(wrap);
   if (!tableRect.width) return;
 
   // 障碍：桌心中央区三件套 + 全部席位卡（含 hero；自家卡单独判定不压数字）
   const obstacles = ['stage-label', 'pot-display', 'community']
     .map((id) => document.getElementById(id))
     .filter((el) => el && !el.classList.contains('hidden'))
-    .map((el) => el.getBoundingClientRect());
+    .map(readRect);
   const seatRects = new Map();
   document.querySelectorAll('#seats .seat').forEach((el) => {
     const card = el.querySelector('.seat-card');
-    if (card && el.dataset.seat) seatRects.set(Number(el.dataset.seat), card.getBoundingClientRect());
+    if (card && el.dataset.seat) seatRects.set(Number(el.dataset.seat), readRect(card));
   });
   const heroCard = document.querySelector('#hero-seat .seat-card');
-  if (heroCard && mySeat >= 0) seatRects.set(mySeat, heroCard.getBoundingClientRect());
+  if (heroCard && mySeat >= 0) seatRects.set(mySeat, readRect(heroCard));
 
   const overlaps = (r, o, m) => r.right > o.left + m && r.left < o.right - m && r.bottom > o.top + m && r.top < o.bottom - m;
 
@@ -1560,20 +1563,21 @@ document.getElementById('raise-panel').addEventListener('keydown', event => {
 });
 // 键盘弹起兜底（仅手机）：软键盘把抽屉盖住时，用 visualViewport 实测
 // 键盘高度把抽屉抬到键盘上方；键盘收起自动归位。主路径（快捷/滑条/步进）不依赖键盘。
-function syncVisibleViewport(){
-  const v=window.visualViewport,height=v?.height||window.innerHeight,top=v?.offsetTop||0;
-  document.documentElement.style.setProperty('--visible-height',`${height}px`);
-  document.documentElement.style.setProperty('--visible-top',`${top}px`);
-  document.documentElement.style.setProperty('--keyboard-inset',`${Math.max(0,window.innerHeight-height-top)}px`);
-}
-syncVisibleViewport();
-window.visualViewport?.addEventListener('resize',syncVisibleViewport);
-window.visualViewport?.addEventListener('scroll',syncVisibleViewport);
-window.addEventListener('resize',()=>{
-  syncVisibleViewport();
-  // 仅重排环桌席位和筹码，不重建房间/手牌/操作面板，不重置未提交的输入。
-  if(state){renderSeats();renderBets();}
+let wasCompactView = false;
+const mobileView = createMobileView({
+  root: document.getElementById('app-surface'), game: document.getElementById('game'),
+  onNotice: showToast,
+  onChange: view => {
+    if (view.compact && !wasCompactView) setLogCollapsed(true);
+    wasCompactView = view.compact;
+    document.getElementById('btn-page-landscape').textContent = view.manual ? '恢复自动布局' : '横向牌桌';
+    document.getElementById('btn-fullscreen').textContent = view.fullscreen ? '退出全屏' : '全屏游戏';
+    if (state) requestAnimationFrame(() => { renderSeats(); renderBets(); });
+  },
 });
+mobileView.refresh();
+document.getElementById('btn-page-landscape').onclick = () => { closeMenu(); mobileView.toggleLandscape(); };
+document.getElementById('btn-fullscreen').onclick = () => { closeMenu(); mobileView.toggleFullscreen(); };
 
 document.getElementById('raise-input').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') confirmRaise();
