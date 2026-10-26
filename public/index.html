@@ -142,8 +142,9 @@
             <div id="raise-panel" class="hidden">
               <div class="raise-head">
                 <span class="raise-label" id="raise-label">加注到</span>
-                <input id="raise-input" type="number" step="10" inputmode="numeric" aria-label="加注金额" />
+                <input id="raise-input" type="number" step="1" inputmode="numeric" aria-label="本轮合计下注到" aria-describedby="raise-explanation" />
               </div>
+              <p id="raise-explanation" aria-live="polite"></p>
               <div class="raise-presets" role="group" aria-label="快捷加注">
                 <button class="btn preset" data-preset="third">1/3池</button>
                 <button class="btn preset" data-preset="half">1/2池</button>
@@ -286,6 +287,7 @@
           <h2 id="result-title"></h2>
           <button id="btn-result-close-top" type="button" class="result-close-top" aria-label="关闭复盘并返回牌桌" title="关闭复盘">×</button>
         </div>
+        <p id="result-overview"></p>
         <div id="hand-changes" class="hidden"></div>
         <div id="squid-result" class="hidden"></div>
         <div id="result-pots"></div>
@@ -365,7 +367,7 @@
   <!-- 断线提示遮罩：自动重连（token 恢复座位），失败给出手动入口 -->
   <div id="conn-overlay" class="overlay hidden">
     <div class="conn-card">
-      <div id="conn-msg">连接断开，正在重连…</div>
+      <div id="conn-msg" role="status" aria-live="polite">连接断开，正在重连…</div>
       <span id="conn-sub">恢复后会自动回到牌局</span>
       <div id="conn-actions" class="hidden">
         <button id="btn-reconnect" class="btn btn-primary btn-small">立即重连</button>
@@ -377,6 +379,8 @@
   <script src="/socket.io/socket.io.js"></script>
   <script src="chat-delivery.js"></script>
   <script src="lobby-requests.js"></script>
+  <script src="room-connection.js"></script>
+  <script src="poker-explanations.js"></script>
   <script src="client.js"></script>
 </body>
 </html>

@@ -578,6 +578,11 @@ body {
 .raise-range { display: flex; justify-content: space-between; color: var(--a1-faint); font-size: 11px; }
 .raise-actions { display: flex; gap: 9px; }
 .raise-actions .btn { flex: 1; min-height: 40px; font-size: 13px; }
+#raise-explanation { margin:0; color:var(--a1-text-soft); font-size:12px; line-height:1.6; text-align:center; overflow-wrap:anywhere; }
+#raise-panel.allin-confirm .raise-presets,
+#raise-panel.allin-confirm .raise-slider-row,
+#raise-panel.allin-confirm .raise-range { display:none; }
+#raise-panel.allin-confirm #raise-input:disabled { opacity:1; color:var(--a1-text); -webkit-text-fill-color:var(--a1-text); }
 
 /* ---- 次级按钮 / 表情 / 提示 ---- */
 .footer-buttons { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
@@ -834,6 +839,13 @@ body.modal-open { overflow: hidden; }
 .hand-change.gain b { color: #8fc7ad; }
 .hand-change.loss b { color: #dc9391; }
 .hand-change.flat b { color: var(--a1-muted); }
+#result-overview { margin:0 0 14px; text-align:left; font-size:12px; line-height:1.7; color:var(--a1-text-soft); }
+.hand-change-info { min-width:0; text-align:left; overflow-wrap:anywhere; }
+.hand-change small { display:block; font-size:11px; line-height:1.6; color:var(--a1-muted); font-weight:400; }
+.hand-change-net { flex-shrink:0; text-align:right; }
+.hand-change.has-payment { flex-basis:100%; }
+#squid-result p { text-align:left; line-height:1.7; }
+.pot-explanation { margin:0 0 10px; color:var(--a1-muted); font-size:11px; line-height:1.6; }
 .result-pot-row {
   background: var(--a1-surface-quiet);
   border: 1px solid var(--a1-line-soft);

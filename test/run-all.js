@@ -199,8 +199,11 @@ installSignalHandler('SIGTERM', 143);
 (async () => {
   try {
     await runNode('test/ui-content.test.js', {}, { timeoutMs: 60000 });
+    await runNode('test/action-result.test.js', {}, { timeoutMs: 60000 });
     await runNode('test/chat-delivery.test.js', {}, { timeoutMs: 60000 });
     await runNode('test/lobby-requests.test.js', {}, { timeoutMs: 60000 });
+    await runNode('test/room-connection.test.js', {}, { timeoutMs: 60000 });
+    await runNode('test/room-connection.integration.test.js', {}, { timeoutMs: 60000 });
     await runNode('test/rules.test.js', {}, { timeoutMs: 60000 });
     await runNode('test/runtime.test.js', {}, { timeoutMs: 60000 });
     await runNode('test/network-guard.test.js', {}, { timeoutMs: 60000 });
