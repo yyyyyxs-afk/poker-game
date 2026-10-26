@@ -37,6 +37,7 @@ assert.ok(chat.includes(".emit('chat_message'") && client.includes('chatDelivery
 assert.ok(html.indexOf('src="chat-delivery.js"') >= 0 && html.indexOf('src="chat-delivery.js"') < html.indexOf('src="client.js"'), '聊天回执组件必须先加载');
 assert.ok(html.indexOf('src="lobby-requests.js"') >= 0 && html.indexOf('src="lobby-requests.js"') < html.indexOf('src="client.js"'), '大厅生命周期必须先加载');
 assert.ok(html.indexOf('src="room-connection.js"') >= 0 && html.indexOf('src="room-connection.js"') < html.indexOf('src="client.js"'), '房间恢复组件必须先加载');
+assert.ok(html.indexOf('src="poker-explanations.js"') >= 0 && html.indexOf('src="poker-explanations.js"') < html.indexOf('src="client.js"'), '金额解释组件必须先加载');
 assert.ok(client.includes('p.seat === mySeat') && client.includes('0.82'), '自己的下注筹码缺少桌面下沿专用锚点');
 assert.ok(client.includes('me.raiseAllowed !== false') && client.includes('未重新开放加注权'),
   '客户端未按服务端加注权禁用操作');

@@ -1,7 +1,7 @@
 // 隔离本地视觉检查夹具：浏览器创建房间后加入5名虚拟好友。
 const readline=require('readline');
 const {io:connect}=require('socket.io-client');
-const {server,io,rooms,applyAction}=require('../server');
+const {server,io,rooms,applyAction,__test}=require('../server');
 const clients=[];
 let room,busy=false;
 server.listen(0,'127.0.0.1',()=>console.log(`UI_PORT=${server.address().port}`));
@@ -13,6 +13,21 @@ const poll=setInterval(()=>{
 },100);
 readline.createInterface({input:process.stdin}).on('line',async line=>{
   if(!room)return;
+  // 仅本机验收：固定合法牌面/整数投入，用生产摊牌函数生成主池/边池或平分结果。
+  if(line==='review sidepots'||line==='review split'){
+    if(room.players.length<3||!['preflop','flop','turn','river'].includes(room.stage))return console.log('请先加入至少3人并开局');
+    const split=line==='review split',ranks=split?[10,11,12,13,14]:[2,7,9,11,12];
+    room.community=ranks.map((r,i)=>({r,s:split?'s':['c','d','h','s','c'][i]}));
+    room.players.forEach((p,i)=>{
+      p.inHand=i<3;p.folded=i>=3||(split&&i===2);p.allIn=false;
+      p.totalBet=i<3?(split?101:[100,200,200][i]):0;p.roundBet=0;
+      p.chips=p.handStartChips-p.totalBet-(p.squidFrozen||0);
+      if(i<3)p.hole=[{r:[14,13,10][i],s:'d'},{r:[14,13,10][i],s:'h'}];
+    });
+    room.pot=room.players.reduce((sum,p)=>sum+p.totalBet,0);room.stage='river';
+    __test.showdown(room);
+    return console.log('UI_REVIEW='+JSON.stringify({scenario:split?'split':'sidepots',pots:room.results.pots.map(p=>({amount:p.amount,winners:p.winners.map(w=>({name:w.name,amountWon:w.amountWon}))})),changes:room.results.changes.map(p=>({name:p.name,delta:p.delta}))}));
+  }
   if(line==='status')return console.log('UI_STATUS='+JSON.stringify({stage:room.stage,hand:room.handNumber,players:room.players.map((p,seat)=>({seat,name:p.name,chips:p.chips,frozen:require('../squid').frozen(p),roundBet:p.roundBet}))}));
   if(line.startsWith('raise '))return console.log('UI_RAISE='+JSON.stringify(applyAction(room,room.turnSeat,'raise',Number(line.slice(6)))));
   if(line.startsWith('bots ')){

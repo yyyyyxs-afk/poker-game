@@ -7,6 +7,7 @@ let mySeat = -1;
 let state = null;
 let raiseOpen = false;
 let raiseContext = '';
+let allInIntent = null;
 let activeRoomCode = '';
 let roomConnectionReady = false;
 
@@ -1315,7 +1316,7 @@ function renderMyArea() {
     bar.classList.remove('hidden');
     hint.classList.remove('hidden');
     tip.textContent = '';
-    resetFoldBtn(); // 新一轮行动开始时复位弃牌确认态
+    if (foldContext && foldContext !== currentContext) resetFoldBtn();
     updateActionBar(me);
     // 轮到自己：提示音 + 振动 + 思考倒计时（每次行动只触发一次）
     const turnKey = `${state.handNumber}_${state.stage}_${state.turnSeat}`;
@@ -1326,6 +1327,7 @@ function renderMyArea() {
       startTurnTimer();
     }
   } else {
+    resetFoldBtn();
     bar.classList.add('hidden');
     hint.classList.add('hidden');
     hideRaisePanel();
@@ -1348,19 +1350,21 @@ function waitingTipText() {
 
 function updateActionBar(me) {
   const toCall = state.currentBet - me.roundBet;
+  const amounts = PokerExplanations.actionAmounts(state, me);
   const raiseAllowed = me.raiseAllowed !== false; // 兼容旧服务端：字段缺失时仍按可加注处理
   // "轮到你 · 跟注 335"式提示：金额数据全部来自服务端状态
   const hint = document.getElementById('action-hint');
-  hint.innerHTML = toCall <= 0 ? '轮到你 · <b>过牌</b>'
-    : toCall >= me.chips ? `轮到你 · <b>跟注全押 ${me.chips}</b>`
-      : `轮到你 · <b>跟注 ${toCall}</b>`;
+  hint.innerHTML = toCall <= 0 ? '轮到你 · <b>可以过牌，无需投入</b>'
+    : `轮到你 · <b>再投 ${PokerExplanations.number(amounts.call)} 跟注</b> · 余 ${PokerExplanations.number(amounts.afterCall)}`;
   const callBtn = document.getElementById('btn-check-call');
   callBtn.textContent = toCall <= 0 ? '过牌'
     : toCall >= me.chips ? `跟注全押 (${me.chips})` : `跟注 ${toCall}`;
-  callBtn.onclick = () => sendAction(toCall <= 0 ? 'check' : 'call');
+  callBtn.onclick = () => toCall > 0 && toCall >= me.chips
+    ? openAllInConfirmation('call') : sendAction(toCall <= 0 ? 'check' : 'call');
 
   const allInBtn = document.getElementById('btn-allin');
-  allInBtn.onclick = () => sendAction('allin');
+  allInBtn.textContent = `全押 ${PokerExplanations.number(me.chips)}`;
+  allInBtn.onclick = () => openAllInConfirmation('allin');
 
   // 加注面板范围：最小加注到 ~ 全部筹码。
   // 筹码不足以最小加注时（rawMin > max）合法动作只剩全押：把下限钳到全部筹码，
@@ -1374,7 +1378,7 @@ function updateActionBar(me) {
   const slider = document.getElementById('raise-slider');
   slider.min = minRaiseTo;
   slider.max = maxRaiseTo;
-  slider.step = cfg().bigBlind; // 步进跟盲注走，自定义盲注也能整步覆盖
+  slider.step = 1; // 允许精确到整数筹码；全押上限不一定是大盲的整数倍。
   // 面板打开期间不重置用户已调的金额（state 广播如对手表情/结算不丢失输入）
   if (!raiseOpen) {
     slider.value = minRaiseTo;
@@ -1386,14 +1390,6 @@ function updateActionBar(me) {
   }
   input.min = minRaiseTo;
   input.max = maxRaiseTo;
-  const currentRaise = Number(slider.value) || minRaiseTo;
-  const confirmValue = document.getElementById('raise-confirm-value');
-  confirmValue.textContent = currentRaise.toLocaleString('zh-CN');
-  // 按钮首个子节点是"确认加注 "文本节点（金额在后面的 span 里），仅在类型正确时改写
-  const confirmBtn = document.getElementById('btn-raise-confirm');
-  if (confirmBtn.firstChild && confirmBtn.firstChild.nodeType === Node.TEXT_NODE) {
-    confirmBtn.firstChild.textContent = allInOnly ? '全押 ' : '确认加注 ';
-  }
   document.getElementById('raise-min-label').textContent = !raiseAllowed
     ? '不足额全押未重新开放加注权'
     : allInOnly ? '筹码不足以最小加注，仅全押'
@@ -1405,32 +1401,31 @@ function updateActionBar(me) {
   /** 滑条/步进/快捷共用：同步数字输入与确认按钮金额 */
   const syncRaiseViews = () => {
     input.value = slider.value;
-    confirmValue.textContent = Number(slider.value).toLocaleString('zh-CN');
+    renderRaiseExplanation();
   };
   slider.oninput = syncRaiseViews;
   input.oninput = () => {
-    const v = parseInt(input.value, 10);
-    if (!Number.isFinite(v)) return; // 输入中（空/负号/非数字）：不抖动，确认时统一钳制
+    const v = Number(input.value);
+    if (!Number.isSafeInteger(v) || input.value === '') return renderRaiseExplanation();
     const clamped = Math.max(+slider.min, Math.min(+slider.max, v));
     slider.value = clamped;
-    confirmValue.textContent = clamped.toLocaleString('zh-CN');
+    renderRaiseExplanation();
   };
   // P2-5：失焦时把显示值回写为钳制后的合法值（输入中不打断，确认金额始终一致）
   input.onblur = () => {
-    const v = parseInt(input.value, 10);
-    const clamped = Number.isFinite(v)
-      ? Math.max(+slider.min, Math.min(+slider.max, v))
-      : Number(slider.value);
+    const v = Number(input.value);
+    if (!Number.isSafeInteger(v) || input.value === '') return renderRaiseExplanation();
+    const clamped = Math.max(+slider.min, Math.min(+slider.max, v));
     input.value = clamped;
     slider.value = clamped;
-    confirmValue.textContent = clamped.toLocaleString('zh-CN');
+    renderRaiseExplanation();
   };
   document.getElementById('raise-dec').onclick = () => {
-    slider.value = Number(slider.value) - Number(slider.step);
+    slider.value = Number(slider.value) - cfg().bigBlind;
     syncRaiseViews();
   };
   document.getElementById('raise-inc').onclick = () => {
-    slider.value = Number(slider.value) + Number(slider.step);
+    slider.value = Number(slider.value) + cfg().bigBlind;
     syncRaiseViews();
   };
 
@@ -1450,7 +1445,7 @@ function updateActionBar(me) {
         v = Math.max(minRaiseTo, Math.min(maxRaiseTo, target));
       }
       slider.value = v; input.value = v;
-      confirmValue.textContent = Number(slider.value).toLocaleString('zh-CN');
+      renderRaiseExplanation();
     };
   });
 
@@ -1459,7 +1454,52 @@ function updateActionBar(me) {
   raiseBtn.disabled = maxRaiseTo <= state.currentBet || !raiseAllowed;
   raiseBtn.onclick = onRaiseToggleClick;
   document.getElementById('btn-raise-confirm').onclick = confirmRaise;
-  document.getElementById('btn-raise-cancel').onclick = hideRaisePanel;
+  document.getElementById('btn-raise-cancel').onclick = cancelRaisePanel;
+  input.disabled = !!allInIntent;
+  if (allInIntent) slider.value = input.value = maxRaiseTo;
+  document.getElementById('raise-panel').classList.toggle('allin-confirm', !!allInIntent);
+  renderRaiseExplanation();
+}
+
+function renderRaiseExplanation() {
+  const me = state?.players[mySeat];
+  if (!me) return;
+  const input = document.getElementById('raise-input');
+  const confirm = document.getElementById('btn-raise-confirm');
+  const invalid = !allInIntent && (input.value === '' || !Number.isSafeInteger(Number(input.value)));
+  confirm.disabled = invalid;
+  input.setAttribute('aria-invalid', String(invalid));
+  if (invalid) {
+    document.getElementById('raise-explanation').textContent = '请填写整数筹码，再确认下注。';
+    return;
+  }
+  const amounts = PokerExplanations.actionAmounts(state, me, allInIntent
+    ? me.roundBet + me.chips : document.getElementById('raise-slider').value);
+  const isAllIn = amounts.extra === me.chips;
+  if (confirm.firstChild?.nodeType === Node.TEXT_NODE) {
+    confirm.firstChild.textContent = isAllIn ? '确认全押 ' : state.currentBet === 0 ? '确认下注到 ' : '确认加注到 ';
+  }
+  document.getElementById('raise-confirm-value').textContent = PokerExplanations.number(isAllIn ? amounts.extra : amounts.total);
+  document.getElementById('raise-label').textContent = allInIntent ? '全押后，本轮合计下注' : state.currentBet === 0 ? '本轮下注到' : '本轮加注到';
+  document.getElementById('raise-explanation').textContent =
+    `本轮已投 ${PokerExplanations.number(me.roundBet)}；再投入 ${PokerExplanations.number(amounts.extra)}，可用余 ${PokerExplanations.number(amounts.remaining)}。` +
+    (amounts.frozen ? `另有冻结 ${PokerExplanations.number(amounts.frozen)}，不参与本次下注。` : '');
+}
+
+function openAllInConfirmation(type) {
+  const me = state?.players[mySeat], context = raiseContextKey(me);
+  if (!context || !roomConnectionReady || !socket.connected || me.chips <= 0) return;
+  const max = me.roundBet + me.chips;
+  if (type === 'allin' && me.raiseAllowed === false && max > state.currentBet) return;
+  if (type === 'call' && state.currentBet - me.roundBet < me.chips) return;
+  resetFoldBtn();
+  allInIntent = { type, context };
+  raiseOpen = true;
+  raiseContext = context;
+  updateActionBar(me);
+  document.getElementById('raise-panel').classList.remove('hidden');
+  document.getElementById('action-bar').classList.add('raising');
+  document.getElementById('btn-raise-confirm').focus();
 }
 
 /** 加注按钮：点击展开 Raise Controller 面板，面板内取消或确认。
@@ -1476,18 +1516,34 @@ function onRaiseToggleClick() {
   }
   raiseOpen = true;
   raiseContext = currentContext;
+  allInIntent = null;
+  updateActionBar(me);
   document.getElementById('raise-panel').classList.remove('hidden');
   document.getElementById('action-bar').classList.add('raising');
   document.getElementById('btn-toggle-raise').classList.add('is-active');
 }
 function hideRaisePanel() {
+  const wasAllIn = !!allInIntent;
   raiseOpen = false;
   raiseContext = '';
+  allInIntent = null;
+  document.getElementById('raise-panel').classList.remove('allin-confirm');
+  document.getElementById('raise-input').disabled = false;
+  if (wasAllIn) {
+    const slider = document.getElementById('raise-slider');
+    slider.value = slider.min;
+    document.getElementById('raise-input').value = slider.value;
+  }
   document.getElementById('raise-panel').classList.add('hidden');
   document.getElementById('action-bar').classList.remove('raising');
   document.getElementById('raise-panel').style.bottom = ''; // 清键盘兜底偏移
   const toggle = document.getElementById('btn-toggle-raise');
   if (toggle) toggle.classList.remove('is-active');
+}
+function cancelRaisePanel() {
+  const trigger = allInIntent ? allInIntent.type === 'call' ? 'btn-check-call' : 'btn-allin' : 'btn-toggle-raise';
+  hideRaisePanel();
+  document.getElementById(trigger).focus();
 }
 function raiseContextKey(me) {
   if (!state || !me || me.folded || me.allIn || state.turnSeat !== mySeat ||
@@ -1496,7 +1552,12 @@ function raiseContextKey(me) {
     state.currentBet, me.roundBet, me.chips].join('|');
 }
 // 手机抽屉遮罩：点击等同取消
-document.getElementById('raise-scrim').addEventListener('click', hideRaisePanel);
+document.getElementById('raise-scrim').addEventListener('click', cancelRaisePanel);
+document.getElementById('raise-panel').addEventListener('keydown', event => {
+  if (event.key !== 'Escape') return;
+  event.preventDefault();
+  cancelRaisePanel();
+});
 // 键盘弹起兜底（仅手机）：软键盘把抽屉盖住时，用 visualViewport 实测
 // 键盘高度把抽屉抬到键盘上方；键盘收起自动归位。主路径（快捷/滑条/步进）不依赖键盘。
 function syncVisibleViewport(){
@@ -1521,11 +1582,16 @@ document.getElementById('raise-input').addEventListener('keydown', (e) => {
  *  （此前用长按方案：普通单击不足 600ms 被当作取消，按钮看起来"没用"） */
 const foldBtn = document.getElementById('btn-fold');
 let foldArmed = false;
+let foldContext = '';
 let foldDisarmTimer = null;
 foldBtn.addEventListener('click', () => {
   if (foldBtn.disabled) return;
+  const context = raiseContextKey(state?.players[mySeat]);
+  if (!context || !roomConnectionReady || !socket.connected) return;
+  if (foldArmed && foldContext !== context) resetFoldBtn();
   if (!foldArmed) {
     foldArmed = true;
+    foldContext = context;
     foldBtn.classList.add('holding');
     foldBtn.textContent = '再点一次确认弃牌';
     clearTimeout(foldDisarmTimer);
@@ -1537,6 +1603,7 @@ foldBtn.addEventListener('click', () => {
 });
 function resetFoldBtn() {
   foldArmed = false;
+  foldContext = '';
   clearTimeout(foldDisarmTimer);
   foldDisarmTimer = null;
   foldBtn.classList.remove('holding');
@@ -1544,9 +1611,20 @@ function resetFoldBtn() {
 }
 
 function confirmRaise() {
+  const context = raiseContextKey(state?.players[mySeat]);
+  if (!raiseOpen || !context || context !== raiseContext || !roomConnectionReady || !socket.connected) {
+    hideRaisePanel();
+    return;
+  }
+  if (allInIntent) {
+    const type = allInIntent.type;
+    if (allInIntent.context === context) sendAction(type);
+    hideRaisePanel();
+    return;
+  }
   const slider = document.getElementById('raise-slider');
-  let v = parseInt(document.getElementById('raise-input').value, 10);
-  if (!v || v <= 0) return;
+  let v = Number(document.getElementById('raise-input').value);
+  if (!Number.isSafeInteger(v) || v <= 0) return;
   // 发送前钳制到合法范围，避免超限才被服务端打回
   v = Math.max(+slider.min, Math.min(+slider.max, v));
   sendAction('raise', v);
@@ -1692,10 +1770,11 @@ function renderResults() {
     ? escapeHtml(mainPot.winners[0].handName) : '对手全部弃牌';
   const mainPotWinnerAmount = Number.isFinite(mainPot.winners[0].amountWon)
     ? mainPot.winners[0].amountWon : mainPot.amount;
-  const mainPotAmountLabel = mainPot.winners.length > 1 ? '赢家合计分得' : '分得底池';
+  const potName = r.pots.length > 1 ? '主池' : '底池';
+  const mainPotAmountLabel = mainPot.winners.length > 1 ? `${potName}合计分得` : `分得${potName}`;
   if (isCurrentResult) {
     winnerBanner.innerHTML = `<b>${winnerNames}</b><span class="winner-amount">${mainPotAmountLabel} <em>+${mainPot.winners.length > 1 ? mainPot.amount : mainPotWinnerAmount}</em></span>` +
-      `<span class="winner-hand">${winnerHand}${r.pots.length > 1 ? ` · 含边池 ${r.pots.length - 1} 个` : ''}</span>`;
+      `<span class="winner-hand">${winnerHand}${r.pots.length > 1 ? ` · 另有 ${r.pots.length - 1} 个边池分别结算` : ''}</span>`;
     winnerBanner.classList.remove('hidden');
   } else {
     winnerBanner.classList.add('hidden');
@@ -1703,6 +1782,11 @@ function renderResults() {
   resultDetailBtn.textContent = isCurrentResult ? '查看本局详情' : `回看第 ${r.handNumber} 局`;
   resultDetailBtn.classList.remove('hidden');
   resultOverlay.classList.toggle('hidden', !resultDetailOpen); // 第二层仅在主动查看时显示
+  document.getElementById('result-overview').textContent =
+    `本局底池合计 ${PokerExplanations.number(r.pots.reduce((sum, pot) => sum + pot.amount, 0))} 筹码。` +
+    (r.forfeit ? '其他玩家全部弃牌，无需亮牌即可获胜。' : r.pots.length > 1
+      ? '主池、边池各自比较有资格玩家的牌力，赢家可以不同。' : '摊牌按最佳五张比较，同牌力时平分。') +
+    '底池分得含本人投入，实际输赢看净盈亏。';
 
   const changesDiv = document.getElementById('hand-changes');
   const changes = Array.isArray(r.changes)
@@ -1715,10 +1799,14 @@ function renderResults() {
         ${changes.map((entry) => {
           const delta = Number(entry.delta) || 0;
           const tone = delta > 0 ? 'gain' : (delta < 0 ? 'loss' : 'flat');
-          const label = delta > 0 ? `+${delta}` : `${delta}`;
-          return `<div class="hand-change ${tone}">
-            <span>${escapeHtml(entry.name)}</span>
-            <b>${label}</b>
+          const label = PokerExplanations.signed(delta);
+          const breakdown = PokerExplanations.resultBreakdown(r, entry);
+          const mine = entry.name === state.players[mySeat]?.name;
+          const hasPayment = r.squidEvents?.some(event => event.type === 'payment');
+          return `<div class="hand-change ${tone}${hasPayment ? ' has-payment' : ''}">
+            <div class="hand-change-info"><span>${escapeHtml(entry.name)}${mine ? '（你）' : ''}</span>
+              <small>${breakdown.returned === null ? '底池分配未记录' : `底池分得 ${PokerExplanations.number(breakdown.returned)}`}${hasPayment ? `<br>德州 ${PokerExplanations.signed(breakdown.pokerNet)} · 鱿鱼 ${PokerExplanations.signed(breakdown.squidNet)}` : ''}</small></div>
+            <div class="hand-change-net"><small>${delta > 0 ? '净赢' : delta < 0 ? '净输' : '持平'}</small><b>${label}</b></div>
           </div>`;
         }).join('')}
       </div>`;
@@ -1735,18 +1823,20 @@ function renderResults() {
     row.className = 'result-pot-row';
     const label = r.pots.length > 1 ? (i === 0 ? '主池' : `边池 ${i}`) : '底池';
     const winnerAmountLabel = (winner) => {
-      if (Number.isFinite(winner.amountWon)) return `分得 ${winner.amountWon} 筹码`;
-      if (pot.winners.length === 1) return `分得底池 ${pot.amount} 筹码`;
+      if (Number.isFinite(winner.amountWon)) return `分得 ${PokerExplanations.number(winner.amountWon)} 筹码`;
+      if (pot.winners.length === 1) return `分得底池 ${PokerExplanations.number(pot.amount)} 筹码`;
       return `与 ${pot.winners.length - 1} 位赢家共享底池（个人分配未记录）`;
     };
     row.innerHTML = `
-      <div class="pot-label">${label} · ${pot.amount} 筹码</div>
+      <div class="pot-label">${label} · ${PokerExplanations.number(pot.amount)} 筹码${pot.winners.length > 1 ? ' · 平分' : ''}</div>
+      ${i > 0 ? '<p class="pot-explanation">较多投入形成的独立底池，只在有资格参与本池的玩家间结算。</p>' : ''}
+      ${pot.winners.length > 1 ? '<p class="pot-explanation">下方为各人实分金额；零头筹码从庄家左侧赢家起分配。</p>' : ''}
       ${pot.winners.map((w) => `
         <div class="winners">
           <img class="winner-avatar" src="${avatarPng(w.seat)}" alt="" />
           <div class="winner-info">
             <div class="winner-name"><b>${escapeHtml(w.name)}</b> ${winnerAmountLabel(w)}</div>
-            ${w.handName ? `<div class="hand-name">牌型: ${w.handName}</div>` : '<div class="hand-name">对手全部弃牌</div>'}
+            ${w.handName ? `<div class="hand-name">牌型: ${escapeHtml(w.handName)}</div>` : '<div class="hand-name">对手全部弃牌</div>'}
             ${winnerCardsHtml(w, r.community)}
           </div>
         </div>`).join('')}
@@ -2068,9 +2158,9 @@ function squidMarkHtml(p){
   return `<span class="squid-mark${glow?' squid-glow':''}" ${glow?`style="animation-delay:-${elapsed}ms"`:''} title="本轮已得鱿鱼标记" aria-label="本轮已得鱿鱼标记">◆</span>`;
 }
 function squidEventText(e){
-  if(e.type==='round')return `第${e.round}轮开始：${e.names.join('、')}；大盲${e.bb}，向每人支付${e.payment??e.bb}，每人冻结${(e.names.length-1)*(e.payment??e.bb)}`;
-  if(e.type==='mark')return `${e.name} 主池独赢，得到标记并解冻`;
-  if(e.type==='payment')return `${e.from} 支付${e.total}，${e.to.join('、')}各收${e.payment??e.bb}筹码`;
+  if(e.type==='round')return `第${e.round}轮开始：${e.names.join('、')}；末位需向其余每人支付 ${PokerExplanations.number(e.payment??e.bb)} 筹码，开轮每人先冻结 ${PokerExplanations.number((e.names.length-1)*(e.payment??e.bb))}。冻结仍属本人资产。`;
+  if(e.type==='mark')return `${e.name} 主池独赢，获得标记，本轮冻结筹码退回可用余额。解冻不是额外获利。`;
+  if(e.type==='payment')return `${e.from} 为本轮末位，从冻结筹码支付 ${PokerExplanations.number(e.total)}；${e.to.join('、')}各收 ${PokerExplanations.number(e.payment??e.bb)}（${e.to.length} 人 × ${PokerExplanations.number(e.payment??e.bb)}）。`;
   return `第${e.round}轮取消并解冻：${e.reason}`;
 }
 function renderSquid(){
