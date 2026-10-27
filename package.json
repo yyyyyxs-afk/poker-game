@@ -9,6 +9,7 @@
     "test:rules": "node test/rules.test.js",
     "test:ui": "node test/ui-content.test.js",
     "test:action-result": "node test/action-result.test.js",
+    "test:session-panel": "node test/session-panel.test.js",
     "test:mobile-view": "node test/mobile-view.test.js",
     "test:geometry": "node test/geometry-check.js",
     "test:show-cards": "node test/show-cards.test.js",

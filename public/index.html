@@ -88,6 +88,7 @@
           <div id="menu-dropdown" class="hidden" role="menu">
             <button id="btn-copy-code" role="menuitem">复制房号</button>
             <button id="btn-copy-link" role="menuitem">复制邀请链接</button>
+            <button id="btn-session" role="menuitem">本场战绩</button>
             <button id="btn-rules-game" role="menuitem">玩法说明与牌型</button>
             <button id="btn-page-landscape" role="menuitem">横向牌桌</button>
             <button id="btn-fullscreen" role="menuitem">全屏游戏</button>
@@ -281,6 +282,19 @@
           <button id="btn-settings-close" class="btn btn-secondary btn-small">取消</button>
           <button id="btn-settings-save" class="btn btn-primary btn-small">保存</button>
         </div>
+      </div>
+    </div>
+
+    <div id="session-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="session-title">
+      <div id="session-card" tabindex="-1">
+        <div class="session-head">
+          <h2 id="session-title">本场战绩</h2>
+          <button id="btn-session-close" type="button" class="result-close-top" aria-label="关闭本场战绩">×</button>
+        </div>
+        <p id="session-status"></p>
+        <p class="session-note">总资产包含鱿鱼冻结筹码，冻结不算亏损；离场记录按离场资产计算。</p>
+        <div id="session-list"></div>
+        <button id="btn-session-export" type="button" class="btn btn-secondary btn-small">下载本场战绩 CSV</button>
       </div>
     </div>
 

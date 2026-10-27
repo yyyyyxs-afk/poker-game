@@ -60,6 +60,7 @@ renderSoundBtn();
 // ---------------- Header 汉堡菜单（复制房号 / 邀请链接 / 退出） ----------------
 const menuBtn = document.getElementById('btn-menu');
 const menuDropdown = document.getElementById('menu-dropdown');
+const sessionOverlay = document.getElementById('session-overlay');
 function closeMenu() {
   menuDropdown.classList.add('hidden');
   menuBtn.setAttribute('aria-expanded', 'false');
@@ -147,7 +148,7 @@ function getModalFocusableElements(overlay) {
 }
 
 function getTopOpenModal() {
-  const overlays = [settingsOverlay, resultOverlay, rulesOverlay]
+  const overlays = [settingsOverlay, resultOverlay, sessionOverlay, rulesOverlay]
     .filter((overlay) => overlay && isVisibleAndEnabled(overlay));
   return overlays.reduce((top, candidate) => {
     if (!top) return candidate;
@@ -189,6 +190,7 @@ function handleModalKeyboard(event) {
     event.stopImmediatePropagation();
     if (activeModal === rulesOverlay) closeRules();
     else if (activeModal === resultOverlay) closeResultDetail();
+    else if (activeModal === sessionOverlay) closeSession();
     else if (activeModal === settingsOverlay) closeSettings();
     return;
   }
@@ -738,6 +740,7 @@ socket.on('disconnect', () => {
   if (!activeRoomCode || document.getElementById('game').classList.contains('hidden')) {
     return;
   }
+  sessionOverlay.classList.add('hidden');
   hideRaisePanel();
   resetFoldBtn();
   connOverlay.classList.remove('hidden');
@@ -767,6 +770,7 @@ function render() {
     renderIdentityControls();
     renderNextHandStatus();
     renderResults();
+    if (!sessionOverlay.classList.contains('hidden')) renderSession();
     renderSquid();
     // 手牌、操作区和冻结提示都会影响桌面高度；全部更新后再量下注坐标。
     renderBets();
@@ -1435,13 +1439,34 @@ function updateActionBar(me) {
   // 快捷下注：基于服务端权威的 pot / currentBet 计算"跟注后的底池"比例，
   // 低于最小合法加注自动抬到最小值，超出最大金额自动封顶（全押）
   const PRESET_FRAC = { third: 1 / 3, half: 1 / 2, twothird: 2 / 3, pot: 1 };
+  const PRESET_BLINDS = { third: 2, half: 2.5, twothird: 3 };
+  const opening = state.stage === 'preflop' && state.currentBet === state.bigBlind;
   document.querySelectorAll('.preset').forEach((btn) => {
+    const preset = btn.dataset.preset;
+    btn.hidden = opening && preset === 'pot';
+    let openingTarget, openingValue, adjustment = '';
+    if (opening && PRESET_BLINDS[preset]) {
+      const multiple = PRESET_BLINDS[preset];
+      openingTarget = Math.ceil(state.bigBlind * multiple);
+      openingValue = Math.max(minRaiseTo, Math.min(maxRaiseTo, openingTarget));
+      adjustment = openingValue > openingTarget ? '已提高到最小加注' : openingValue < openingTarget ? '已按筹码上限调整为全押' : '';
+      btn.textContent = `${multiple}倍 ${PokerExplanations.number(openingValue)}${adjustment ? openingValue > openingTarget ? '最低' : '全押' : ''}`;
+      btn.title = adjustment || `加注到 ${PokerExplanations.number(openingValue)}`;
+      btn.setAttribute('aria-label', `${multiple}倍大盲，加注到 ${PokerExplanations.number(openingValue)}${adjustment ? `，${adjustment}` : ''}`);
+    } else {
+      const labels = { third: '1/3池', half: '1/2池', twothird: '2/3池', pot: '满池', allin: '全押' };
+      btn.textContent = labels[preset];
+      btn.title = '';
+      btn.setAttribute('aria-label', labels[preset]);
+    }
     btn.onclick = () => {
       let v;
-      if (btn.dataset.preset === 'allin') {
+      if (preset === 'allin') {
         v = maxRaiseTo;
+      } else if (opening && PRESET_BLINDS[preset]) {
+        v = openingValue;
       } else {
-        const frac = PRESET_FRAC[btn.dataset.preset];
+        const frac = PRESET_FRAC[preset];
         if (!frac) return;
         const potAfterCall = state.pot + toCall;
         const target = state.currentBet + Math.ceil(potAfterCall * frac);
@@ -1449,6 +1474,7 @@ function updateActionBar(me) {
       }
       slider.value = v; input.value = v;
       renderRaiseExplanation();
+      if (adjustment) document.getElementById('raise-explanation').textContent += ` ${adjustment}。`;
     };
   });
 
@@ -1887,16 +1913,49 @@ function renderResults() {
   }
 }
 
-/** 本场战绩表：买入 / 当前筹码 / 盈亏 / 手数 / 胜场；离场玩家以存档显示 */
+function openSession() {
+  closeMenu();
+  renderSession();
+  sessionOverlay.classList.remove('hidden');
+  document.getElementById('btn-session-close').focus();
+}
+function closeSession() {
+  if (sessionOverlay.classList.contains('hidden')) return;
+  sessionOverlay.classList.add('hidden');
+  restoreModalFocus(menuBtn);
+}
+document.getElementById('btn-session').addEventListener('click', openSession);
+document.getElementById('btn-session-close').addEventListener('click', closeSession);
+sessionOverlay.addEventListener('click', event => { if (event.target === sessionOverlay) closeSession(); });
+
+/** 使用服务端战绩；已归档离场记录的资产为买入加盈亏，与 CSV 一致。 */
 function renderSession() {
   const box = document.getElementById('session-box');
-  if (!box) return;
   const list = state.session || [];
-  if (!list.length) { box.classList.add('hidden'); return; }
-  box.classList.remove('hidden');
-  const tbody = box.querySelector('tbody');
-  tbody.innerHTML = list.map((e) => {
-    const chips = e.left ? '已离场' : `${e.estate ?? e.chips}${e.frozen ? `（冻${e.frozen}）` : ''}`;
+  const settled = ['waiting', 'handover'].includes(state.stage);
+  const names = new Map(), seen = new Map();
+  list.forEach(e => names.set(e.name, (names.get(e.name) || 0) + 1));
+  const totals = e => e.estate ?? (e.left ? e.buyIn + e.pl : e.chips);
+  document.getElementById('session-status').textContent = settled
+    ? '已结算战绩，可在局间下载。'
+    : '本手尚未结算，总资产含本手已投入，盈亏待结算更新；请在局间下载战绩。';
+  document.getElementById('session-list').innerHTML = list.length ? list.map(e => {
+    const index = (seen.get(e.name) || 0) + 1;
+    seen.set(e.name, index);
+    const suffix = names.get(e.name) > 1 ? ` · 同名记录 ${index}` : '';
+    const status = e.left ? (e.estate != null && !settled ? '已离场，本手待结算' : '已离场') : '在场';
+    const frozen = e.frozen ? `<small class="session-frozen">含冻结 ${PokerExplanations.number(e.frozen)}</small>` : '';
+    const plCls = e.pl > 0 ? 'pl-pos' : e.pl < 0 ? 'pl-neg' : '';
+    return `<section class="session-entry"><div class="session-player"><b>${escapeHtml(e.name)}</b><span>${status}${suffix}</span></div>
+      <dl><div><dt>买入</dt><dd>${PokerExplanations.number(e.buyIn)}</dd></div>
+      <div><dt>总资产</dt><dd>${PokerExplanations.number(totals(e))}${frozen}</dd></div>
+      <div><dt>净盈亏</dt><dd class="${plCls}">${PokerExplanations.signed(e.pl)}</dd></div>
+      <div><dt>手数</dt><dd>${PokerExplanations.number(e.hands)}</dd></div>
+      <div><dt>胜场</dt><dd>${PokerExplanations.number(e.wins)}</dd></div></dl></section>`;
+  }).join('') : '<p class="session-note">暂无战绩。</p>';
+  box.classList.toggle('hidden', !list.length);
+  box.querySelector('tbody').innerHTML = list.map((e) => {
+    const chips = `${PokerExplanations.number(totals(e))}${e.frozen ? `（冻${PokerExplanations.number(e.frozen)}）` : ''}`;
     const plCls = e.pl > 0 ? 'pl-pos' : e.pl < 0 ? 'pl-neg' : '';
     const plText = (e.pl > 0 ? '+' : '') + e.pl;
     return `<tr>
@@ -2036,6 +2095,7 @@ function renderNextHandStatus() {
   document.getElementById('next-hand-status').textContent = isForfeitIntermission() ? forfeitStatus() : (paused ? '下一局已暂停，当前手照常进行' : '');
   const settled = ['waiting', 'handover'].includes(state.stage);
   document.getElementById('btn-export-session').disabled = !settled;
+  document.getElementById('btn-session-export').disabled = !settled;
   document.getElementById('export-session-tip').textContent = settled
     ? '导出已结算战绩，包含已离场记录；离场筹码按离场时记录。'
     : '本手尚未结算，请在局间下载战绩。';
@@ -2045,7 +2105,7 @@ document.getElementById('btn-pause-next').onclick = () => {
     if (!res || !res.ok) alert((res && res.err) || '操作失败');
   });
 };
-document.getElementById('btn-export-session').onclick = () => {
+function exportSession() {
   socket.emit('export_session', null, res => {
     if (!res || !res.ok) return alert((res && res.err) || '导出失败');
     const url = URL.createObjectURL(new Blob([res.csv], { type: 'text/csv;charset=utf-8' }));
@@ -2053,7 +2113,9 @@ document.getElementById('btn-export-session').onclick = () => {
     link.href = url; link.download = res.filename; link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
-};
+}
+document.getElementById('btn-export-session').onclick = exportSession;
+document.getElementById('btn-session-export').onclick = exportSession;
 
 function renderIdentityControls() {
   const me = state.players.find(p => p.seat === mySeat);

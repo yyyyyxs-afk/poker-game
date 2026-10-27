@@ -554,6 +554,7 @@ body {
 #raise-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 #raise-input:focus { border-bottom-color: var(--a1-raise); }
 .raise-presets { display: flex; gap: 7px; }
+.raise-presets .preset[hidden] { display: none; }
 .raise-presets .preset {
   flex: 1; min-width: 0; min-height: 34px; padding: 0 6px;
   border: 1px solid var(--a1-line);
@@ -710,7 +711,7 @@ body {
   display: flex; align-items: center; justify-content: center;
 }
 /* Dialogs must stay above the mobile log/chat bottom sheet (z-index: 65). */
-#settings-overlay, #result-overlay { z-index: 90; }
+#settings-overlay, #result-overlay, #session-overlay { z-index: 90; }
 @keyframes popIn {
   from { transform: scale(.96); opacity: 0; }
   to { transform: none; opacity: 1; }
@@ -904,6 +905,26 @@ body.modal-open { overflow: hidden; }
 .timeline-action b { color: var(--a1-text-soft); font-weight: 600; }
 
 /* 本场战绩表 */
+#session-card {
+  background:var(--a1-surface); border:1px solid var(--a1-line-soft); border-radius:var(--a1-radius-md);
+  width:min(540px, 92vw); max-height:88vh; overflow-y:auto; overscroll-behavior:contain;
+  padding:20px; box-shadow:var(--a1-shadow-panel); text-align:left;
+}
+.session-head { position:sticky; top:-20px; z-index:2; display:flex; align-items:center; min-height:52px; margin:-20px -20px 0; padding:8px 64px 8px 20px; background:var(--a1-surface); border-bottom:1px solid var(--a1-line-soft); }
+.session-head h2 { margin:0; color:var(--a1-text); font-size:18px; }
+.session-head .result-close-top { right:20px; }
+#session-status, .session-note { margin:8px 0; color:var(--a1-muted); font-size:12px; line-height:1.5; }
+#session-list { display:grid; gap:8px; margin:12px 0; }
+.session-entry { min-width:0; padding:10px 12px; border:1px solid var(--a1-line-soft); border-radius:var(--a1-radius-sm); background:var(--a1-surface-quiet); }
+.session-player { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 10px; color:var(--a1-text); }
+.session-player b { overflow-wrap:anywhere; }
+.session-player span { color:var(--a1-muted); font-size:11px; }
+.session-entry dl { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:9px 0 0; }
+.session-entry dt { color:var(--a1-muted); font-size:11px; }
+.session-entry dd { margin:2px 0 0; color:var(--a1-text); font-size:13px; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.session-frozen { display:block; color:var(--a1-muted); font-size:11px; }
+.session-entry .pl-pos { color:#8fc7ad; }
+.session-entry .pl-neg { color:#dc9391; }
 #session-box { margin-top: 16px; text-align: left; }
 #session-box h3 { color: var(--a1-text-soft); font-size: 13px; margin-bottom: 8px; letter-spacing: 1px; }
 #session-table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
@@ -1408,11 +1429,11 @@ body.modal-open { overflow: hidden; }
   .lobby-card { max-width:100%; }
   #topbar { padding-left:max(10px,env(safe-area-inset-left,0px)); padding-right:max(10px,env(safe-area-inset-right,0px)); }
   #play-layout { padding-left:max(8px,env(safe-area-inset-left,0px)); padding-right:max(8px,env(safe-area-inset-right,0px)); padding-bottom:max(8px,env(safe-area-inset-bottom,0px)); }
-  #settings-overlay,#result-overlay,#conn-overlay {
+  #settings-overlay,#result-overlay,#session-overlay,#conn-overlay {
     top:var(--visible-top,0px); bottom:auto; height:var(--visible-height,100dvh);
     padding:10px max(10px,env(safe-area-inset-right,0px)) max(10px,env(safe-area-inset-bottom,0px)) max(10px,env(safe-area-inset-left,0px));
   }
-  #settings-card,#result-card { max-height:calc(var(--visible-height,100dvh) - 24px); overscroll-behavior:contain; }
+  #settings-card,#result-card,#session-card { max-height:calc(var(--visible-height,100dvh) - 24px); overscroll-behavior:contain; }
   .settings-actions { position:sticky; bottom:-24px; padding:10px 0; margin-bottom:-12px; background:var(--a1-surface); z-index:2; }
   #raise-panel { bottom:var(--keyboard-inset,0px); max-height:calc(var(--visible-height,100dvh) - 16px); overflow-y:auto; overscroll-behavior:contain; padding-left:max(16px,env(safe-area-inset-left,0px)); padding-right:max(16px,env(safe-area-inset-right,0px)); }
   #log-panel { bottom:var(--keyboard-inset,0px); max-height:calc(var(--visible-height,100dvh) - 12px); padding-left:max(14px,env(safe-area-inset-left,0px)); padding-right:max(14px,env(safe-area-inset-right,0px)); }
