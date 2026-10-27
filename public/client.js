@@ -1079,7 +1079,7 @@ function renderHeroSeat(me) {
       ${me.isDealer && state.stage !== 'waiting' ? '<span class="dealer-badge" title="庄家">D</span>' : ''}
       <img class="avatar-img" src="${avatarPng(me.seat)}" alt="我的头像" />${squidMarkHtml(me)}
       <div class="seat-copy">
-        <strong>${escapeHtml(me.name)}</strong>
+        <strong title="${escapeHtml(me.name)}">${escapeHtml(me.name)}</strong>
         ${me.frozen ? `<span class="seat-chips hero-balances"><span>可用 ${me.chips}</span><span class="hero-frozen">冻结 ${me.frozen}</span></span>` : `<span class="seat-chips">${me.chips}</span>`}
       </div>
       ${stateBadge ? `<span class="state-badge">${stateBadge}</span>` : ''}
@@ -1933,16 +1933,17 @@ function renderResults() {
 
 let tournamentClockTimer=null, tournamentTimeOffset=0, tournamentFinishShown='';
 function updateTournamentClock(){
-  const t=state?.tournament,el=document.getElementById('tournament-clock');
+  const t=state?.tournament,el=document.getElementById('tournament-clock'),compact=document.getElementById('tournament-clock-compact');
   if(!t)return;
-  if(t.status==='waiting'){el.textContent=`锦标赛 · ${t.intervalMinutes}分钟升盲 · 禁止补买`;return;}
-  if(t.status==='finished'){const winner=t.members.find(m=>m.status==='champion');el.textContent=winner?`锦标赛结束 · 冠军 ${winner.name}`:'锦标赛结束 · 无冠军';return;}
+  const show=(full,short=full)=>{el.textContent=full;compact.textContent=short;};
+  if(t.status==='waiting'){show(`锦标赛 · ${t.intervalMinutes}分钟升盲 · 禁止补买`);return;}
+  if(t.status==='finished'){const winner=t.members.find(m=>m.status==='champion');show(winner?`锦标赛结束 · 冠军 ${winner.name}`:'锦标赛结束 · 无冠军');return;}
   const current=`第${t.level}级 ${t.smallBlind}/${t.bigBlind}`;
   const seconds=t.nextAt?Math.max(0,Math.ceil((t.nextAt-(Date.now()+tournamentTimeOffset))/1000)):0;
   const remaining=`${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;
-  if(t.pendingLevel>t.level){el.textContent=`${current} · 下手第${t.pendingLevel}级 ${t.pendingBlinds.smallBlind}/${t.pendingBlinds.bigBlind}${t.nextAt?` · 再过${remaining}升盲`:''}`;return;}
-  if(!t.nextAt){el.textContent=`${current} · 盲注已封顶`;return;}
-  el.textContent=`${current} · 下档 ${t.upcoming.smallBlind}/${t.upcoming.bigBlind} · ${remaining} 后升盲，下手生效`;
+  if(t.pendingLevel>t.level){show(`${current} · 下手第${t.pendingLevel}级 ${t.pendingBlinds.smallBlind}/${t.pendingBlinds.bigBlind}${t.nextAt?` · 再过${remaining}升盲`:''}`,`${current}\n下手${t.pendingLevel}级 ${t.pendingBlinds.smallBlind}/${t.pendingBlinds.bigBlind}${t.nextAt?` · ${remaining}再升`:''}`);return;}
+  if(!t.nextAt){show(`${current} · 盲注已封顶`);return;}
+  show(`${current} · 下档 ${t.upcoming.smallBlind}/${t.upcoming.bigBlind} · ${remaining} 后升盲，下手生效`,`${current} · 下档 ${t.upcoming.smallBlind}/${t.upcoming.bigBlind}\n${remaining} 后升盲 · 下手生效`);
 }
 function openTournament(){
   tournamentOverlay.classList.remove('hidden');

@@ -907,6 +907,8 @@ body.modal-open { overflow: hidden; }
 /* 本场战绩表 */
 #tournament-bar { display:flex; align-items:center; justify-content:space-between; gap:6px; width:100%; font-size:11px; color:var(--a1-text-soft); }
 #tournament-clock { min-width:0; line-height:1.4; }
+.tournament-clock-copy { min-width:0; flex:1; }
+#tournament-clock-compact { display:none; }
 #btn-tournament-open { flex:none; }
 #tournament-card { background:var(--a1-surface); border:1px solid var(--a1-line-soft); border-radius:var(--a1-radius-md); width:min(480px,92vw); max-height:88vh; overflow-y:auto; overscroll-behavior:contain; padding:20px; text-align:left; box-shadow:var(--a1-shadow-panel); }
 #tournament-title { margin:0; font-size:18px; }
