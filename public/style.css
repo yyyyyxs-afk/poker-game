@@ -711,7 +711,7 @@ body {
   display: flex; align-items: center; justify-content: center;
 }
 /* Dialogs must stay above the mobile log/chat bottom sheet (z-index: 65). */
-#settings-overlay, #result-overlay, #session-overlay { z-index: 90; }
+#settings-overlay, #result-overlay, #session-overlay, #tournament-overlay { z-index: 90; }
 @keyframes popIn {
   from { transform: scale(.96); opacity: 0; }
   to { transform: none; opacity: 1; }
@@ -905,6 +905,14 @@ body.modal-open { overflow: hidden; }
 .timeline-action b { color: var(--a1-text-soft); font-weight: 600; }
 
 /* 本场战绩表 */
+#tournament-bar { display:flex; align-items:center; justify-content:space-between; gap:6px; width:100%; font-size:11px; color:var(--a1-text-soft); }
+#tournament-clock { min-width:0; line-height:1.4; }
+#btn-tournament-open { flex:none; }
+#tournament-card { background:var(--a1-surface); border:1px solid var(--a1-line-soft); border-radius:var(--a1-radius-md); width:min(480px,92vw); max-height:88vh; overflow-y:auto; overscroll-behavior:contain; padding:20px; text-align:left; box-shadow:var(--a1-shadow-panel); }
+#tournament-title { margin:0; font-size:18px; }
+#tournament-result-note { color:var(--a1-text-soft); font-size:13px; line-height:1.5; margin:12px 0; }
+.tournament-rank { display:flex; flex-wrap:wrap; gap:6px 12px; align-items:baseline; justify-content:space-between; padding:9px 4px; border-bottom:1px solid var(--a1-line-soft); font-size:13px; }
+.tournament-rank span { color:var(--a1-muted); font-size:12px; }
 #session-card {
   background:var(--a1-surface); border:1px solid var(--a1-line-soft); border-radius:var(--a1-radius-md);
   width:min(540px, 92vw); max-height:88vh; overflow-y:auto; overscroll-behavior:contain;
@@ -1429,11 +1437,11 @@ body.modal-open { overflow: hidden; }
   .lobby-card { max-width:100%; }
   #topbar { padding-left:max(10px,env(safe-area-inset-left,0px)); padding-right:max(10px,env(safe-area-inset-right,0px)); }
   #play-layout { padding-left:max(8px,env(safe-area-inset-left,0px)); padding-right:max(8px,env(safe-area-inset-right,0px)); padding-bottom:max(8px,env(safe-area-inset-bottom,0px)); }
-  #settings-overlay,#result-overlay,#session-overlay,#conn-overlay {
+  #settings-overlay,#result-overlay,#session-overlay,#tournament-overlay,#conn-overlay {
     top:var(--visible-top,0px); bottom:auto; height:var(--visible-height,100dvh);
     padding:10px max(10px,env(safe-area-inset-right,0px)) max(10px,env(safe-area-inset-bottom,0px)) max(10px,env(safe-area-inset-left,0px));
   }
-  #settings-card,#result-card,#session-card { max-height:calc(var(--visible-height,100dvh) - 24px); overscroll-behavior:contain; }
+  #settings-card,#result-card,#session-card,#tournament-card { max-height:calc(var(--visible-height,100dvh) - 24px); overscroll-behavior:contain; }
   .settings-actions { position:sticky; bottom:-24px; padding:10px 0; margin-bottom:-12px; background:var(--a1-surface); z-index:2; }
   #raise-panel { bottom:var(--keyboard-inset,0px); max-height:calc(var(--visible-height,100dvh) - 16px); overflow-y:auto; overscroll-behavior:contain; padding-left:max(16px,env(safe-area-inset-left,0px)); padding-right:max(16px,env(safe-area-inset-right,0px)); }
   #log-panel { bottom:var(--keyboard-inset,0px); max-height:calc(var(--visible-height,100dvh) - 12px); padding-left:max(14px,env(safe-area-inset-left,0px)); padding-right:max(14px,env(safe-area-inset-right,0px)); }

@@ -5,9 +5,9 @@ function paymentError(value){
   return Number.isSafeInteger(value)&&value>=1&&value<=MAX_PAYMENT?null:'每人支付额须为1–1,000,000的整数筹码';
 }
 function parseCreate(data){
-  if(Object.keys(data).some(k=>!['name','mode','settings','squidPayment'].includes(k)))return {err:'创建参数无效'};
+  if(Object.keys(data).some(k=>!['name','mode','settings','squidPayment','blindIntervalMinutes'].includes(k)))return {err:'创建参数无效'};
   const mode=data.mode===undefined?'classic':data.mode;
-  if(!['classic','squid'].includes(mode))return {err:'玩法无效'};
+  if(!['classic','squid','tournament'].includes(mode))return {err:'玩法无效'};
   if(data.settings!==undefined&&(!data.settings||typeof data.settings!=='object'||Array.isArray(data.settings)))return {err:'房间设置无效'};
   const source=data.settings||{};
   if(Object.keys(source).some(k=>!Object.hasOwn(DEFAULTS,k)))return {err:'房间设置字段无效'};
@@ -17,9 +17,13 @@ function parseCreate(data){
   if(!Number.isSafeInteger(sb)||!Number.isSafeInteger(bb)||sb<1||bb<sb||bb>Math.floor(sc/20))return {err:'盲注须为正整数，大盲≥小盲，起始筹码至少为大盲的20倍'};
   if(![20,30,45,60].includes(at)||![5,10,20].includes(nh))return {err:'行动/局间时长无效'};
   if(typeof rb!=='boolean'||typeof locked!=='boolean')return {err:'重买/锁房设置无效'};
-  if(mode==='classic'&&data.squidPayment!==undefined)return {err:'经典德州不使用鱿鱼支付设置'};
+  if(mode!=='squid'&&data.squidPayment!==undefined)return {err:'该玩法不使用鱿鱼支付设置'};
+  if(mode!=='tournament'&&data.blindIntervalMinutes!==undefined)return {err:'该玩法不使用锦标赛升盲设置'};
+  const blindIntervalMinutes=data.blindIntervalMinutes===undefined?10:data.blindIntervalMinutes;
+  if(mode==='tournament'&&![5,10,15].includes(blindIntervalMinutes))return {err:'升盲间隔仅支持5、10或15分钟'};
   const payment=data.squidPayment===undefined?bb:data.squidPayment;
   if(mode==='squid'&&paymentError(payment))return {err:paymentError(payment)};
-  return {mode,settings,payment};
+  if(mode==='tournament')settings.rebuyAllowed=false;
+  return {mode,settings,payment,blindIntervalMinutes};
 }
 module.exports={DEFAULTS,MAX_PAYMENT,paymentError,parseCreate};

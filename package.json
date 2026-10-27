@@ -20,6 +20,7 @@
     "test:room-connection": "node test/room-connection.test.js && node test/room-connection.integration.test.js",
     "test:squid": "node test/squid.test.js",
     "test:mode-config": "node test/mode-config.test.js",
+    "test:tournament": "node test/tournament.test.js",
     "test:smoke": "node test/smoke.test.js"
   },
   "engines": {
