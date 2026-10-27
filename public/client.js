@@ -61,6 +61,7 @@ renderSoundBtn();
 const menuBtn = document.getElementById('btn-menu');
 const menuDropdown = document.getElementById('menu-dropdown');
 const sessionOverlay = document.getElementById('session-overlay');
+const tournamentOverlay = document.getElementById('tournament-overlay');
 function closeMenu() {
   menuDropdown.classList.add('hidden');
   menuBtn.setAttribute('aria-expanded', 'false');
@@ -148,7 +149,7 @@ function getModalFocusableElements(overlay) {
 }
 
 function getTopOpenModal() {
-  const overlays = [settingsOverlay, resultOverlay, sessionOverlay, rulesOverlay]
+  const overlays = [settingsOverlay, resultOverlay, sessionOverlay, tournamentOverlay, rulesOverlay]
     .filter((overlay) => overlay && isVisibleAndEnabled(overlay));
   return overlays.reduce((top, candidate) => {
     if (!top) return candidate;
@@ -191,6 +192,7 @@ function handleModalKeyboard(event) {
     if (activeModal === rulesOverlay) closeRules();
     else if (activeModal === resultOverlay) closeResultDetail();
     else if (activeModal === sessionOverlay) closeSession();
+    else if (activeModal === tournamentOverlay) closeTournament();
     else if (activeModal === settingsOverlay) closeSettings();
     return;
   }
@@ -363,9 +365,9 @@ document.getElementById('create-options').onsubmit = event => {
   const name = getName();
   if (!name) return;
   if(!validateCreateFields())return;
-  const settings={startChips:Number(document.getElementById('create-chips').value),smallBlind:Number(document.getElementById('create-sb').value),bigBlind:Number(document.getElementById('create-bb').value),actionTime:Number(document.getElementById('create-action').value),nextHandDelay:Number(document.getElementById('create-delay').value),rebuyAllowed:document.getElementById('create-rebuy').value==='true'};
   const mode=selectedCreateMode();
-  sendLobbyRequest('create', { name,mode,settings,...(mode==='squid'?{squidPayment:Number(document.getElementById('create-payment').value)}:{}) }, {success:res=>{
+  const settings={startChips:Number(document.getElementById('create-chips').value),smallBlind:Number(document.getElementById('create-sb').value),bigBlind:Number(document.getElementById('create-bb').value),actionTime:Number(document.getElementById('create-action').value),nextHandDelay:Number(document.getElementById('create-delay').value),rebuyAllowed:mode!=='tournament'&&document.getElementById('create-rebuy').value==='true'};
+  sendLobbyRequest('create', { name,mode,settings,...(mode==='squid'?{squidPayment:Number(document.getElementById('create-payment').value)}:{}),...(mode==='tournament'?{blindIntervalMinutes:Number(document.getElementById('create-blind-interval').value)}:{}) }, {success:res=>{
       saveAuth(res.code, name, res.token);
       enterRoom(res.code);
   },rejected:res=>showLobbyError(res.err||'创建被拒绝，请检查资料。')});
@@ -390,10 +392,12 @@ joinRoomBtn.onclick=()=>{
   sendLobbyRequest('preview',{code},{success:res=>{
     if(document.getElementById('room-code').value.trim().toUpperCase()!==code)return;
     previewCode=code;
-    const info=res.info,c=info.settings,isSquid=info.mode==='squid';
+    const info=res.info,c=info.settings,isSquid=info.mode==='squid',isTournament=info.mode==='tournament';
     document.getElementById('preview-room-code').textContent=code;
-    document.getElementById('join-preview-title').textContent=isSquid?'加入鱿鱼德州':'加入经典德州';
-    document.getElementById('join-mode-meta').textContent=isSquid?'普通52张德州＋经典鱿鱼 · 3–6人':'普通52张无限注德州 · 2–6人';
+    document.getElementById('join-preview-title').textContent=isSquid?'加入鱿鱼德州':isTournament?'加入单桌锦标赛':'加入经典德州';
+    document.getElementById('join-mode-meta').textContent=isSquid?'普通52张德州＋经典鱿鱼 · 3–6人':isTournament?'定时升盲、淘汰争冠 · 2–6人':'普通52张无限注德州 · 2–6人';
+    document.getElementById('join-tournament-note').classList.toggle('hidden',!isTournament);
+    document.getElementById('join-tournament-note').textContent=isTournament?`每${info.blindIntervalMinutes}分钟升盲；禁止补买，开赛后不接受新入座，服务器重启不保留赛事。`:'';
     document.getElementById('join-start-chips').textContent=c.startChips.toLocaleString('zh-CN');
     document.getElementById('join-blinds').textContent=`${c.smallBlind} / ${c.bigBlind}`;
     document.getElementById('join-tempo').textContent=`${c.actionTime}秒行动 · ${c.nextHandDelay}秒局间 · ${c.rebuyAllowed?'允许':'禁止'}重买`;
@@ -442,16 +446,18 @@ document.getElementById('btn-create-back').onclick=()=>showCreateOptions(false);
 document.getElementById('btn-create-cancel').onclick=()=>showCreateOptions(false);
 let createPaymentTouched=false;
 function renderCreateOptions(){
-  const isSquid=selectedCreateMode()==='squid';
+  const mode=selectedCreateMode(),isSquid=mode==='squid',isTournament=mode==='tournament';
   lobbyCard.classList.toggle('classic',!isSquid);
   document.getElementById('create-squid-settings').classList.toggle('hidden',!isSquid);
+  document.getElementById('create-tournament-settings').classList.toggle('hidden',!isTournament);
+  document.getElementById('create-rebuy-row').classList.toggle('hidden',isTournament);
   document.getElementById('create-mode-tip').textContent='玩法创建后固定，入房后不能切换。';
   const p=Number(document.getElementById('create-payment').value);
   const total=Number.isSafeInteger(p)&&p>=1&&p<=1000000?(3*p).toLocaleString('zh-CN'):'—';
   document.getElementById('preview-total').textContent=total;
   document.getElementById('preview-frozen').textContent=total;
   document.querySelectorAll('[data-payment]').forEach(b=>b.setAttribute('aria-pressed',String(Number(b.dataset.payment)===p)));
-  document.getElementById('advanced-summary').textContent=`${document.getElementById('create-action').value}秒行动 · ${document.getElementById('create-delay').value}秒局间 · ${document.getElementById('create-rebuy').value==='true'?'允许':'禁止'}重买`;
+  document.getElementById('advanced-summary').textContent=`${document.getElementById('create-action').value}秒行动 · ${document.getElementById('create-delay').value}秒局间 · ${isTournament?'禁止':document.getElementById('create-rebuy').value==='true'?'允许':'禁止'}重买`;
 }
 document.getElementById('create-mode').onchange=renderCreateOptions;
 document.getElementById('create-bb').oninput=()=>{if(!createPaymentTouched)document.getElementById('create-payment').value=document.getElementById('create-bb').value;renderCreateOptions();};
@@ -601,6 +607,8 @@ const leaveBtn = document.getElementById('btn-leave');
 let leavingRoom = false;
 leaveBtn.onclick = () => {
   if (leavingRoom) return;
+  const participant=state?.tournament?.members.find(m=>m.name===state.players[mySeat]?.name);
+  if(state?.tournament?.status==='running'&&participant?.status==='active'&&!confirm('退出将作为退赛，已投入筹码留在底池，剩余筹码退出赛事，不能重新参赛。确定退出？'))return;
   leavingRoom = true;
   leaveBtn.disabled = true;
   leaveBtn.textContent = '退出中…';
@@ -667,6 +675,9 @@ settingsBtn.onclick = () => {
   document.getElementById('set-action-time').value = String(state.settings.actionTime || 45);
   document.getElementById('set-next-hand').value = String(state.settings.nextHandDelay || 20);
   document.getElementById('set-rebuy').value = String(state.settings.rebuyAllowed !== false);
+  document.getElementById('set-rebuy-row').classList.toggle('hidden',state.mode==='tournament');
+  document.getElementById('set-blind-interval-row').classList.toggle('hidden',state.mode!=='tournament');
+  if(state.tournament)document.getElementById('set-blind-interval').value=String(state.tournament.intervalMinutes);
   document.getElementById('set-locked').value = String(!!state.settings.locked);
   document.getElementById('settings-error').textContent = '';
   settingsOverlay.classList.remove('hidden');
@@ -682,15 +693,17 @@ function closeSettings() {
 document.getElementById('btn-settings-close').onclick = closeSettings;
 document.getElementById('btn-settings-save').onclick = saveSettings;
 function saveSettings() {
+  const chipsValue=id=>state.mode==='tournament'?Number(document.getElementById(id).value):parseInt(document.getElementById(id).value,10);
   const payload = {
-    startChips: parseInt(document.getElementById('set-start-chips').value, 10),
-    smallBlind: parseInt(document.getElementById('set-sb').value, 10),
-    bigBlind: parseInt(document.getElementById('set-bb').value, 10),
+    startChips: chipsValue('set-start-chips'),
+    smallBlind: chipsValue('set-sb'),
+    bigBlind: chipsValue('set-bb'),
     actionTime: parseInt(document.getElementById('set-action-time').value, 10),
     nextHandDelay: parseInt(document.getElementById('set-next-hand').value, 10),
-    rebuyAllowed: document.getElementById('set-rebuy').value === 'true',
+    rebuyAllowed: state.mode!=='tournament' && document.getElementById('set-rebuy').value === 'true',
     locked: document.getElementById('set-locked').value === 'true',
   };
+  if(state.mode==='tournament')payload.blindIntervalMinutes=Number(document.getElementById('set-blind-interval').value);
   socket.emit('update_settings', payload, (res) => {
     if (res.ok) {
       closeSettings();
@@ -770,6 +783,7 @@ function render() {
     renderIdentityControls();
     renderNextHandStatus();
     renderResults();
+    renderTournament();
     if (!sessionOverlay.classList.contains('hidden')) renderSession();
     renderSquid();
     // 手牌、操作区和冻结提示都会影响桌面高度；全部更新后再量下注坐标。
@@ -855,7 +869,7 @@ function renderTableInfo() {
   const settingsBtn = document.getElementById('btn-settings');
   if (settingsBtn) {
     settingsBtn.classList.toggle(
-      'hidden', !(state.stage === 'waiting' && state.isHost));
+      'hidden', !(state.stage === 'waiting' && state.isHost && (!state.tournament || state.tournament.status==='waiting')));
   }
   const inviteBtn = document.getElementById('btn-invite');
   if (inviteBtn) inviteBtn.classList.toggle('hidden', state.stage !== 'waiting');
@@ -1025,7 +1039,7 @@ function renderSeats() {
     wrap.appendChild(div);
 
     // 房主踢人按钮：在非自己、非已离开的座位上显示
-    if (state.isHost && p.seat !== mySeat && !p.left) {
+    if (state.isHost && p.seat !== mySeat && !p.left && (!state.tournament || state.tournament.status==='waiting')) {
       const kickBtn = document.createElement('button');
       kickBtn.className = 'kick-btn';
       kickBtn.textContent = '踢出';
@@ -1298,7 +1312,7 @@ function renderMyArea() {
   rebuyBtn.classList.toggle('hidden', !showRebuy);
   rebuyBtn.textContent = `重新买入（补充 ${cfg().startChips} 筹码）`;
   // 暂离/坐回按钮：对局中或局间都可以暂离；暂离状态显示坐回按钮
-  const showSitOut = me && !me.sittingOut && ['waiting', 'handover', 'preflop', 'flop', 'turn', 'river'].includes(state.stage) && !state.gameOver;
+  const showSitOut = !state.tournament && me && !me.sittingOut && ['waiting', 'handover', 'preflop', 'flop', 'turn', 'river'].includes(state.stage) && !state.gameOver;
   const showSitBack = me && me.sittingOut;
   sitOutBtn.classList.toggle('hidden', !showSitOut);
   sitBackBtn.classList.toggle('hidden', !showSitBack);
@@ -1339,7 +1353,9 @@ function renderMyArea() {
     hint.classList.add('hidden');
     hideRaisePanel();
     stopTurnTimer();
-    if (inHandActive) tip.textContent = '等待其他玩家行动…';
+    const tournamentMember=state.tournament?.members.find(m=>m.name===me?.name);
+    if(tournamentMember?.status==='eliminated')tip.textContent='你已淘汰，可查看比赛进度和名次。';
+    else if (inHandActive) tip.textContent = '等待其他玩家行动…';
     else if (me && (me.folded || me.allIn) && state.stage !== 'handover') {
       tip.textContent = me.folded ? '你已弃牌，观战中' : '你已全押，等待摊牌';
     } else if (state.stage !== 'waiting') tip.textContent = '';
@@ -1791,19 +1807,19 @@ function renderResults() {
     return;
   }
   document.getElementById('result-title').textContent =
-    `${isCurrentResult ? '' : `第 ${r.handNumber} 局 · `}${r.forfeit ? '其余玩家全部弃牌' : '摊牌结算'}`;
+    `${isCurrentResult ? '' : `第 ${r.handNumber} 局 · `}${r.noWinner?'本手无赢家':r.forfeit ? '其余玩家全部弃牌' : '摊牌结算'}`;
 
   // 第一层：牌桌直显横幅（主池赢家 + 赢取金额 + 牌型）
   const mainPot = r.pots[0];
   const winnerNames = mainPot.winners.map((w) => escapeHtml(w.name)).join('、');
-  const winnerHand = mainPot.winners[0].handName
+  const winnerHand = mainPot.winners[0]?.handName
     ? escapeHtml(mainPot.winners[0].handName) : '对手全部弃牌';
-  const mainPotWinnerAmount = Number.isFinite(mainPot.winners[0].amountWon)
+  const mainPotWinnerAmount = Number.isFinite(mainPot.winners[0]?.amountWon)
     ? mainPot.winners[0].amountWon : mainPot.amount;
   const potName = r.pots.length > 1 ? '主池' : '底池';
   const mainPotAmountLabel = mainPot.winners.length > 1 ? `${potName}合计分得` : `分得${potName}`;
   if (isCurrentResult) {
-    winnerBanner.innerHTML = `<b>${winnerNames}</b><span class="winner-amount">${mainPotAmountLabel} <em>+${mainPot.winners.length > 1 ? mainPot.amount : mainPotWinnerAmount}</em></span>` +
+    winnerBanner.innerHTML = r.noWinner?'本手无赢家，投入已退回':`<b>${winnerNames}</b><span class="winner-amount">${mainPotAmountLabel} <em>+${mainPot.winners.length > 1 ? mainPot.amount : mainPotWinnerAmount}</em></span>` +
       `<span class="winner-hand">${winnerHand}${r.pots.length > 1 ? ` · 另有 ${r.pots.length - 1} 个边池分别结算` : ''}</span>`;
     winnerBanner.classList.remove('hidden');
   } else {
@@ -1814,7 +1830,7 @@ function renderResults() {
   resultOverlay.classList.toggle('hidden', !resultDetailOpen); // 第二层仅在主动查看时显示
   document.getElementById('result-overview').textContent =
     `本局底池合计 ${PokerExplanations.number(r.pots.reduce((sum, pot) => sum + pot.amount, 0))} 筹码。` +
-    (r.forfeit ? '其他玩家全部弃牌，无需亮牌即可获胜。' : r.pots.length > 1
+    (r.noWinner ? '本手无人有资格获胜，各人投入已退回。' : r.forfeit ? '其他玩家全部弃牌，无需亮牌即可获胜。' : r.pots.length > 1
       ? '主池、边池各自比较有资格玩家的牌力，赢家可以不同。' : '摊牌按最佳五张比较，同牌力时平分。') +
     '底池分得含本人投入，实际输赢看净盈亏。';
 
@@ -1859,6 +1875,7 @@ function renderResults() {
     };
     row.innerHTML = `
       <div class="pot-label">${label} · ${PokerExplanations.number(pot.amount)} 筹码${pot.winners.length > 1 ? ' · 平分' : ''}</div>
+      ${r.noWinner ? `<p class="pot-explanation">无人获胜；${(r.refunds||[]).map(e=>`${escapeHtml(e.name)} 退回 ${PokerExplanations.number(e.amount)}`).join('、')}。</p>` : ''}
       ${i > 0 ? '<p class="pot-explanation">较多投入形成的独立底池，只在有资格参与本池的玩家间结算。</p>' : ''}
       ${pot.winners.length > 1 ? '<p class="pot-explanation">下方为各人实分金额；零头筹码从庄家左侧赢家起分配。</p>' : ''}
       ${pot.winners.map((w) => `
@@ -1887,6 +1904,7 @@ function renderResults() {
     clearInterval(countdownTimer);
     countdown = cfg().nextHandDelay || 20;
     countdownTimer = setInterval(() => {
+      if(state.gameOver){nextTip.textContent=state.tournament?'锦标赛已结束，可查看比赛名次。':'游戏结束！刷新页面可开新房间。';return;}
       if (state.nextHandPaused) { nextTip.textContent = '下一局已暂停，等待房主恢复'; return; }
       countdown = state.nextHandDeadline ? Math.max(0, Math.ceil((state.nextHandDeadline - Date.now()) / 1000)) : 0;
       if (countdown <= 0) { nextTip.textContent = state.nextHandDeadline ? '正在开始下一局…' : '等待可参与玩家或重买后继续'; }
@@ -1901,16 +1919,61 @@ function renderResults() {
   nextTip.classList.toggle('hidden', !isCurrentResult);
   if (!isCurrentResult) {
     nextBtn.classList.add('hidden');
+  } else if (state.gameOver) {
+    nextTip.textContent = state.tournament?'锦标赛已结束，可查看比赛名次。':'游戏结束！刷新页面可开新房间。';
+    nextBtn.classList.add('hidden');
   } else if (state.nextHandPaused) {
     nextTip.textContent = '下一局已暂停，等待房主恢复';
-    nextBtn.classList.add('hidden');
-  } else if (state.gameOver) {
-    nextTip.textContent = '游戏结束！刷新页面可开新房间。';
     nextBtn.classList.add('hidden');
   } else {
     nextTip.textContent = state.nextHandDeadline ? `${Math.max(0, Math.ceil((state.nextHandDeadline - Date.now()) / 1000))} 秒后自动开始下一局…` : '等待可参与玩家或重买后继续';
     nextBtn.classList.toggle('hidden', !state.isHost);
   }
+}
+
+let tournamentClockTimer=null, tournamentTimeOffset=0, tournamentFinishShown='';
+function updateTournamentClock(){
+  const t=state?.tournament,el=document.getElementById('tournament-clock');
+  if(!t)return;
+  if(t.status==='waiting'){el.textContent=`锦标赛 · ${t.intervalMinutes}分钟升盲 · 禁止补买`;return;}
+  if(t.status==='finished'){const winner=t.members.find(m=>m.status==='champion');el.textContent=winner?`锦标赛结束 · 冠军 ${winner.name}`:'锦标赛结束 · 无冠军';return;}
+  const current=`第${t.level}级 ${t.smallBlind}/${t.bigBlind}`;
+  const seconds=t.nextAt?Math.max(0,Math.ceil((t.nextAt-(Date.now()+tournamentTimeOffset))/1000)):0;
+  const remaining=`${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;
+  if(t.pendingLevel>t.level){el.textContent=`${current} · 下手第${t.pendingLevel}级 ${t.pendingBlinds.smallBlind}/${t.pendingBlinds.bigBlind}${t.nextAt?` · 再过${remaining}升盲`:''}`;return;}
+  if(!t.nextAt){el.textContent=`${current} · 盲注已封顶`;return;}
+  el.textContent=`${current} · 下档 ${t.upcoming.smallBlind}/${t.upcoming.bigBlind} · ${remaining} 后升盲，下手生效`;
+}
+function openTournament(){
+  tournamentOverlay.classList.remove('hidden');
+  document.getElementById('btn-tournament-close').focus();
+}
+function closeTournament(){
+  if(tournamentOverlay.classList.contains('hidden'))return;
+  tournamentOverlay.classList.add('hidden');
+  restoreModalFocus(document.getElementById('btn-tournament-open'),[menuBtn]);
+}
+document.getElementById('btn-tournament-open').addEventListener('click',openTournament);
+document.getElementById('btn-tournament-close').addEventListener('click',closeTournament);
+tournamentOverlay.addEventListener('click',event=>{if(event.target===tournamentOverlay)closeTournament();});
+function renderTournament(){
+  const t=state.tournament,bar=document.getElementById('tournament-bar');
+  bar.classList.toggle('hidden',!t);
+  if(!t){clearInterval(tournamentClockTimer);tournamentClockTimer=null;tournamentOverlay.classList.add('hidden');return;}
+  tournamentTimeOffset=t.serverNow-Date.now();
+  updateTournamentClock();
+  if(t.status==='running'&&!tournamentClockTimer)tournamentClockTimer=setInterval(updateTournamentClock,1000);
+  if(t.status!=='running'){clearInterval(tournamentClockTimer);tournamentClockTimer=null;}
+  const winner=t.members.find(m=>m.status==='champion');
+  document.getElementById('tournament-result-note').textContent=t.status==='finished'?(winner?`比赛结束，冠军：${winner.name}`:'比赛结束，所有参赛者退赛，无冠军。'):'比赛中；开赛后禁止补买和新入座。暂停下一手不暂停升盲时钟。';
+  const members=[...t.members].sort((a,b)=>(a.rank??0)-(b.rank??0));
+  document.getElementById('tournament-rankings').innerHTML=members.length?members.map(m=>{
+    const rank=m.rank?`第${m.rank}名`:'比赛中';
+    const status=m.status==='champion'?'冠军':m.status==='eliminated'?'已淘汰':m.status==='withdrawn'?`退赛 · 剩余 ${PokerExplanations.number(m.withdrawnChips)} 筹码退出赛事`:'';
+    return `<div class="tournament-rank"><b>${escapeHtml(m.name)}</b><span>${rank}${status?` · ${status}`:''}</span></div>`;
+  }).join(''):'尚未开赛。';
+  const finishKey=`${state.code}:${state.handNumber}`;
+  if(t.status==='finished'&&tournamentFinishShown!==finishKey){tournamentFinishShown=finishKey;openTournament();}
 }
 
 function openSession() {
@@ -2089,10 +2152,10 @@ function showEmojiBubble(seat, emoji) {
 function renderNextHandStatus() {
   const paused = !!state.nextHandPaused;
   const btn = document.getElementById('btn-pause-next');
-  btn.classList.toggle('hidden', !state.isHost);
+  btn.classList.toggle('hidden', !state.isHost || state.tournament?.status==='finished');
   btn.textContent = paused ? '恢复下一局' : '暂停下一局';
   btn.setAttribute('aria-pressed', String(paused));
-  document.getElementById('next-hand-status').textContent = isForfeitIntermission() ? forfeitStatus() : (paused ? '下一局已暂停，当前手照常进行' : '');
+  document.getElementById('next-hand-status').textContent = state.tournament?.status==='finished'?'锦标赛已结束':isForfeitIntermission() ? forfeitStatus() : (paused ? `下一局已暂停，当前手照常进行${state.tournament?'；升盲时钟继续':''}` : '');
   const settled = ['waiting', 'handover'].includes(state.stage);
   document.getElementById('btn-export-session').disabled = !settled;
   document.getElementById('btn-session-export').disabled = !settled;
@@ -2161,6 +2224,7 @@ document.getElementById('winner-show-controls').onclick = e => {
 
 function isForfeitIntermission() { return state && state.stage === 'handover' && state.results && state.results.forfeit; }
 function forfeitStatus() {
+  if(state.tournament?.status==='finished')return '锦标赛已结束';
   if (state.nextHandPaused) return '下一局已暂停';
   if (state.nextHandDeadline) return `下一局 ${Math.max(0, Math.ceil((state.nextHandDeadline-Date.now())/1000))} 秒`;
   return '等待玩家就绪';
@@ -2243,8 +2307,8 @@ function renderSquid(){
     roomPayment.dataset.saved=String(s.payment);
   }
   document.getElementById('squid-current-setting').textContent=s.current?`本轮向每人支付${s.current.payment}；下轮向每人支付${s.payment}。保存只改变下轮，本轮冻结和标记不变。`:`下轮向每人支付${s.payment}筹码。`;
-  document.querySelector('#room-setup summary').textContent=state.mode==='squid'?'鱿鱼德州 · 房间设置':'经典德州 · 房间设置';
-  document.getElementById('room-mode-info').textContent=state.mode==='squid'?'普通52张德州＋经典鱿鱼，3–6人。主池独赢得标记；一轮最多发人数−1个，最后未得标记者支付。玩法固定。':'普通52张德州扑克，2–6人。玩法固定。';
+  document.querySelector('#room-setup summary').textContent=state.mode==='squid'?'鱿鱼德州 · 房间设置':state.tournament?'单桌锦标赛 · 房间设置':'经典德州 · 房间设置';
+  document.getElementById('room-mode-info').textContent=state.mode==='squid'?'普通52张德州＋经典鱿鱼，3–6人。主池独赢得标记；一轮最多发人数−1个，最后未得标记者支付。玩法固定。':state.tournament?'单桌锦标赛，禁止补买和开赛后新入座。暂停下一手时升盲时钟继续；服务器重启不保留赛事。':'普通52张德州扑克，2–6人。玩法固定。';
   const c=cfg();
   document.getElementById('room-settings-info').textContent=`起始${c.startChips} · 盲注${c.smallBlind}/${c.bigBlind} · 行动${c.actionTime}秒 · 局间${c.nextHandDelay}秒 · ${c.rebuyAllowed===false?'禁止':'允许'}重买`;
   const preview=document.getElementById('room-payment-preview'),n=state.players.filter(p=>p.connected&&!p.sittingOut&&!p.left).length;

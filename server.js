@@ -5,6 +5,7 @@
  * 流程：发牌 -> 翻牌前 -> 翻牌 -> 转牌 -> 河牌 -> 摊牌（含边池分配）
  */
 const squid = require('./squid');
+const tournament = require('./tournament');
 const {parseCreate,paymentError}=require('./room-config');
 const express = require('express');
 const http = require('http');
@@ -264,7 +265,7 @@ function addLog(room, msg) {
 }
 
 function canAct(p) {
-  return p && !p.folded && !p.allIn && p.connected && p.chips > 0 && p.inHand && !p.sittingOut;
+  return p && !p.left && !p.folded && !p.allIn && (p.connected || p.tournamentIndex != null) && p.chips > 0 && p.inHand && !p.sittingOut;
 }
 
 /**
@@ -314,6 +315,7 @@ function pay(p, amount) {
 
 // ---------------- 一局流程 ----------------
 function startHand(room) {
+  if (room.tournament?.status === 'finished') return {ok:false,err:'锦标赛已结束，不能继续发牌'};
   if (room.stage === 'handover' && room.nextHandPaused) return;
   const waitingReason = squid.check(room);
   if (waitingReason) { broadcast(room); return { ok:false, err:waitingReason }; }
@@ -324,7 +326,8 @@ function startHand(room) {
   // compactLeftPlayers 会在压缩前保存庄家锚点，避免离场导致庄家/盲注错位。
   compactLeftPlayers(room);
   // 可参与本局的玩家：有筹码、未暂离、已连接
-  const playable = room.players.filter((p) => p && p.chips > 0 && !p.sittingOut && p.connected);
+  const tournamentRunning=room.tournament?.status==='running';
+  const playable = room.players.filter((p) => p && p.chips > 0 && !p.sittingOut && (p.connected || tournamentRunning));
   if (playable.length < MIN_PLAYERS) {
     // 凑不齐人进入等待时也必须先清掉上一局残留状态：
     // 此时赢家筹码已经发放，若 totalBet 还挂着不清，广播出的 waiting
@@ -358,6 +361,14 @@ function startHand(room) {
   if (squidReason) { broadcast(room); return { ok:false, err:squidReason }; }
   if (room.players.length > MAX_PLAYERS) room.players = room.players.slice(0, MAX_PLAYERS);
 
+  if (room.tournament) {
+    const now=Date.now();
+    if (room.tournament.status==='waiting') tournament.start(room.tournament, playable, now);
+    room.tournament.appliedLevel=tournament.levelAt(room.tournament,now);
+    Object.assign(room.settings,tournament.blindsAt(room.tournament,room.tournament.appliedLevel));
+    armTournamentClock(room);
+  }
+
   const sbAmt = room.settings.smallBlind;
   const bbAmt = room.settings.bigBlind;
   room.handNumber++;
@@ -378,7 +389,7 @@ function startHand(room) {
     // 必须在扣除盲注前记录，才能反映这一整手的真实盈亏。
     p.handStartChips = squid.estate(p);
     // 暂离或 0 筹码玩家不参与本局
-    if (p.sittingOut || p.chips <= 0 || !p.connected) {
+    if (p.sittingOut || p.chips <= 0 || (!p.connected && !tournamentRunning)) {
       p.inHand = false;
       p.folded = true;
     } else {
@@ -404,7 +415,7 @@ function startHand(room) {
   });
 
   // 庄家位轮转（跳过暂离/0筹码/未连接的玩家）
-  const isPlayable = (p) => p && !p.left && !p.sittingOut && p.chips > 0 && p.connected;
+  const isPlayable = (p) => p && !p.left && !p.sittingOut && p.chips > 0 && (p.connected || tournamentRunning);
   room.dealerSeat = room.handNumber === 1
     ? room.players.findIndex(isPlayable)
     : nextSeat(room, room.dealerSeat, isPlayable);
@@ -412,7 +423,7 @@ function startHand(room) {
   // 盲注位：单挑时庄家是小盲；多人时庄家下一位小盲、再下一位大盲
   const n = room.players.length;
   let sbSeat, bbSeat;
-  if (n === 2) {
+  if (room.tournament ? playable.length === 2 : n === 2) {
     sbSeat = room.dealerSeat;
     bbSeat = nextSeat(room, sbSeat, isPlayable);
   } else {
@@ -442,7 +453,11 @@ function startHand(room) {
   );
   sbP.isSB = true; bbP.isBB = true;
 
-  buildQueueFrom(room, nextSeat(room, bbSeat, canAct));
+  const actors=room.players.filter(canAct);
+  if(room.tournament&&actors.length===1&&actors[0].roundBet>=room.currentBet){
+    // 对手盲注已全押且唯一可行动者无需跟注时，没有可供对手回应的下注。
+    setTurn(room,-1); nextStreet(room);
+  }else buildQueueFrom(room, nextSeat(room, bbSeat, canAct));
 
   broadcast(room);
   armTurnTimer(room);
@@ -484,6 +499,7 @@ function nextStreet(room) {
   streetBetsToPot(room);
 
   const alive = room.players.filter((p) => p && !p.folded && p.inHand);
+  if(alive.length===0&&room.tournament){consumeQueueAndAdvance(room,-1);return;}
   if (alive.length <= 1) { showdown(room); return; }
 
   if (room.stage === 'preflop') {
@@ -622,6 +638,15 @@ function applyAction(room, seat, action, amount, opts = {}) {
 function consumeQueueAndAdvance(room, actedSeat) {
   room.queue = room.queue.filter((s) => s !== actedSeat);
   const alive = room.players.filter((p) => p && !p.folded && p.inHand);
+
+  if(alive.length===0&&room.tournament){
+    streetBetsToPot(room);
+    const refunds=room.players.filter(p=>p&&p.totalBet>0).map(p=>({name:p.name,amount:p.totalBet}));
+    room.players.forEach(p=>{if(p)p.chips+=p.totalBet||0;});
+    room.results={pots:[{amount:room.pot,winners:[]}],forfeit:false,noWinner:true,refunds};
+    addLog(room,'本手无有效玩家，投入筹码退回各自账户');
+    endHand(room); return;
+  }
 
   if (alive.length === 1) {
     // 其余全部弃牌，直接赢池
@@ -815,10 +840,86 @@ function endHand(room) {
       }));
     room.lastResult = room.results;
   }
+  if (room.tournament?.status==='running') finishTournamentRound(room);
   // 对局中明确离开的玩家为维持座位索引暂留到本手结束；结算完成后再固化战绩。
   room.players.forEach((p) => { if (p && p.left) bankSession(room, p); });
   scheduleNextHandIfReady(room);
   scheduleRetainedRoomCleanup(room);
+  broadcast(room);
+}
+
+// 盲注时间只用于确定下一手级别；广播不修改当前手的下注条件。
+function armTournamentClock(room) {
+  const t=room.tournament;
+  if(!t)return;
+  clearTimeout(t.blindTimer); t.blindTimer=null;
+  if(t.status!=='running')return;
+  const next=tournament.snapshot(t,Date.now()).nextAt;
+  if(next===null)return;
+  t.blindTimer=setTimeout(()=>{
+    t.blindTimer=null;
+    if(rooms.get(room.code)!==room||t.status!=='running')return;
+    broadcast(room); armTournamentClock(room);
+  },Math.max(1,next-Date.now()));
+  t.blindTimer.unref();
+}
+function clearTournamentTimers(room) {
+  if(!room.tournament)return;
+  clearTimeout(room.tournament.blindTimer); room.tournament.blindTimer=null;
+  room.players.forEach(p=>{if(p){clearTimeout(p.tournamentOfflineTimer);p.tournamentOfflineTimer=null;p.tournamentOfflineDeadline=null;}});
+}
+function finishTournamentRound(room) {
+  const t=room.tournament;
+  const finished=tournament.settle(t,room.players,room.handNumber,Date.now());
+  room.players.forEach(p=>{if(p&&t.members[p.tournamentIndex]?.status!=='active'){clearTimeout(p.tournamentOfflineTimer);p.tournamentOfflineTimer=null;p.tournamentOfflineDeadline=null;}});
+  if(finished){
+    room.gameOver=true; clearTournamentTimers(room);
+    const champion=t.members.find(m=>m.status==='champion');
+    if(champion)addLog(room,`锦标赛冠军：${champion.name}`);
+    else addLog(room,'锦标赛结束，全部参赛者退赛，无冠军');
+  }
+}
+function scheduleTournamentRetirement(room,p) {
+  if(room.tournament?.status!=='running'||p.tournamentIndex==null||room.tournament.members[p.tournamentIndex]?.status!=='active')return;
+  clearTimeout(p.tournamentOfflineTimer);
+  p.tournamentOfflineDeadline=Date.now()+10*60*1000;
+  const expire=()=>{
+    p.tournamentOfflineTimer=null;
+    if(rooms.get(room.code)!==room||room.tournament?.status!=='running')return;
+    const now=Date.now();
+    const expired=room.players.filter(x=>x&&!x.connected&&!x.left&&room.tournament.members[x.tournamentIndex]?.status==='active'&&x.tournamentOfflineDeadline!=null&&x.tournamentOfflineDeadline<=now);
+    withdrawTournamentPlayers(room,expired,'离线超过10分钟');
+    if(!p.left&&!p.connected&&p.tournamentOfflineDeadline!=null&&room.tournament?.status==='running'&&room.tournament.members[p.tournamentIndex]?.status==='active'){
+      p.tournamentOfflineTimer=setTimeout(expire,Math.max(1,p.tournamentOfflineDeadline-Date.now()));
+      p.tournamentOfflineTimer.unref();
+    }
+  };
+  p.tournamentOfflineTimer=setTimeout(expire,10*60*1000);
+  p.tournamentOfflineTimer.unref();
+}
+function withdrawTournament(room,p,reason) {
+  withdrawTournamentPlayers(room,[p],reason);
+}
+function withdrawTournamentPlayers(room,players,reason) {
+  const leaving=players.filter(p=>room.players.includes(p)&&!p.left&&room.tournament?.members[p.tournamentIndex]?.status==='active');
+  if(!leaving.length)return;
+  const midHand=['preflop','flop','turn','river'].includes(room.stage);
+  const oldTurn=room.turnSeat,oldHost=leaving.find(p=>p.name===room.hostName);
+  const indices=leaving.map(p=>room.players.indexOf(p));
+  leaving.forEach(p=>{
+    clearTimeout(p.tournamentOfflineTimer);p.tournamentOfflineTimer=null;p.tournamentOfflineDeadline=null;
+    p.left=true;p.connected=false;p.socketId=null;p.tournamentWithdrawReason=reason;
+    if(midHand&&p.inHand&&!p.folded)p.folded=true;
+    addLog(room,`${p.name} ${reason}，已投入筹码留在底池`);
+  });
+  if(oldHost)transferHostAfterLeave(room,oldHost);
+  if(midHand){
+    room.queue=room.queue.filter(s=>!indices.includes(s));
+    const alive=room.players.filter(x=>x&&x.inHand&&!x.folded).length;
+    if(alive<=1||indices.includes(oldTurn))consumeQueueAndAdvance(room,-1);
+  }else{
+    leaving.forEach(p=>bankSession(room,p)); finishTournamentRound(room); scheduleNextHandIfReady(room);
+  }
   broadcast(room);
 }
 
@@ -837,9 +938,9 @@ function scheduleNextHandIfReady(room) {
   clearTimeout(room.nextHandTimer);
   room.nextHandTimer = null;
   room.nextHandDeadline = 0;
-  if (room.stage !== 'handover' || room.nextHandPaused) return;
+  if (room.stage !== 'handover' || room.nextHandPaused || room.tournament?.status==='finished') return;
   if (squid.check(room)) { broadcast(room); return; }
-  const playable = room.players.filter((p) => p && !p.left && !p.sittingOut && p.chips > 0 && p.connected);
+  const playable = room.players.filter((p) => p && !p.left && !p.sittingOut && p.chips > 0 && (p.connected || room.tournament?.status==='running'));
   if (playable.length < MIN_PLAYERS) {
     // 看看有没有可能通过重买凑齐
     const zeroChips = room.players.filter((p) => p && !p.left && p.chips === 0 && p.connected);
@@ -910,6 +1011,7 @@ function sanitizeState(room, viewerSocketId) {
     startChips: room.settings.startChips,
     settings: room.settings,
     mode: room.mode || 'classic',
+    tournament: room.tournament ? tournament.snapshot(room.tournament,Date.now()) : null,
     squid: squid.snapshot(room),
     isHost: !!viewer && viewer.name === room.hostName,
     hostName: room.hostName,
@@ -1100,6 +1202,7 @@ io.on('connection', (socket) => {
     room.mode=config.mode;
     room.settings=config.settings;
     room.squid={enabled:config.mode==='squid',payment:config.payment,round:0,current:null,waitingReason:null};
+    if(config.mode==='tournament')room.tournament=tournament.makeTournament(config.blindIntervalMinutes,config.settings.smallBlind,config.settings.bigBlind);
     const res = joinPlayer(room, socket, nick.name);
     if (res.err) {
       rooms.delete(room.code);
@@ -1117,12 +1220,13 @@ io.on('connection', (socket) => {
       if(!allowRequestRate(guards.missingRoom,clientKey,reply,'尝试过于频繁，请稍后再试'))return;
       return reply({ok:false,err:'房间不存在，请核对邀请码'});
     }
+    if(room.tournament&&room.tournament.status!=='waiting')return reply({ok:false,err:'锦标赛已开赛，不接受新玩家'});
     if(room.settings.locked)return reply({ok:false,err:'房主已锁定房间，暂不接受新玩家'});
     if(!['waiting','handover'].includes(room.stage))return reply({ok:false,err:'本局进行中，请稍等局结束后加入'});
     const count=room.players.filter(p=>p&&!p.left).length;
     if(count>=MAX_PLAYERS)return reply({ok:false,err:'房间已满（最多6人）'});
     const s=room.settings;
-    reply({ok:true,info:{code:room.code,mode:room.mode||'classic',settings:{startChips:s.startChips,smallBlind:s.smallBlind,bigBlind:s.bigBlind,actionTime:s.actionTime,nextHandDelay:s.nextHandDelay,rebuyAllowed:s.rebuyAllowed},squidPayment:room.mode==='squid'?squid.snapshot(room).payment:null}});
+    reply({ok:true,info:{code:room.code,mode:room.mode||'classic',settings:{startChips:s.startChips,smallBlind:s.smallBlind,bigBlind:s.bigBlind,actionTime:s.actionTime,nextHandDelay:s.nextHandDelay,rebuyAllowed:s.rebuyAllowed},squidPayment:room.mode==='squid'?squid.snapshot(room).payment:null,blindIntervalMinutes:room.tournament?.intervalMinutes}});
   });
 
   onSocketRequest(socket, 'join_room', (payload, reply) => {
@@ -1155,6 +1259,7 @@ io.on('connection', (socket) => {
       if (!allowRequestRate(guards.missingRoom, clientKey, reply, '尝试过于频繁，请稍后再试')) return;
       return reply({ ok: false, err: '房间不存在，请核对邀请码' });
     }
+    if(room.tournament&&room.tournament.status!=='waiting')return reply({ok:false,err:'锦标赛已开赛，只能凭原身份重连'});
     // 断线重连：同名匹配到离线玩家时，任何阶段都允许恢复座位
     const offlineSameName = room.players.find((p) => p && !p.left && p.name === nick.name && !p.connected);
     // 满员判断按有效座位算（排除已离开的占位）；同名断线座位即将被 token 恢复，
@@ -1180,6 +1285,8 @@ io.on('connection', (socket) => {
     if (!room) return reply({ ok: false, err: '不在房间中' });
     const p = room.players.find((x) => x && x.socketId === socket.id);
     if (!p || p.name !== room.hostName) return reply({ ok: false, err: '只有房主可以开始游戏' });
+    if(room.tournament?.status!=='waiting'&&room.tournament)return reply({ok:false,err:'锦标赛已开赛或已结束'});
+    if(room.tournament&&room.players.some(x=>x&&!x.left&&!x.connected))return reply({ok:false,err:'请等待所有参赛者在线后开赛'});
     // 只能在等待/局间开局，防止对局中重复开局重扣盲注
     if (!['waiting', 'handover'].includes(room.stage)) {
       return reply({ ok: false, err: '本局正在进行中' });
@@ -1199,6 +1306,7 @@ io.on('connection', (socket) => {
     if (!requireEmptyPayload(payload, reply)) return;
     const room = findRoomBySocket(socket.id);
     if (!room || room.stage !== 'handover') return reply({ ok: false, err: '当前不能开局' });
+    if(room.tournament?.status==='finished')return reply({ok:false,err:'锦标赛已结束，不能继续发牌'});
     const p = room.players.find((x) => x && x.socketId === socket.id);
     if (!p || p.name !== room.hostName) return reply({ ok: false, err: '只有房主可以立即开始下一局' });
     if (room.nextHandPaused) return reply({ ok: false, err: '下一局已暂停，请先恢复自动发牌' });
@@ -1216,6 +1324,7 @@ io.on('connection', (socket) => {
     const room = findRoomBySocket(socket.id);
     const p = room && room.players.find((x) => x && x.socketId === socket.id);
     if (!p || p.name !== room.hostName) return reply({ ok: false, err: '只有房主可以暂停或恢复下一局' });
+    if(room.tournament?.status==='finished')return reply({ok:false,err:'锦标赛已结束'});
     if (room.nextHandPaused !== data.paused) {
       room.nextHandPaused = data.paused;
       addLog(room, data.paused ? '房主暂停下一局（当前手照常进行）' : '房主恢复下一局自动发牌');
@@ -1320,6 +1429,7 @@ io.on('connection', (socket) => {
     const room = findRoomBySocket(socket.id);
     const p = room && room.players.find((x) => x && x.socketId === socket.id);
     if (!p) return reply({ ok: false, err: '已不在房间中，请刷新页面用邀请码重新加入' });
+    if(room.tournament)return reply({ok:false,err:'锦标赛禁止补买'});
     if (!['waiting', 'handover'].includes(room.stage)) return reply({ ok: false, err: '只能在本局结束后重买' });
     if (room.settings.rebuyAllowed === false) return reply({ ok: false, err: '本房间已禁止重买' });
     if (p.chips > 0 && !squid.canRebuy(room,p)) return reply({ ok: false, err: '你还有筹码，无需重买' });
@@ -1346,7 +1456,7 @@ io.on('connection', (socket) => {
       'startChips', 'smallBlind', 'bigBlind', 'actionTime', 'nextHandDelay', 'rebuyAllowed',
     ]);
     if (!data) return;
-    if(Object.keys(data).some(k=>!['startChips','smallBlind','bigBlind','actionTime','nextHandDelay','rebuyAllowed','locked'].includes(k)))return reply({ok:false,err:'设置字段无效，玩法在创建时固定'});
+    if(Object.keys(data).some(k=>!['startChips','smallBlind','bigBlind','actionTime','nextHandDelay','rebuyAllowed','locked','blindIntervalMinutes'].includes(k)))return reply({ok:false,err:'设置字段无效，玩法在创建时固定'});
     const { startChips, smallBlind, bigBlind, actionTime, nextHandDelay, rebuyAllowed } = data;
     if (typeof rebuyAllowed !== 'boolean') return reply({ ok: false, err: '重买设置格式错误' });
     if (data.locked !== undefined && typeof data.locked !== 'boolean') {
@@ -1356,6 +1466,10 @@ io.on('connection', (socket) => {
     const p = room && room.players.find((x) => x && x.socketId === socket.id);
     if (!room || !p) return reply({ ok: false, err: '不在房间中' });
     if (p.name !== room.hostName) return reply({ ok: false, err: '只有房主可以修改设置' });
+    if(room.tournament?.status!=='waiting'&&room.tournament)return reply({ok:false,err:'开赛后不能修改比赛设置'});
+    if(!room.tournament&&data.blindIntervalMinutes!==undefined)return reply({ok:false,err:'该玩法不使用升盲设置'});
+    if(room.tournament&&(![5,10,15].includes(data.blindIntervalMinutes)||rebuyAllowed!==false))return reply({ok:false,err:'锦标赛禁止补买，升盲间隔仅支持5、10或15分钟'});
+    if(room.tournament&&![startChips,smallBlind,bigBlind].every(Number.isSafeInteger))return reply({ok:false,err:'锦标赛筹码和盲注必须为整数'});
     if (room.stage !== 'waiting' || squid.init(room).current) return reply({ ok: false, err: '只能在等待且没有进行中的鱿鱼轮次时修改' });
 
     const sc = Math.round(Number(startChips));
@@ -1384,6 +1498,7 @@ io.on('connection', (socket) => {
       startChips: sc, smallBlind: sb, bigBlind: bb,
       actionTime: at, nextHandDelay: nh, rebuyAllowed: rb, locked,
     };
+    if(room.tournament)room.tournament=tournament.makeTournament(data.blindIntervalMinutes,sb,bb);
     // 还没开过局：已就座玩家统一按新起始筹码重置（战绩买入同步重算）
     if (room.handNumber === 0) {
       room.players.forEach((x) => { if (x && !x.left) x.chips = sc; });
@@ -1405,6 +1520,7 @@ io.on('connection', (socket) => {
     }
     const room = findRoomBySocket(socket.id);
     if (!room) return reply({ ok: false, err: '不在房间中' });
+    if(room.tournament&&!['preflop','flop','turn','river'].includes(room.stage))return reply({ok:false,err:'当前没有进行中的下注'});
     const seat = room.players.findIndex((p) => p && p.socketId === socket.id);
     const res = applyAction(room, seat, data.type, data.amount);
     reply(res);
@@ -1465,6 +1581,7 @@ io.on('connection', (socket) => {
     const room = findRoomBySocket(socket.id);
     const p = room && room.players.find((x) => x && x.socketId === socket.id);
     if (!p) return reply({ ok: false, err: '不在房间中' });
+    if(room.tournament)return reply({ok:false,err:'锦标赛不能暂离，可选择退赛'});
     p.sittingOut = true;
     // 如果在对局中，标记为已弃牌
     if (p.inHand && !p.folded) {
@@ -1485,6 +1602,7 @@ io.on('connection', (socket) => {
     const room = findRoomBySocket(socket.id);
     const p = room && room.players.find((x) => x && x.socketId === socket.id);
     if (!p) return reply({ ok: false, err: '不在房间中' });
+    if(room.tournament)return reply({ok:false,err:'锦标赛不支持暂离或坐回'});
     p.sittingOut = false;
     addLog(room, `${p.name} 坐回`);
     resumeNextHandIfReady(room);
@@ -1500,6 +1618,7 @@ io.on('connection', (socket) => {
     const room = findRoomBySocket(socket.id);
     const p = room && room.players.find((x) => x && x.socketId === socket.id);
     if (!room || !p) return reply({ ok: false, err: '不在房间中' });
+    if(room.tournament&&room.tournament.status!=='waiting')return reply({ok:false,err:'锦标赛开赛后不能踢人'});
     if (p.name !== room.hostName) return reply({ ok: false, err: '只有房主可以踢人' });
     const target = room.players[data.seat];
     if (!target || target.left) return reply({ ok: false, err: '该座位无人' });
@@ -1566,6 +1685,7 @@ function joinPlayer(room, socket, name, token) {
       return { err: '该昵称已被其他玩家使用，请换一个昵称' };
     }
     const wasOffline = !existing.connected;
+    clearTimeout(existing.tournamentOfflineTimer); existing.tournamentOfflineTimer=null; existing.tournamentOfflineDeadline=null;
     clearTimeout(room.waitingCleanupTimer);
     room.waitingCleanupTimer = null;
     existing.socketId = socket.id;
@@ -1669,6 +1789,7 @@ function scheduleRetainedRoomCleanup(room) {
     clearTimeout(room.nextHandTimer);
     room.nextHandTimer = null;
     room.nextHandDeadline = 0;
+    clearTournamentTimers(room);
     rooms.delete(room.code);
   }, 10 * 60 * 1000);
   room.waitingCleanupTimer = timer;
@@ -1688,6 +1809,12 @@ function ensureConnectedHost(room) {
 function transferHostAfterLeave(room, p) {
   if (['waiting', 'handover'].includes(room.stage)) { ensureConnectedHost(room); return; }
   if (p.name !== room.hostName) return;
+  if(room.tournament){
+    const next=room.players.find(x=>x&&!x.left&&x.connected);
+    room.hostName=next?next.name:null;
+    if(next)addLog(room,`${next.name} 成为新房主`);
+    return;
+  }
   const nextHost = room.players.find((x) => x && !x.left);
   room.hostName = nextHost ? nextHost.name : null;
   if (nextHost) addLog(room, `${nextHost.name} 成为新房主`);
@@ -1699,6 +1826,11 @@ function handleLeave(socket, isDisconnect = false) {
   const idx = room.players.findIndex((p) => p && p.socketId === socket.id);
   if (idx < 0) return;
   const p = room.players[idx];
+
+  if(room.tournament?.status==='running'&&room.tournament.members[p.tournamentIndex]?.status==='active'){
+    if(!isDisconnect){withdrawTournament(room,p,'主动退赛');return;}
+    scheduleTournamentRetirement(room,p);
+  }
 
   if (isDisconnect && ['waiting', 'handover'].includes(room.stage)) {
     p.connected = false; p.socketId = null;
@@ -1763,6 +1895,7 @@ function handleLeave(socket, isDisconnect = false) {
     clearTurnTimer(room);
     clearTimeout(room.nextHandTimer);
     clearTimeout(room.waitingCleanupTimer);
+    clearTournamentTimers(room);
     rooms.delete(room.code);
   }
 }

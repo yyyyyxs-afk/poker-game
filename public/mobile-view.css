@@ -72,6 +72,7 @@
 #app-surface.compact-game #settings-card,
 #app-surface.compact-game #result-card,
 #app-surface.compact-game #session-card,
+#app-surface.compact-game #tournament-card,
 #app-surface.compact-game #rules-card { max-height:calc(var(--visible-height) - 24px); overflow-y:auto; overscroll-behavior:contain; }
 #app-surface.compact-game #rules-overlay { align-items:center; }
 #app-surface.compact-game #emoji-bar { left:auto; right:0; bottom:100%; top:auto; width:200px; padding:8px; }
