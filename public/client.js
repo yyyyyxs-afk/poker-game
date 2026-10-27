@@ -1435,13 +1435,34 @@ function updateActionBar(me) {
   // 快捷下注：基于服务端权威的 pot / currentBet 计算"跟注后的底池"比例，
   // 低于最小合法加注自动抬到最小值，超出最大金额自动封顶（全押）
   const PRESET_FRAC = { third: 1 / 3, half: 1 / 2, twothird: 2 / 3, pot: 1 };
+  const PRESET_BLINDS = { third: 2, half: 2.5, twothird: 3 };
+  const opening = state.stage === 'preflop' && state.currentBet === state.bigBlind;
   document.querySelectorAll('.preset').forEach((btn) => {
+    const preset = btn.dataset.preset;
+    btn.hidden = opening && preset === 'pot';
+    let openingTarget, openingValue, adjustment = '';
+    if (opening && PRESET_BLINDS[preset]) {
+      const multiple = PRESET_BLINDS[preset];
+      openingTarget = Math.ceil(state.bigBlind * multiple);
+      openingValue = Math.max(minRaiseTo, Math.min(maxRaiseTo, openingTarget));
+      adjustment = openingValue > openingTarget ? '已提高到最小加注' : openingValue < openingTarget ? '已按筹码上限调整为全押' : '';
+      btn.textContent = `${multiple}倍 ${PokerExplanations.number(openingValue)}${adjustment ? openingValue > openingTarget ? '最低' : '全押' : ''}`;
+      btn.title = adjustment || `加注到 ${PokerExplanations.number(openingValue)}`;
+      btn.setAttribute('aria-label', `${multiple}倍大盲，加注到 ${PokerExplanations.number(openingValue)}${adjustment ? `，${adjustment}` : ''}`);
+    } else {
+      const labels = { third: '1/3池', half: '1/2池', twothird: '2/3池', pot: '满池', allin: '全押' };
+      btn.textContent = labels[preset];
+      btn.title = '';
+      btn.setAttribute('aria-label', labels[preset]);
+    }
     btn.onclick = () => {
       let v;
-      if (btn.dataset.preset === 'allin') {
+      if (preset === 'allin') {
         v = maxRaiseTo;
+      } else if (opening && PRESET_BLINDS[preset]) {
+        v = openingValue;
       } else {
-        const frac = PRESET_FRAC[btn.dataset.preset];
+        const frac = PRESET_FRAC[preset];
         if (!frac) return;
         const potAfterCall = state.pot + toCall;
         const target = state.currentBet + Math.ceil(potAfterCall * frac);
@@ -1449,6 +1470,7 @@ function updateActionBar(me) {
       }
       slider.value = v; input.value = v;
       renderRaiseExplanation();
+      if (adjustment) document.getElementById('raise-explanation').textContent += ` ${adjustment}。`;
     };
   });
 

@@ -554,6 +554,7 @@ body {
 #raise-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 #raise-input:focus { border-bottom-color: var(--a1-raise); }
 .raise-presets { display: flex; gap: 7px; }
+.raise-presets .preset[hidden] { display: none; }
 .raise-presets .preset {
   flex: 1; min-width: 0; min-height: 34px; padding: 0 6px;
   border: 1px solid var(--a1-line);

@@ -44,7 +44,7 @@ function element(id) {
   return elements.get(id);
 }
 const context = { PokerExplanations, state: { code: 'ABC123', handNumber: 1, stage: 'preflop', turnSeat: 0,
-  currentBet: 20, minRaise: 20, pot: 30, players: [{ ...me }] }, mySeat: 0,
+  currentBet: 20, bigBlind: 20, minRaise: 20, pot: 30, players: [{ ...me }] }, mySeat: 0,
   roomConnectionReady: true, socket: { connected: true }, raiseOpen: false, raiseContext: '', allInIntent: null,
   Node: { TEXT_NODE: 3 }, cfg: () => ({ bigBlind: 20 }), resetFoldBtn() {},
   document: { getElementById: element, querySelectorAll: () => [] }, sendAction: (...args) => sent.push(args) };
@@ -55,6 +55,42 @@ const functions = names.map(name => {
   assert.ok(match, `未找到生产函数 ${name}`); return match[0];
 }).join('\n');
 vm.createContext(context); vm.runInContext(functions, context);
+const presets = ['third', 'half', 'twothird', 'pot', 'allin'].map(name => Object.assign(element(`preset-${name}`), { dataset: { preset: name } }));
+context.document.querySelectorAll = () => presets;
+context.updateActionBar(context.state.players[0]);
+assert.equal(presets[0].textContent, '2倍 40');
+assert.equal(presets[1].textContent, '2.5倍 50');
+assert.equal(presets[2].textContent, '3倍 60');
+assert.equal(presets[3].hidden, true);
+context.onRaiseToggleClick(); presets[1].onclick();
+assert.equal(Number(element('raise-input').value), 50);
+assert.equal(element('raise-confirm-value').textContent, '50');
+assert.equal(sent.length, 0, '快捷按钮只填金额');
+context.updateActionBar(context.state.players[0]);
+assert.equal(Number(element('raise-input').value), 50, '重复广播保留已选金额');
+context.confirmRaise(); assert.deepEqual(sent.pop(), ['raise', 50]);
+context.state.bigBlind = 21; context.state.currentBet = 21; context.state.minRaise = 21;
+context.updateActionBar(context.state.players[0]);
+assert.equal(presets[1].textContent, '2.5倍 53', '奇数大盲向上取整');
+context.state.minRaise = 30; context.updateActionBar(context.state.players[0]);
+assert.match(presets[0].textContent, /51最低/);
+context.onRaiseToggleClick(); presets[0].onclick();
+assert.match(element('raise-explanation').textContent, /提高到最小加注/);
+context.hideRaisePanel();
+context.state.minRaise = 21; context.state.players[0].chips = 35;
+context.updateActionBar(context.state.players[0]); context.onRaiseToggleClick(); presets[2].onclick();
+assert.match(presets[2].textContent, /45全押/);
+assert.match(element('raise-explanation').textContent, /筹码上限调整为全押/);
+assert.equal(element('raise-confirm-value').textContent, '35');
+assert.equal(sent.length, 0); context.confirmRaise(); assert.deepEqual(sent.pop(), ['raise', 45]);
+context.state.players[0] = { ...me, raiseAllowed: false }; context.updateActionBar(context.state.players[0]);
+assert.equal(element('btn-toggle-raise').disabled, true, '加注权未重开时不能打开面板');
+context.state.players[0] = { ...me }; context.state.bigBlind = 20; context.state.currentBet = 40; context.state.minRaise = 20;
+context.updateActionBar(context.state.players[0]);
+assert.equal(presets[0].textContent, '1/3池'); assert.equal(presets[3].hidden, false);
+context.state.stage = 'flop'; context.state.currentBet = 20; context.updateActionBar(context.state.players[0]);
+assert.equal(presets[1].textContent, '1/2池');
+context.state.stage = 'preflop'; context.state.currentBet = 20;
 context.updateActionBar(context.state.players[0]);
 element('btn-allin').onclick();
 assert.equal(sent.length, 0, '点全押入口只能打开确认，不能直接发送');
