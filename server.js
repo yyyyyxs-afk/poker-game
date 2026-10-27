@@ -932,7 +932,9 @@ function sanitizeState(room, viewerSocketId) {
     session: [
       ...[...room.session.entries()].map(([n, st]) => {
         // 对局中主动离开的玩家会以 left 标记留到本手结算，仍需把其筹码/下注计入实时零和。
-        const sp = room.players.find((x) => x && x.name === n);
+        // 局间旧座位会保留到下一手；同名重新入座时优先使用当前座位。
+        const sp = room.players.find((x) => x && x.name === n && !x.left)
+          || room.players.find((x) => x && x.name === n && x.left);
         const owned = sp ? squid.estate(sp) + (['showdown', 'handover'].includes(room.stage) ? 0 : sp.totalBet) : 0;
         return { name: n, buyIn: st.buyIn, chips: sp ? sp.chips : 0, frozen: sp ? squid.frozen(sp) : 0, estate: owned, pl: owned - st.buyIn, hands: st.hands, wins: st.wins, left: !!(sp && sp.left) };
       }),
