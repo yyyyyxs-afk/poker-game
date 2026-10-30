@@ -24,6 +24,19 @@ for (const rank of ranks) {
   previous = index;
 }
 
+// 短牌：新玩法卡、创建说明、按模式切换的牌型表都必须存在，且顺序不能沿用经典
+for (const id of ['mode-short', 'create-short-note', 'hand-ranks-classic', 'hand-ranks-short', 'rank-mode-note']) {
+  assert.ok(html.includes(`id="${id}"`), `缺少短牌界面元素：${id}`);
+}
+const shortRanks = html.slice(html.indexOf('id="hand-ranks-short"'));
+let shortPrevious = -1;
+for (const rank of ['皇家同花顺', '同花顺', '四条', '同花', '葫芦', '三条', '顺子', '两对', '一对', '高牌']) {
+  const index = shortRanks.indexOf(`<b>${rank}</b>`);
+  assert.ok(index > shortPrevious, `短牌牌型顺序缺失或错误：${rank}`);
+  shortPrevious = index;
+}
+assert.ok(client.includes('renderHandRanks') && client.includes("state?.mode"), '牌型速查未按房间玩法切换');
+
 assert.ok(client.includes("openRules('quick'"), '玩法说明入口未接入打开逻辑');
 assert.ok(client.includes("event.key === 'Escape'"), '玩法说明缺少键盘关闭能力');
 assert.ok(css.includes('#rules-card') && css.includes('@media (max-width: 900px)'), '玩法说明缺少桌面或手机样式');

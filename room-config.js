@@ -7,7 +7,7 @@ function paymentError(value){
 function parseCreate(data){
   if(Object.keys(data).some(k=>!['name','mode','settings','squidPayment','blindIntervalMinutes'].includes(k)))return {err:'创建参数无效'};
   const mode=data.mode===undefined?'classic':data.mode;
-  if(!['classic','squid','tournament'].includes(mode))return {err:'玩法无效'};
+  if(!['classic','squid','tournament','short'].includes(mode))return {err:'玩法无效'};
   if(data.settings!==undefined&&(!data.settings||typeof data.settings!=='object'||Array.isArray(data.settings)))return {err:'房间设置无效'};
   const source=data.settings||{};
   if(Object.keys(source).some(k=>!Object.hasOwn(DEFAULTS,k)))return {err:'房间设置字段无效'};
@@ -17,6 +17,8 @@ function parseCreate(data){
   if(!Number.isSafeInteger(sb)||!Number.isSafeInteger(bb)||sb<1||bb<sb||bb>Math.floor(sc/20))return {err:'盲注须为正整数，大盲≥小盲，起始筹码至少为大盲的20倍'};
   if(![20,30,45,60].includes(at)||![5,10,20].includes(nh))return {err:'行动/局间时长无效'};
   if(typeof rb!=='boolean'||typeof locked!=='boolean')return {err:'重买/锁房设置无效'};
+  // 短牌第一期不与鱿鱼、锦标赛组合：显式拒绝，不依赖下面两条的间接判断
+  if(mode==='short'&&(data.squidPayment!==undefined||data.blindIntervalMinutes!==undefined))return {err:'短牌德州不能组合鱿鱼支付或升盲设置'};
   if(mode!=='squid'&&data.squidPayment!==undefined)return {err:'该玩法不使用鱿鱼支付设置'};
   if(mode!=='tournament'&&data.blindIntervalMinutes!==undefined)return {err:'该玩法不使用锦标赛升盲设置'};
   const blindIntervalMinutes=data.blindIntervalMinutes===undefined?10:data.blindIntervalMinutes;

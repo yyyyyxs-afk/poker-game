@@ -34,8 +34,10 @@
             <label class="mode-card"><input id="mode-classic" type="radio" name="create-mode" value="classic" checked /><span><b>经典德州</b><small>52张 · 2–6人</small><em>熟悉的无限注德州</em></span></label>
             <label class="mode-card"><input id="mode-squid" type="radio" name="create-mode" value="squid" /><span><b>鱿鱼德州</b><small>52张 · 3–6人</small><em>叠加标记与末位支付</em></span></label>
             <label class="mode-card"><input id="mode-tournament" type="radio" name="create-mode" value="tournament" /><span><b>单桌锦标赛</b><small>52张 · 2–6人</small><em>定时升盲，淘汰争冠</em></span></label>
+            <label class="mode-card"><input id="mode-short" type="radio" name="create-mode" value="short" /><span><b>短牌德州</b><small>36张 · 2–6人</small><em>去 2–5 · 同花＞葫芦</em></span></label>
           </fieldset>
           <p id="create-mode-tip" class="mode-fixed">玩法创建后固定。</p>
+          <p id="create-short-note" class="mode-note hidden">36 张（去掉 2、3、4、5）；同花＞葫芦、三条＞顺子；A 的小顺子为 A-6-7-8-9。盲注与行动顺序与经典一致。</p>
           <section id="create-tournament-settings" class="form-section hidden"><label>升盲间隔<select id="create-blind-interval"><option value="5">5分钟</option><option value="10" selected>10分钟</option><option value="15">15分钟</option></select></label><p class="mode-note">禁止补买；开赛后不接受新入座。大小盲每档翻倍，下一手生效；下一档超过100万时封顶。服务器重启不保留赛事。</p></section>
           <div class="create-grid">
             <section class="create-common form-section" aria-labelledby="common-title"><h3 id="common-title">入座与筹码</h3>
@@ -371,7 +373,8 @@
 
       <section class="rules-panel hidden" data-rules-panel="hands">
         <p class="rank-tip">从强到弱排列；牌型相同时比较组成牌型的点数，再依次比较踢脚牌。</p>
-        <ol class="hand-ranks">
+        <p id="rank-mode-note" class="mode-note hidden">短牌（36 张，去掉 2–5）：同花＞葫芦、三条＞顺子；A 的小顺子为 A-6-7-8-9，按 9 高。玩法以房主设置为准。</p>
+        <ol class="hand-ranks" id="hand-ranks-classic">
           <li><span class="rank-no">1</span><b>皇家同花顺</b><span>同花色的 10、J、Q、K、A</span></li>
           <li><span class="rank-no">2</span><b>同花顺</b><span>同花色的五张连续点数</span></li>
           <li><span class="rank-no">3</span><b>四条</b><span>四张相同点数</span></li>
@@ -379,6 +382,18 @@
           <li><span class="rank-no">5</span><b>同花</b><span>五张同花色，不连续</span></li>
           <li><span class="rank-no">6</span><b>顺子</b><span>五张连续点数，花色不限</span></li>
           <li><span class="rank-no">7</span><b>三条</b><span>三张相同点数</span></li>
+          <li><span class="rank-no">8</span><b>两对</b><span>两个不同点数的对子</span></li>
+          <li><span class="rank-no">9</span><b>一对</b><span>两张相同点数</span></li>
+          <li><span class="rank-no">10</span><b>高牌</b><span>以上都没有时比较最大单牌</span></li>
+        </ol>
+        <ol class="hand-ranks hidden" id="hand-ranks-short">
+          <li><span class="rank-no">1</span><b>皇家同花顺</b><span>同花色的 10、J、Q、K、A</span></li>
+          <li><span class="rank-no">2</span><b>同花顺</b><span>同花色的五张连续点数，A-6-7-8-9 为最小</span></li>
+          <li><span class="rank-no">3</span><b>四条</b><span>四张相同点数</span></li>
+          <li><span class="rank-no">4</span><b>同花</b><span>五张同花色，不连续（短牌大于葫芦）</span></li>
+          <li><span class="rank-no">5</span><b>葫芦</b><span>三条加一对（短牌小于同花）</span></li>
+          <li><span class="rank-no">6</span><b>三条</b><span>三张相同点数（短牌大于顺子）</span></li>
+          <li><span class="rank-no">7</span><b>顺子</b><span>五张连续点数，花色不限（短牌小于三条）</span></li>
           <li><span class="rank-no">8</span><b>两对</b><span>两个不同点数的对子</span></li>
           <li><span class="rank-no">9</span><b>一对</b><span>两张相同点数</span></li>
           <li><span class="rank-no">10</span><b>高牌</b><span>以上都没有时比较最大单牌</span></li>
