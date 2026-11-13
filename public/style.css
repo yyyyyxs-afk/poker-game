@@ -1489,3 +1489,14 @@ body.modal-open { overflow: hidden; }
   .card .idx i, .card .idx.flip { display:none; }
   .card .pip { inset:auto 4px 3px auto; line-height:1; }
 }
+
+/* 顶部席位手牌：亮牌后改为「藏在席位牌后、只露出上沿」，与牌背同一视觉语言。
+ * 原因：牌背用 bottom:calc(100% - 18px)+z-index:0，亮牌用 calc(100% + 10px)+z-index:4，
+ * 两者相差 28px；顶部席位距牌桌顶边只有 8–27px，多出的 28px 直接越过桌沿压住页头
+ * （375 压 22px、320 压 42px、面宽 1280 压 39px），而席位层 z-index 高于页头。
+ * 同时把明牌降到席位牌之下，避免遮住昵称与筹码；只影响顶部席位，其余席位仍是悬停展示。
+ * 选择器带上 .is-facedown，是为了在同等优先级下覆盖高优先级媒体查询里的写法。 */
+.seat.top-seat .hole-cards {
+  bottom: calc(100% - 18px);
+  z-index: 0;
+}
