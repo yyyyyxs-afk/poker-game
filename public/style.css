@@ -1449,7 +1449,10 @@ body.modal-open { overflow: hidden; }
   #log-panel { bottom:var(--keyboard-inset,0px); max-height:calc(var(--visible-height,100dvh) - 12px); padding-left:max(14px,env(safe-area-inset-left,0px)); padding-right:max(14px,env(safe-area-inset-right,0px)); }
   #chat-list { min-height:0; }
   #chat-input,#btn-chat-send { min-height:38px; }
-  .seat.lower-wing .hole-cards.is-facedown { bottom:-6px; }
+  /* 左右两翼席位：牌背曾经用 bottom:-6px 塞到席位牌下方，被不透明的席位牌整块盖住，
+     观感上等于“对手手牌消失”。改为与其它席位一致的「上沿露出」定位：
+     牌背仍绘制在席位牌之下，重叠的 18px 被遮住，上方约 23px 可见。 */
+  .seat.lower-wing .hole-cards.is-facedown { bottom:calc(100% - 18px); }
 }
 @media(orientation:landscape) and (max-height:500px) {
   #game { height:100dvh; min-height:0; overflow:hidden; }

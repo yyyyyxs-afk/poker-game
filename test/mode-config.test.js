@@ -17,7 +17,8 @@ for(const settings of [{startChips:99},{startChips:1000001},{smallBlind:0},{bigB
 assert.strictEqual(parseCreate({name:'甲',mode:'squid',settings:{bigBlind:50}}).payment,50);
 (async()=>{await new Promise(r=>server.listen(0,'127.0.0.1',r));try{
   const invalid=await open();
-  for(const config of [{mode:'short'},{settings:[]},{settings:{rebuyAllowed:'false'}},{settings:{startChips:10}},{mode:'squid',squidPayment:0},{mode:'squid',squidPayment:'50'},{mode:'squid',squidPayment:1.2},{mode:'classic',squidPayment:50},{mode:'squid',squidPayment:1000001}]){
+  // 短牌已进入白名单（见 test/short-deck.test.js），这里改为校验未知玩法与短牌的不允许组合
+  for(const config of [{mode:'nodlimit'},{mode:'short',squidPayment:50},{mode:'short',blindIntervalMinutes:5},{settings:[]},{settings:{rebuyAllowed:'false'}},{settings:{startChips:10}},{mode:'squid',squidPayment:0},{mode:'squid',squidPayment:'50'},{mode:'squid',squidPayment:1.2},{mode:'classic',squidPayment:50},{mode:'squid',squidPayment:1000001}]){
     const size=rooms.size;assert.strictEqual((await req(invalid,'create_room',{name:'无效配置',...config})).ok,false);assert.strictEqual(rooms.size,size,'失败不能遗留半配置房间');
   }
   const legacy=await table(1,{});assert.strictEqual(legacy.r.mode,'classic');assert.strictEqual(legacy.r.squid.enabled,false);assert.strictEqual(legacy.r.players[0].chips,2000);

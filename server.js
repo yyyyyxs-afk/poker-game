@@ -6,6 +6,7 @@
  */
 const squid = require('./squid');
 const tournament = require('./tournament');
+const pokerRules = require('./poker-rules');
 const {parseCreate,paymentError}=require('./room-config');
 const express = require('express');
 const http = require('http');
@@ -68,12 +69,14 @@ const ROOM_CODE_CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 const ROOM_CODE_LEN = 6;
 
 // ---------------- 牌与牌力评估 ----------------
+// 点数域、类别编号、轮子与牌型名都按模式取自 poker-rules.js；
+// 这里不保留"当前牌堆/当前规则"之类的可变状态，模式一律由调用方按房间传入。
 const SUITS = ['s', 'h', 'd', 'c']; // 黑桃 红心 方块 梅花
-const RANKS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]; // 11=J 12=Q 13=K 14=A
+// 点数域由模式决定（经典 2–14、短牌 6–14），不再维护一份固定的牌面数组
 
-function newDeck() {
+function newDeck(mode = 'classic') {
   const deck = [];
-  for (const s of SUITS) for (const r of RANKS) deck.push({ r, s });
+  for (const s of SUITS) for (const r of pokerRules.rulesFor(mode).ranks) deck.push({ r, s });
   // Fisher-Yates + 密码学安全随机：私人局的洗牌公平性不依赖 Math.random
   for (let i = deck.length - 1; i > 0; i--) {
     const j = crypto.randomInt(0, i + 1);
@@ -83,14 +86,15 @@ function newDeck() {
 }
 
 /** 5 张牌评分，返回可按字典序比较的数组 [类别, k1..k5] */
-function score5(cards) {
+function score5(cards, mode = 'classic') {
+  const rules = pokerRules.rulesFor(mode);
   const rs = cards.map((c) => c.r).sort((a, b) => a - b);
   const flush = cards.every((c) => c.s === cards[0].s);
   const uniq = [...new Set(rs)];
   let straightHigh = 0;
   if (uniq.length === 5) {
     if (uniq[4] - uniq[0] === 4) straightHigh = uniq[4];
-    else if (uniq.join(',') === '2,3,4,5,14') straightHigh = 5; // A-5 轮子
+    else if (uniq.join(',') === rules.wheelKey) straightHigh = rules.wheelHigh; // A 作小顺子的轮子，按模式取
   }
   const cnt = {};
   rs.forEach((r) => (cnt[r] = (cnt[r] || 0) + 1));
@@ -98,23 +102,24 @@ function score5(cards) {
     .map(([r, c]) => [c, +r])
     .sort((a, b) => b[0] - a[0] || b[1] - a[1]); // 先按张数、再按点数降序
 
-  let cat, keys;
-  if (flush && straightHigh) { cat = 8; keys = [straightHigh]; }            // 同花顺
-  else if (groups[0][0] === 4) { cat = 7; keys = [groups[0][1], groups[1][1]]; } // 四条
-  else if (groups[0][0] === 3 && groups[1][0] === 2) { cat = 6; keys = [groups[0][1], groups[1][1]]; } // 葫芦
-  else if (flush) { cat = 5; keys = [...rs].reverse(); }                     // 同花
-  else if (straightHigh) { cat = 4; keys = [straightHigh]; }                 // 顺子
-  else if (groups[0][0] === 3) { cat = 3; keys = [groups[0][1], ...groups.slice(1).map((g) => g[1])]; } // 三条
-  else if (groups[0][0] === 2 && groups[1][0] === 2) {                       // 两对
-    cat = 2;
+  const cat = rules.categories;
+  let category, keys;
+  if (flush && straightHigh) { category = cat.straightFlush; keys = [straightHigh]; }
+  else if (groups[0][0] === 4) { category = cat.quads; keys = [groups[0][1], groups[1][1]]; }
+  else if (groups[0][0] === 3 && groups[1][0] === 2) { category = cat.fullHouse; keys = [groups[0][1], groups[1][1]]; }
+  else if (flush) { category = cat.flush; keys = [...rs].reverse(); }
+  else if (straightHigh) { category = cat.straight; keys = [straightHigh]; }
+  else if (groups[0][0] === 3) { category = cat.trips; keys = [groups[0][1], ...groups.slice(1).map((g) => g[1])]; }
+  else if (groups[0][0] === 2 && groups[1][0] === 2) {
+    category = cat.twoPair;
     const kicker = groups.find((g) => g[0] === 1);
     keys = [groups[0][1], groups[1][1], kicker ? kicker[1] : 0];
-  } else if (groups[0][0] === 2) {                                           // 一对
-    cat = 1;
+  } else if (groups[0][0] === 2) {
+    category = cat.onePair;
     keys = [groups[0][1], ...groups.slice(1).map((g) => g[1])];
-  } else { cat = 0; keys = [...rs].reverse(); }                              // 高牌
+  } else { category = cat.highCard; keys = [...rs].reverse(); }
 
-  const out = [cat, ...keys];
+  const out = [category, ...keys];
   while (out.length < 6) out.push(0);
   return out;
 }
@@ -133,34 +138,19 @@ const COMBOS_7_5 = [];
   for (let i = start; i < 7; i++) { picked.push(i); gen(i + 1, picked); picked.pop(); }
 })(0, []);
 
-function rankText(r) {
-  const R = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
-  return R[r] || String(r);
-}
-
-/** 把评分数组转成带关键点数的中文描述，如 "一对 3"、"两对 J 和 9" */
-function describeScore(score) {
-  switch (score[0]) {
-    case 8: return `同花顺（${rankText(score[1])} 高）`;
-    case 7: return `四条 ${rankText(score[1])}`;
-    case 6: return `葫芦（${rankText(score[1])} 带 ${rankText(score[2])}）`;
-    case 5: return `同花（${rankText(score[1])} 高）`;
-    case 4: return `顺子（${rankText(score[1])} 高）`;
-    case 3: return `三条 ${rankText(score[1])}`;
-    case 2: return `两对 ${rankText(score[1])} 和 ${rankText(score[2])}`;
-    case 1: return `一对 ${rankText(score[1])}`;
-    default: return `高牌 ${rankText(score[1])}`;
-  }
+/** 把评分数组转成带关键点数的中文描述，如 "一对 3"、"两对 J 和 9"；牌型名随模式取 */
+function describeScore(score, mode = 'classic') {
+  return pokerRules.handNameFor(mode, score[0])(score);
 }
 
 /** 评估 7 张牌的最佳 5 张，返回 { score, name, best5 } */
-function evaluate7(cards7) {
+function evaluate7(cards7, mode = 'classic') {
   let best = null;
   for (const combo of COMBOS_7_5) {
-    const s = score5(combo.map((i) => cards7[i]));
+    const s = score5(combo.map((i) => cards7[i]), mode);
     if (!best || cmpScore(s, best.score) > 0) best = { score: s, cards: combo.map((i) => cards7[i]) };
   }
-  return { score: best.score, name: describeScore(best.score), best5: best.cards };
+  return { score: best.score, name: describeScore(best.score, mode), best5: best.cards };
 }
 
 // ---------------- 房间管理 ----------------
@@ -431,7 +421,7 @@ function startHand(room) {
     bbSeat = nextSeat(room, sbSeat, isPlayable);
   }
 
-  room.deck = newDeck();
+  room.deck = newDeck(room.mode);
   for (let round = 0; round < 2; round++) {
     for (let i = 1; i <= n; i++) {
       const idx = (sbSeat + i) % n; // 从小盲开始顺时针发牌
@@ -749,7 +739,7 @@ function showdown(room) {
 
   const evals = {};
   for (const seat of aliveSeats) {
-    evals[seat] = evaluate7([...room.players[seat].hole, ...room.community]);
+    evals[seat] = evaluate7([...room.players[seat].hole, ...room.community], room.mode);
     addLog(room, `${room.players[seat].name} 摊牌 ${evals[seat].name}（${room.players[seat].hole.map(cardText).join('')}）`);
   }
 
@@ -1345,7 +1335,7 @@ io.on('connection', (socket) => {
     if(err||Object.keys(data).some(k=>k!=='payment'))return reply({ok:false,err:err||'支付参数无效'});
     const room=findRoomBySocket(socket.id),p=room&&room.players.find(p=>p&&!p.left&&p.socketId===socket.id);
     if(!p||p.name!==room.hostName)return reply({ok:false,err:'只有房主可以修改支付额'});
-    if(room.mode!=='squid')return reply({ok:false,err:'经典德州没有鱿鱼支付设置'});
+    if(room.mode!=='squid')return reply({ok:false,err:'当前玩法没有鱿鱼支付设置'});
     if(!['waiting','handover'].includes(room.stage))return reply({ok:false,err:'只能在等待或局间修改下轮支付额'});
     const s=squid.init(room);
     if(s.payment===data.payment)return reply({ok:true});
@@ -1358,7 +1348,7 @@ io.on('connection', (socket) => {
     if(!requireEmptyPayload(payload,reply))return;
     const room=findRoomBySocket(socket.id),p=room&&room.players.find(p=>p&&!p.left&&p.socketId===socket.id);
     if(!p||p.name!==room.hostName)return reply({ok:false,err:'只有房主可以取消本轮'});
-    if(room.mode!=='squid')return reply({ok:false,err:'经典德州没有鱿鱼轮次'});
+    if(room.mode!=='squid')return reply({ok:false,err:'当前玩法没有鱿鱼轮次'});
     if(!['waiting','handover'].includes(room.stage))return reply({ok:false,err:'请在局间取消本轮'});
     squid.cancel(room,'房主取消本轮');
     squid.check(room);
@@ -1911,7 +1901,7 @@ if (require.main === module) {
 // 供自动化测试使用
 module.exports = {
   server, io, rooms,
-  evaluate7, computePots, score5, newDeck, normalizeNickname, newToken,
+  evaluate7, computePots, score5, newDeck, describeScore, normalizeNickname, newToken,
   applyAction, canRaise, oddChipWinnerOrder, awardPot,
   __test: { showdown, consumeQueueAndAdvance },
 };
